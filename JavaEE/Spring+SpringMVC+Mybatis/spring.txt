@@ -1,0 +1,866 @@
+一、Spring
+	1. 概述
+		① Spring是一个开源框架
+		② Spring为简化企业级应用开发而生，使用Spring可以使简单的JavaBean实现以前只有EJB才能实现的功能
+		③ Spring是一个IOC（DI）和AOP容器框架
+	2. 具体描述
+		① 轻量级：Spring是非侵入性的，基于Spring开发的应用中的对象可以不依赖于Spring的API
+		② 依赖注入（DI--dependence injection、IOC）
+		③ 面向切面编程（AOP--aspect oriented propgramming）'
+		④ 容器：Spring是一个容器，因为它包含并且管理应用对象的生命周期
+		⑤ 框架：Spring实现了使用简单的组件配置组合成一个复杂的应用，在spring中可以使用XML和Java租借组合这些对象
+		⑥ 一站式：在IOC和AOP的基础上可以整合各种企业应用的开源框架和优秀的第三方类库（实际上Spring自身也提供展现层
+		的SpringMVC和持久层的Spring JDBC）
+	3. 安装spring tool suite
+		① Spring tool suite是一个eclipse插件，利用该插件可以更方便的在eclipse平台上开发基于Spring的应用
+		② 安装方法说明（springsource-tool-suite-3.4.0.RELEASE-e4.3.1-updatesite.zip）：
+			A. Help --> Install New Software...
+			B. Click Add... 
+			C. In dialog Add Site dialog, click Archive... 
+			D. Navigate to springsource-tool-suite-3.4.0.RELEASE-e4.3.1-updatesite.zip  and click  Open 
+			E. Clicking OK in the Add Site dialog will bring you back to the dialog 'Install' 
+			F. Select the xxx/Spring IDE that has appeared 
+			G. Click Next  and then Finish 
+			H. Approve the license 
+			I. Restart eclipse when that is asked
+	4. 搭建 Spring 开发环境
+		① 把以下 jar 包加入到工程的 classpath 下:
+			A. commons-logging-1.2.jar
+			B. spring-aop-4.3.22.RELEASE.jar
+			C. spring-beans-4.3.22.RELEASE.jar
+			D. spring-context-4.3.22.RELEASE.jar
+			E. spring-context-support-4.3.22.RELEASE.jar
+			F. spring-expression-4.3.22.RELEASE.jar
+		② Spring 的配置文件: 一个典型的 Spring 项目需要创建一个或多个 Bean 配置文件, 这些配置文件用于在 Spring IOC 
+		容器里配置 Bean. Bean 的配置文件可以放在 classpath 下, 也可以放在其它目录下.
+		③ 创建applicationContext.xml，该文件需要通过spring Bean Configuration File来创建
+		④ 注册bean: 
+			<bean id="user" class="com.li.spring.bean.User">
+				<property name="username" value="LiXL"></property>
+			</bean>
+		⑤ 创建Spring IOC 容器对象：ApplicationContext ac = new ClassPathXmlApplicationContext("applicationContext.xml");
+		⑥ 从IOC容器中获取Bean：User user = (User)ac.getBean("user");
+二、IOC & DI概述
+	1. 配置bean
+		① 配置形式：
+			A. 基于XML文件的方式
+				a. 在 xml 文件中通过 bean 节点来配置 bean
+				b. 	<bean id="user" class="com.li.spring.bean.User">
+						<property name="username" value="LiXL"></property>
+					</bean>
+				c. id：Bean 的名称
+					（1）在 IOC 容器中必须是唯一的
+					（2）若 id 没有指定，Spring 自动将权限定性类名作为 Bean 的名字
+					（3）id 可以指定多个名字，名字之间可用逗号、分号、或空格分隔
+			B. 基于注解的方式（基于注解配置 Bean；基于注解来装配 Bean 的属性）
+				a. 在 classpath 中扫描组件
+					(1) 组件扫描(component scanning):  Spring 能够从 classpath 下自动扫描, 侦测和实例化具有特定注解的组件. 
+					(2)特定组件包括:
+						@Component: 基本注解, 标识了一个受 Spring 管理的组件
+						@Respository: 标识持久层组件
+						@Service: 标识服务层(业务层)组件
+						@Controller: 标识表现层组件
+					(3) 对于扫描到的组件, Spring 有默认的命名策略: 使用非限定类名, 第一个字母小写. 也可以在注解中通过 value 属性值标识组件的名称
+					(4) 当在组件类上使用了特定的注解之后, 还需要在 Spring 的配置文件中声明 <context:component-scan> 
+						(a) base-package 属性指定一个需要扫描的基类包，Spring 容器将会扫描这个基类包里及其子包中的所有类. 当需要扫描多个包时, 可以使用逗号分隔.
+						(b) 如果仅希望扫描特定的类而非基包下的所有类，可使用 resource-pattern 属性过滤特定的类，示例：
+							<context:component-scan base-package="com.li.spring.mock"
+							resource-pattern="service/*.class"></context:component-scan>
+						(c) <context:include-filter> 子节点表示要包含的目标类, 使用该子节点需要在<context:component-scan>中添加属性use-default-filters="false"，实例
+							<context:component-scan base-package="com.li.spring.mock"
+								use-default-filters="false">
+								<context:include-filter type="annotation"
+									expression="org.springframework.stereotype.Controller" />
+							</context:component-scan>
+						(d) <context:exclude-filter> 子节点表示要排除在外的目标类，实例
+							<context:component-scan base-package="com.li.spring.mock">  
+								<context:exclude-filter type="annotation" expression="org.springframework.stereotype.Controller" />
+							</context:component-scan>
+						(e) <context:component-scan> 下可以拥有若干个 <context:include-filter> 和 <context:exclude-filter> 子节点
+					(5) <context:include-filter> 和 <context:exclude-filter> 子节点支持多种类型的过滤表达式：
+						(a) annotation: 对指定注解的全类名进行过滤
+						(b) assinable: 对指定类的全类名进行过滤，包括该类的继承类和实现类
+				b. 组件装配
+					(1) <context:component-scan> 元素还会自动注册 AutowiredAnnotationBeanPostProcessor 实例, 该实例可以自动装配具有 @Autowired 和 @Resource 、@Inject注解的属性.
+					(2) @Autowired 注解自动装配具有兼容类型的单个 Bean属性
+						(a) 构造器, 普通字段(即使是非 public), 一切具有参数的方法都可以应用@Authwired 注解
+						(b) 默认情况下, 所有使用 @Authwired 注解的属性都需要被设置. 当 Spring 找不到匹配的 Bean 装配属性时, 会抛出异常, 若某一属性允许不被设置, 可以设置 @Authwired 注解的 required 属性为 false
+						(c) 默认情况下, 当 IOC 容器里存在多个类型兼容的 Bean 时, 通过类型的自动装配将无法工作. 此时可以在 @Qualifier 注解里提供 Bean 的名称. Spring 允许对方法的入参标注 @Qualifiter 已指定注入 Bean 的名称
+						(d) @Authwired 注解也可以应用在数组类型的属性上, 此时 Spring 将会把所有匹配的 Bean 进行自动装配.
+						(e) @Authwired 注解也可以应用在集合属性上, 此时 Spring 读取该集合的类型信息, 然后自动装配所有与之兼容的 Bean. 
+						(f) @Authwired 注解用在 java.util.Map 上时, 若该 Map 的键值为 String, 那么 Spring 将自动装配与之 Map 值类型兼容的 Bean, 此时 Bean 的名称作为键值
+					(3) 使用 @Resource 或 @Inject 自动装配 Bean
+						(a) Spring 还支持 @Resource 和 @Inject 注解，这两个注解和 @Autowired 注解的功用类似
+						(b) @Resource 注解要求提供一个 Bean 名称的属性，若该属性为空，则自动采用标注处的变量或方法名作为 Bean 的名称
+						(c) @Inject 和 @Autowired 注解一样也是按类型匹配注入的 Bean， 但没有 reqired 属性
+						(d) 建议使用 @Autowired 注解
+
+		② Bean的配置方式：
+			A. 通过全类名（反射）
+			B. 通过工厂方法（静态工厂方法 & 实例工厂方法）
+				a. 静态工厂方法
+					(1) 调用静态工厂方法创建 Bean是将对象创建的过程封装到静态方法中. 当客户端需要对象时, 只需要简单地调用静态方法, 而不同关心创建对象的细节.
+					(2) 要声明通过静态方法创建的 Bean, 需要在 Bean 的 class 属性里指定拥有该工厂的方法的类, 同时在 factory-method 属性里指定工厂方法的名称. 最后, 使用 <constrctor-arg> 元素为该方法传递方法参数.
+					(3) <bean id="employee1" class="com.li.spring.bean.factory.StaticFatory"
+							factory-method="getEmployees">
+							<constructor-arg value="Li"></constructor-arg>
+						</bean>
+				b. 实例工厂方法
+					(1) 实例工厂方法: 将对象的创建过程封装到另外一个对象实例的方法里. 当客户端需要请求对象时, 只需要简单的调用该实例方法而不需要关心对象的创建细节.
+					(2) 要声明通过实例工厂方法创建的 Bean
+						(a) 在 bean 的 factory-bean 属性里指定拥有该工厂方法的 Bean
+						(b) 在 factory-method 属性里指定该工厂方法的名称
+						(c) 使用 construtor-arg 元素为工厂方法传递方法参数
+					(3) <bean id="instanceFactory" class="com.li.spring.bean.factory.InstanceFactory"></bean>
+						<bean id="employee2" factory-bean="instanceFactory"
+							factory-method="getEmployee">
+							<constructor-arg value="Ke"></constructor-arg>
+						</bean>
+			C. FactoryBean
+				a. 中有两种类型的 Bean, 一种是普通Bean, 另一种是工厂Bean, 即FactoryBean. 
+				b. 工厂 Bean 跟普通Bean不同, 其返回的对象不是指定类的一个实例, 其返回的是该工厂 Bean 的 getObject 方法所返回的对象 
+				c. 	<bean id="employee3" class="com.li.spring.bean.factory.MyFactoryBean">
+						<property name="empId" value="829"></property>
+						<property name="lastName" value="YuCX"></property>
+						<property name="salary" value="4000.0"></property>
+					</bean>
+		③ IOC 容器 BeanFactory & ApplicationContext 概述
+			A. Spring 容器：在 Spring IOC 容器读取 Bean 配置创建 Bean 实例之前, 必须对它进行实例化. 只有在容器实例化后, 才可以从 IOC 容器里获取 Bean 实例并使用.
+			B. Spring 提供了两种类型的 IOC 容器实现: BeanFactory和ApplicationContext
+				a. BeanFactory: IOC 容器的基本实现
+				b. ApplicationContext: 提供了更多的高级特性. 是 BeanFactory 的子接口.
+				c. BeanFactory 是 Spring 框架的基础设施，面向 Spring 本身；ApplicationContext 面向使用 Spring 框架的开发者，几乎所有的应用场合都直接使用 ApplicationContext 而非底层的 BeanFactory
+				d. 无论使用何种方式, 配置文件时相同的
+			C.  ApplicationContext
+				a. 主要实现类
+					（1）ClassPathXmlApplicationContext：从类路径下加载配置文件
+					（2）FileSystemXmlApplicationContext：从文件系统中加载配置文件
+				b. ConfigurableApplicationContext: 扩展于 ApplicationContext，新增加两个主要方法：refresh() 和 close()， 让 ApplicationContext 具有启动、刷新和关闭上下文的能力
+				c. ApplicationContext 在初始化上下文时就实例化所有单例的 Bean
+				d. WebApplicationContext 是专门为 WEB 应用而准备的，它允许从相对于 WEB 根目录的路径中完成初始化工作
+			D. 从 IOC 容器中获取 Bean：调用 ApplicationContext 的 getBean() 方法
+		④ 依赖注入的方式：
+			A. 属性注入
+				a. 属性注入即通过 setter 方法注入Bean 的属性值或依赖的对象
+				b. 属性注入使用 <property> 元素, 使用 name 属性指定 Bean 的属性名称，value 属性或 <value> 子节点指定属性值 
+				c. 属性注入是实际应用中最常用的注入方式
+				d.  <bean id="user" class="com.li.spring.bean.User">
+						<property name="username" value="LiXL"></property>
+					</bean>
+			B. 构造器注入
+				a. 通过构造方法注入Bean 的属性值或依赖的对象，它保证了 Bean 实例在实例化后就可以使用。
+				b. 构造器注入在 <constructor-arg> 元素里声明属性, <constructor-arg> 中没有 name 属性
+				c. 按索引匹配入参
+					<bean id="employees1" class="com.li.spring.bean.Employees">
+						<constructor-arg value="8" index="0"></constructor-arg>
+						<constructor-arg value="Yu" index="1"></constructor-arg>
+					</bean>
+				d. 按类型匹配入参
+					<bean id="employees2" class="com.li.spring.bean.Employees">
+						<constructor-arg value="29" type="java.lang.Integer"></constructor-arg>
+						<constructor-arg value="3000" type="java.lang.Double"></constructor-arg>
+					</bean>
+			C. 工厂方法注入（很少使用，不推荐）
+		⑤ 注入属性细节
+			A. 字面值
+				a. 字面值：可用字符串表示的值，可以通过 <value> 元素标签或 value 属性进行注入。
+				b. 基本数据类型及其封装类、String 等类型都可以采取字面值注入的方式
+				c. 若字面值中包含特殊字符，可以使用 <![CDATA[]]> 把字面值包裹起来。
+				d. <![CDATA[<com.sql.jdbc.driver>]]>
+			B. 引用其它 Bean
+				a. 组成应用程序的 Bean 经常需要相互协作以完成应用程序的功能. 要使 Bean 能够相互访问, 就必须在 Bean 配置文件中指定对 Bean 的引用
+				b. 在 Bean 的配置文件中, 可以通过 <ref> 元素或 ref  属性为 Bean 的属性或构造器参数指定对 Bean 的引用. 
+				c. 也可以在属性或构造器里包含 Bean 的声明, 这样的 Bean 称为内部 Bean
+				d. <ref bean="employees2"/> | <property name="departments" ref="departments"></property>
+			C. 内部 Bean
+				a. 当 Bean 实例仅仅给一个特定的属性使用时, 可以将其声明为内部 Bean. 内部 Bean 声明直接包含在 <property> 或 <constructor-arg> 元素里, 不需要设置任何 id 或 name 属性
+				b. 内部 Bean 不能使用在任何其他地方
+				c.  <bean id="department2" class="com.li.spring.bean.Department">
+						<constructor-arg value="11" type="int"></constructor-arg>
+						<constructor-arg value="IT" type="java.lang.String"></constructor-arg>
+						<constructor-arg type="com.li.spring.bean.Employees">
+							<bean class="com.li.spring.bean.Employees">
+								<constructor-arg value="22"></constructor-arg>
+								<constructor-arg value="Li"></constructor-arg>
+								<constructor-arg value="4000"></constructor-arg>
+							</bean>
+						</constructor-arg>
+					</bean>
+			D. 注入参数详解：null 值和级联属性
+				a. 可以使用专用的 <null/> 元素标签为 Bean 的字符串或其它对象类型的属性注入 null 值
+				b. 和 Struts、Hiberante 等框架一样，Spring 支持级联属性的配置。
+				c. <property name="dptName"><null/></property>
+				d. 级联属性的配置的前提是必须初始化该属性，如果该属性没有初始化，则不会默认初始化
+					<property name="employee" ref="employees1"></property>
+					<property name="employee.salary" value="4000"></property>
+			E. 集合属性
+				a. 在 Spring中可以通过一组内置的 xml 标签(例如: <list>, <set> 或 <map>) 来配置集合属性.
+				b. 配置 java.util.List 类型的属性, 需要指定 <list>  标签, 在标签里包含一些元素. 这些标签可以通过 <value> 指定简单的常量值, 通过 <ref> 指定对其他 Bean 的引用. 通过<bean> 指定内置 Bean 定义. 通过 <null/> 指定空元素. 甚至可以内嵌其他集合.
+				c. 数组的定义和 List 一样, 都使用 <list>
+				d. 配置 java.util.Set 需要使用 <set> 标签, 定义元素的方法与 List 一样.
+				e. 	<list>
+						<ref bean="department"/>
+						<ref bean="department1"/>
+						<ref bean="department2"/>
+					</list>
+				f.	<map>
+						<entry key="department" value-ref="department"></entry>
+						<entry key="department1" value-ref="department1"></entry>
+						<entry key="department2" value-ref="department2"></entry>
+					</map>
+			F. 使用 utility scheme 定义集合
+				a. 使用基本的集合标签定义集合时, 不能将集合作为独立的 Bean 定义, 导致其他 Bean 无法引用该集合, 所以无法在不同 Bean 之间共享集合.
+				b. 以使用 util schema 里的集合标签定义独立的集合 Bean. 需要注意的是, 必须在 <beans> 根元素里添加 util schema 定义
+				c. 	<util:list id="departments">
+						<ref bean="department"/>
+						<ref bean="department1"/>
+						<ref bean="department2"/>
+					</util:list>
+			H. 使用 p 命名空间
+				a. 为了简化 XML 文件的配置，越来越多的 XML 文件采用属性而非子元素配置信息。
+				b. Spring 从 2.5 版本开始引入了一个新的 p 命名空间，可以通过 <bean> 元素属性的方式配置 Bean 的属性。
+				c. 使用 p 命名空间后，基于 XML 的配置方式将进一步简化
+				d. <bean id="location3" class="com.li.spring.bean.Location" p:locationId="26" p:locationName="Ke" p:departments-ref="department"></bean>
+		⑥ 自动装配
+			A. XML 配置里的 Bean 自动装配
+				a. Spring IOC 容器可以自动装配 Bean. 需要做的仅仅是在 <bean> 的 autowire 属性里指定自动装配的模式
+				b. byType(根据类型自动装配): 若 IOC 容器中有多个与目标 Bean 类型一致的 Bean. 在这种情况下, Spring 将无法判定哪个 Bean 最合适该属性, 所以不能执行自动装配.
+				c. byName(根据名称自动装配): 必须将目标 Bean 的名称和属性名设置的完全相同.
+				d. constructor(通过构造器自动装配): 当 Bean 中存在多个构造器时, 此种自动装配方式将会很复杂. 不推荐使用
+				e. <bean id="location4" class="com.li.spring.bean.Location" p:locationId="26" p:locationName="Ke" autowire="byType"></bean>
+				f. <bean id="location4" class="com.li.spring.bean.Location" p:locationId="26" p:locationName="Ke" autowire="byName"></bean>
+			B. XML 配置里的 Bean 自动装配的缺点
+				a. 在 Bean 配置文件里设置 autowire 属性进行自动装配将会装配 Bean 的所有属性. 然而, 若只希望装配个别属性时, autowire 属性就不够灵活了. 
+				b. autowire 属性要么根据类型自动装配, 要么根据名称自动装配, 不能两者兼而有之.
+				c. 一般情况下，在实际的项目中很少使用自动装配功能，因为和自动装配功能所带来的好处比起来，明确清晰的配置文档更有说服力一些
+		⑦ bean 之间的关系：继承；依赖
+			A. 继承 Bean 配置
+				a. Spring 允许继承 bean 的配置, 被继承的 bean 称为父 bean. 继承这个父 Bean 的 Bean 称为子 Bean
+				b. 子 Bean 从父 Bean 中继承配置, 包括 Bean 的属性配置
+				c. 子 Bean 也可以覆盖从父 Bean 继承过来的配置
+				d. 父 Bean 可以作为配置模板, 也可以作为 Bean 实例. 若只想把父 Bean 作为模板, 可以设置 <bean> 的abstract 属性为 true, 这样 Spring 将不会实例化这个 Bean
+				e. 并不是 <bean> 元素里的所有属性都会被继承. 比如: autowire, abstract 等.
+				f. 也可以忽略父 Bean 的 class 属性, 让子 Bean 指定自己的类, 而共享相同的属性配置. 但此时 abstract 必须设为 true
+			B. 依赖 Bean 配置
+				a. Spring 允许用户通过 depends-on 属性设定 Bean 前置依赖的Bean，前置依赖的 Bean 会在本 Bean 实例化之前创建好
+				b. 如果前置依赖于多个 Bean，则可以通过逗号，空格或的方式配置 Bean 的名称
+		⑧ Bean 的作用域
+			A. 在 Spring 中, 可以在 <bean> 元素的 scope 属性里设置 Bean 的作用域. 
+			B. 默认情况下, Spring 只为每个在 IOC 容器里声明的 Bean 创建唯一一个实例, 整个 IOC 容器范围内都能共享该实例：所有后续的 getBean() 调用和 Bean 引用都将返回这个唯一的 Bean 实例.该作用域被称为 singleton, 它是所有 Bean 的默认作用域.
+			C. singleton: 在SpringIOC容器中仅存在一个Bean实例，Bean以单例的方式存在
+			D. prototype：每次调用getBean()时都会返回一个新的实例，并且使用getBean获取实例时，才会在IOC容器中创建该Bean
+			E. request：每次HTTP请求都会创建一个新的Bean，该作用域仅适用于WebApplicationContext环境
+			F. session：同一个HTTP Session共享一个Bean，不同的Http Session使用不同的Bean，该作用域仅适用于WebApplicationContext环境
+		⑨ 使用外部属性文件
+			A. 在配置文件里配置 Bean 时, 有时需要在 Bean 的配置里混入系统部署的细节信息(例如: 文件路径, 数据源配置信息等). 而这些部署细节实际上需要和 Bean 配置相分离
+			B. Spring 提供了一个 PropertyPlaceholderConfigurer 的 BeanFactory 后置处理器, 这个处理器允许用户将 Bean 配置的部分内容外移到属性文件中. 可以在 Bean 配置文件里使用形式为 ${var} 的变量, PropertyPlaceholderConfigurer 从属性文件里加载属性, 并使用这些属性来替换变量.
+			C. Spring 还允许在属性文件中使用 ${propName}，以实现属性之间的相互引用。
+			D. Spring 2.5 之后: 可通过 <context:property-placeholder> 元素简化:
+				a. <beans> 中添加 context Schema 定义
+				b. 在配置文件中加入如下配置: <context:property-placeholder location="classpath:jdbc.properties"/>
+				c. 使用 ${propName} 引入外部文件属性
+					<bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+						<property name="user" value="${jdbc.user}"></property>
+						<property name="password" value="${jdbc.password}"></property>
+						<property name="driverClass" value="${jdbc.driver}"></property>
+						<property name="jdbcUrl" value="${jdbc.url}"></property>
+					</bean>
+		⑩ SpEL
+			A. Spring表达式语言：SpEL
+				a. Spring 表达式语言（简称SpEL）：是一个支持运行时查询和操作对象图的强大的表达式语言。
+				b. 语法类似于 EL：SpEL 使用 #{…} 作为定界符，所有在大框号中的字符都将被认为是 SpEL
+				c. SpEL 为 bean 的属性进行动态赋值提供了便利
+				d. 通过 SpEL 可以实现：
+					(1) 通过 bean 的 id 对 bean 进行引用
+					(2) 调用方法以及引用对象中的属性
+					(3) 计算表达式的值
+					(4) 正则表达式的匹配
+			B. SpEL：字面量
+				a. 整数：<property name="count" value="#{5}"/>
+				b. 小数：<property name="frequency" value="#{89.7}"/>
+				c. 科学计数法：<property name="capacity" value="#{1e4}"/>
+				d. String可以使用单引号或者双引号作为字符串的定界符号：<property name=“name” value="#{'Chuck'}"/> 或 <property name='name' value='#{"Chuck"}'/>
+				e.  Boolean：<property name="enabled" value="#{false}"/>
+			C.  SpEL：引用 Bean、属性和方法
+				a. 引用其他对象：
+				b. 引用其他对象的属性
+				c. 调用其他方法，还可以链式操作
+			D. SpEL支持的运算符号
+				a. 算数运算符：+, -, *, /, %, ^：
+				b. 加号还可以用作字符串连接：
+				c. 比较运算符： <, >, ==, <=, >=, lt, gt, eq, le, ge
+				d. 逻辑运算符号： and, or, not, |
+				e. if-else 运算符：?: (ternary), ?: (Elvis)
+				f. 三目运算符
+				g. 正则表达式：matches
+			E. 引用 Bean、属性和方法
+				调用静态方法或静态属性：通过 T() 调用一个类的静态方法，它将返回一个 Class Object，然后再调用相应的方法或属性：
+		泛型依赖注入
+			Spring 4.x 中可以为子类注入子类对应的泛型类型的成员变量的引用
+	2. IOC 和 DI
+		① IOC（Inversion of Control）：其思想是反转资源获取的方向，传统的资源查找方式要求组件向容器发起请求查找资源，
+		作为回应，容器适时的返回资源，而应用了IOC之后，则是容器主动地将资源推送给它所管理的组件，组件所要做的仅是选择
+		一种禾寿司的方式来接受资源，这种行为也被称为查找的被动形式
+		② DI（ Dependency Injection）：IOC 的另一种表述方式：即组件以一些预先定义好的方式(例如: setter 方法)接受来自如容器的资源注入. 相对于 IOC 而言，这种表述更直接
+		③ IOC前生
+			A. 分离接口与实现
+			B. 采用工厂设计模式
+			C. 采用反转控制
+三、Spring AOP
+1. 为什么需要AOP
+	① AOP 前奏
+		A. 需求1-日志：在程序执行期间追踪正在发生的活动
+		B. 需求2-验证：希望计算器只能处理正数的运算
+	② 代码实现片段
+		public class ArithmeticCalculatorImpl implements ArithmeticCalculator {
+
+			@Override
+			public int add(int i, int j) {
+				//日志
+				//验证
+				return i + j;
+				//日志
+			}
+		}
+	③ 问题
+		A. 代码混乱：越来越多的非业务需求(日志和验证等)加入后, 原有的业务方法急剧膨胀.  每个方法在处理核心逻辑的同时还必须兼顾其他多个关注点. 
+		b. 代码分散: 以日志需求为例, 只是为了满足这个单一需求, 就不得不在多个模块（方法）里多次重复相同的日志代码. 如果日志需求发生变化, 必须修改所有模块.
+	④ 使用动态代理解决上述问题
+		代理设计模式的原理: 使用一个代理将对象包装起来, 然后用该代理对象取代原始对象. 任何对原始对象的调用都要通过代理. 代理对象决定是否以及何时将方法调用转到原始对象上.
+		// ArithmeticCalculatorLoggingProxy
+		public class ArithmeticCalculatorLoggingProxy {
+
+			private ArithmeticCalculator target;
+
+			public ArithmeticCalculatorLoggingProxy(ArithmeticCalculator target) {
+				this.target = target;
+			}
+
+			public ArithmeticCalculator getLoggingProxy() {
+				ArithmeticCalculator proxy = null;
+				ClassLoader loader = target.getClass().getClassLoader();
+				@SuppressWarnings("rawtypes")
+				Class[] interfaces = new Class[] { ArithmeticCalculator.class };
+				InvocationHandler h = new InvocationHandler() {
+
+					/**
+					 * proxy 正在返回的代理对象，一般在invoke方法中不使用该对象
+					 * method 正在执行的方法
+					 * args 执行方法时传入的参数
+					 */
+					@Override
+					public Object invoke(Object proxy, Method method, Object[] args)
+							throws Throwable {
+						String methodName = method.getName();
+						//日志
+						System.out.println("the method " + methodName +  " begin with " + Arrays.asList(args));
+						//业务体
+						Object result = method.invoke(target, args);
+						//日志
+						System.out.println("the method" + methodName +  "end with " + result);
+						return result;
+					}
+				};
+				proxy = (ArithmeticCalculator) Proxy.newProxyInstance(loader, interfaces, h);
+				return proxy;
+			}
+		}
+		// 测试代码
+		ArithmeticCalculator target = new ArithmeticCalculatorImpl();
+		ArithmeticCalculator proxy = new ArithmeticCalculatorLoggingProxy(
+				target).getLoggingProxy();
+		System.out.println(proxy.add(1, 2));
+	2. AOP 简介
+		① AOP(Aspect-Oriented Programming, 面向切面编程): 是一种新的方法论, 是对传统 OOP(Object-Oriented Programming, 面向对象编程) 的补充.
+		② AOP 的主要编程对象是切面(aspect), 而切面模块化横切关注点.
+		③ 在应用 AOP 编程时, 仍然需要定义公共功能, 但可以明确的定义这个功能在哪里, 以什么方式应用, 并且不必修改受影响的类. 这样一来横切关注点就被模块化到特殊的对象(切面)里.
+		④ AOP 的好处:
+			A. 每个事物逻辑位于一个位置, 代码不分散, 便于维护和升级
+			B. 业务模块更简洁, 只包含核心业务代码.
+	3. AOP 术语
+		A. 切面(Aspect):  横切关注点(跨越应用程序多个模块的功能)被模块化的特殊对象
+		B. 通知(Advice):  切面必须要完成的工作
+		C. 目标(Target): 被通知的对象
+		D. 代理(Proxy): 向目标对象应用通知之后创建的对象
+		E. 连接点（Joinpoint）：程序执行的某个特定位置：如类某个方法调用前、调用后、方法抛出异常后等。连接点由两个信息确定：方法表示的程序执行点；相对点表示的方位。例如 ArithmethicCalculator#add() 方法执行前的连接点，执行点为 ArithmethicCalculator#add()； 方位为该方法执行前的位置
+		F. 切点（pointcut）：每个类都拥有多个连接点：例如 ArithmethicCalculator 的所有方法实际上都是连接点，即连接点是程序类中客观存在的事务。AOP 通过切点定位到特定的连接点。类比：连接点相当于数据库中的记录，切点相当于查询条件。切点和连接点不是一对一的关系，一个切点匹配多个连接点，切点通过 org.springframework.aop.Pointcut 接口进行描述，它使用类和方法作为连接点的查询条件。
+	4. Spring  AOP
+		① AspectJ：Java 社区里最完整最流行的 AOP 框架.
+		② 在 Spring2.0 以上版本中, 可以使用基于 AspectJ 注解或基于 XML 配置的 AOP
+		③ 在 Spring 中启用 AspectJ 注解支持
+			A. 要在 Spring 应用中使用 AspectJ 注解, 必须在 classpath 下包含 AspectJ 类库: 
+				a. aopalliance.jar
+				b. aspectj.weaver.jar 
+				c. spring-aspects.jar
+				d. spring-aop.jar
+			B. 将 aop Schema 添加到 <beans> 根元素中, 即添加aop命名空间
+			C. 要在 Spring IOC 容器中启用 AspectJ 注解支持, 只要在 Bean 配置文件中定义一个空的 XML 元素 <aop:aspectj-autoproxy>
+				<aop:aspectj-autoproxy></aop:aspectj-autoproxy>
+			D. 当 Spring IOC 容器侦测到 Bean 配置文件中的 <aop:aspectj-autoproxy> 元素时, 会自动为与 AspectJ 切面匹配的 Bean 创建代理.
+		④ 用 AspectJ 注解声明切面
+			A. 要在 Spring 中声明 AspectJ 切面, 只需要在 IOC 容器中将切面声明为 Bean 实例. 当在 Spring IOC 容器中初始化 AspectJ 切面之后, Spring IOC 容器就会为那些与 AspectJ 切面相匹配的 Bean 创建代理.
+			B. 在 AspectJ 注解中, 切面只是一个带有 @Aspect 注解的 Java 类. 
+			C. 通知是标注有某种注解的简单的 Java 方法.
+			D. AspectJ 支持 5 种类型的通知注解: 
+				a  Before: 前置通知, 在方法执行之前执行	
+					(1) 前置通知:在方法执行之前执行的通知
+					(2) 前置通知使用 @Before 注解, 并将切入点表达式的值作为注解值.
+					(3) 前置通知，是在方法被执行前执行的通知，因此前置通知无法获取方法执行的返回值
+					(4) 实例
+						@Before(value="execution(* com.li.spring.mock.aop.ArithmeticCalculatorImpl.add(..))")//c
+						public void before(JoinPoint joinPoint) { // d
+							String methodName = joinPoint.getSignature().getName();
+							List<Object> args =  Arrays.asList(joinPoint.getArgs());
+							System.out.println("the method " + methodName +  " begin with " + args);
+						}
+				b. @After: 后置通知, 在方法执行之后执行 
+					(1) 后置通知是在连接点完成之后执行的, 即连接点返回结果或者抛出异常的时候, 下面的后置通知记录了方法的终止.
+					(2) 后置通知，是在方法异常处理后执行的通知，由于无法确定方法是否正常执行，因此无法获取方法执行的返回值
+					(3) 一个切面可以包括一个或者多个通知.
+					(4) 实例
+						@After(value="execution(* com.li.spring.mock.aop.ArithmeticCalculatorImpl.*(..))")
+						public void after(JoinPoint joinPoint) {
+							String methodName = joinPoint.getSignature().getName();
+							System.out.println("the method " + methodName +  " end");
+						}
+				c. @AfterRunning: 返回通知, 在方法返回结果之后执行
+					(1) 无论连接点是正常返回还是抛出异常, 后置通知都会执行. 如果只想在连接点返回的时候记录日志, 应使用返回通知代替后置通知.
+					(2) 返回通知，是在方法被执行时执行的通知，因此可以获取方法正常执行时的返回值
+					(3) 在返回通知中访问连接点的返回值
+						a. 在返回通知中, 只要将 returning 属性添加到 @AfterReturning 注解中, 就可以访问连接点的返回值. 该属性的值即为用来传入返回值的参数名称. 
+						b. 必须在通知方法的签名中添加一个同名参数. 在运行时, Spring AOP 会通过这个参数传递返回值.
+						c. 原始的切点表达式需要出现在 pointcut 属性中
+					(4) 实例
+						@AfterReturning(value = "execution(* com.li.spring.mock.aop.ArithmeticCalculatorImpl.*(..))", returning="result")
+						public void afterReturning(JoinPoint joinPoint, Object result) {
+							String methodName = joinPoint.getSignature().getName();
+							System.out.println("the method " + methodName + " end with " + result);
+						}
+					d. @AfterThrowing: 异常通知, 在方法抛出异常之后
+						(1) 只在连接点抛出异常时才执行异常通知
+						(2) 将 throwing 属性添加到 @AfterThrowing 注解中, 也可以访问连接点抛出的异常. Throwable 是所有错误和异常类的超类. 所以在异常通知方法可以捕获到任何错误和异常
+						(3) 如果只对某种特殊的异常类型感兴趣, 可以将参数声明为其他异常的参数类型. 然后通知就只在抛出这个类型及其子类的异常时才被执行
+						(4) 异常通知，该通知是在异常处理的catch中被执行的通知，因此只有在通知出异常并且被捕获时才会执行，并且可以返回异常对象。
+						(5) 实例
+							@AfterThrowing(value = "execution(* com.li.spring.mock.aop.ArithmeticCalculatorImpl.*(..))", throwing="e")
+							public void afterThrowing(JoinPoint joinPoint, Exception e) {
+								String methodName = joinPoint.getSignature().getName();
+								System.out.println("the method " + methodName + " throw with " + e);
+							}
+					e. @Around: 环绕通知, 围绕着方法执行
+						(1) 环绕通知是所有通知类型中功能最为强大的, 能够全面地控制连接点. 甚至可以控制是否执行连接点.
+						(2) 对于环绕通知来说, 连接点的参数类型必须是 ProceedingJoinPoint . 它是 JoinPoint 的子接口, 允许控制何时执行, 是否执行连接点.
+						(3) 在环绕通知中需要明确调用 ProceedingJoinPoint 的 proceed() 方法来执行被代理的方法. 如果忘记这样做就会导致通知被执行了, 但目标方法没有被执行.
+						(4) 注意: 环绕通知的方法需要返回目标方法执行之后的结果, 即调用 joinPoint.proceed(); 的返回值, 否则会出现空指针异常
+						(5) 实例
+						/**
+						 * @param
+						 * @return
+						 * @Descripton 环绕通知，类似于动态代理的全过程, 因此该方法有返回值
+						 * @Descripton 环绕通知， 需要携带ProceedingJoinPoint类型的参数，ProceedingJoinPoint对象参数可以决定是否执行目标方法
+						 * @Descripton 环绕通知， ProceedingJoinPoint对象若不调用proceed()方法，目标切点执行的是动态代理的方法。
+						 * @Descripton 环绕通知，必须有返回值，并且返回值为目标方法的返回值
+						 * @date 2019年8月28日 上午9:25:41
+						 */
+						@Around(value = "execution(* com.li.spring.mock.aop.ArithmeticCalculatorImpl.*(..))")
+						public Object around(ProceedingJoinPoint joinPoint) {
+							Object result = null;
+							String methodName = joinPoint.getSignature().getName();
+							List<Object> args = Arrays.asList(joinPoint.getArgs());
+							try {
+								//前置通知
+								System.out.println("the mothod " + methodName + " begin with " + args);
+								//执行目标方法
+								result = joinPoint.proceed();
+								//返回通知
+								System.out.println("the mothod " + methodName + " end with " + result);
+							} catch (Throwable e) {
+								//异常通知
+								System.out.println("the mothod " + methodName + " occurs exception " + e);
+								throw new RuntimeException(e);
+							}
+							//后置通知
+							System.out.println("the mothod " + methodName + " end");
+							return result;
+						}
+			E. 实例：
+				@Component //a
+				@Aspect //b
+				public class LoggingAspect {
+
+					@Before(value="execution(* com.li.spring.mock.aop.ArithmeticCalculatorImpl.add(..))")//c
+					public void before(JoinPoint joinPoint) { // d
+						String methodName = joinPoint.getSignature().getName();
+						List<Object> args =  Arrays.asList(joinPoint.getArgs());
+						System.out.println("the method " + methodName +  " begin with " + args);
+					}
+				}
+				a. 在 IOC 容器中将切面声明为 Bean 实例
+				b. 标识这个类是一个切面
+				c. 标识这个方法是个前置通知,  切点表达式表示执行 ArithmeticCalculator 
+				接口的 add() 方法. * 代表匹配任意修饰符及任意返回值, 参数列表中的 .. 
+				匹配任意数量的参数
+					(1) 利用方法签名编写 AspectJ 切入点表达式
+						最典型的切入点表达式时根据方法的签名来匹配各种方法:
+						(a) execution * com.atguigu.spring.ArithmeticCalculator.*(..): 匹配 ArithmeticCalculator 中声明的所有方法,第一个 * 代表任意修饰符及任意返回值. 第二个 * 代表任意方法. .. 匹配任意数量的参数. 若目标类与接口与该切面在同一个包中, 可以省略包名.
+						(b) execution public * ArithmeticCalculator.*(..): 匹配 ArithmeticCalculator 接口的所有公有方法.
+						(c) execution public double ArithmeticCalculator.*(..): 匹配 ArithmeticCalculator 中返回 double 类型数值的方法
+						(d) execution public double ArithmeticCalculator.*(double, ..): 匹配第一个参数为 double 类型的方法, .. 匹配任意数量任意类型的参数
+						(e) execution public double ArithmeticCalculator.*(double, double): 匹配参数类型为 double, double 类型的方法.
+						(f) execution * *.*(..): 切点表达式表示执行任意类的任意方法. 第一个 * 代表匹配任意修饰符及任意返回值,  第二个 * 代表任意类的对象,第三个 * 代表任意方法, 参数列表中的 ..  匹配任意数量的参数
+					(2) 合并切入点表达式
+						在 AspectJ 中, 切入点表达式可以通过操作符 &&, ||, ! 结合起来
+						execution(* com.li.spring.mock.aop.ArithmeticCalculatorImpl.add(..)) || execution(* com.li.spring.mock.aop.ArithmeticCalculatorImpl.sub(..))
+				d. 让通知访问当前连接点的细节
+					可以在通知方法中声明一个类型为 JoinPoint 的参数. 然后就能访问链接细节. 如方法名称和参数值. 
+					String methodName = joinPoint.getSignature().getName();
+					List<Object> args =  Arrays.asList(joinPoint.getArgs());
+		⑤ 指定切面的优先级
+			A. 在同一个连接点上应用不止一个切面时, 除非明确指定, 否则它们的优先级是不确定的.
+			B. 切面的优先级可以通过实现 Ordered 接口或利用 @Order 注解指定.
+			C. 实现 Ordered 接口, getOrder() 方法的返回值越小, 优先级越高.
+			D. 若使用 @Order 注解, 序号出现在注解中
+				a. @Order(2)
+				b. @Order(1)
+		⑥ 重用切入点定义
+			A. 在编写 AspectJ 切面时, 可以直接在通知注解中书写切入点表达式. 但同一个切点表达式可能会在多个通知中重复出现.
+			B. 在 AspectJ 切面中, 可以通过 @Pointcut 注解将一个切入点声明成简单的方法. 切入点的方法体通常是空的, 因为将切入点定义与应用程序逻辑混在一起是不合理的. 
+			C. 切入点方法的访问控制符同时也控制着这个切入点的可见性. 如果切入点要在多个切面中共用, 最好将它们集中在一个公共的类中. 在这种情况下, 它们必须被声明为 public. 在引入这个切入点时, 必须将类名也包括在内. 如果类没有与这个切面放在同一个包中, 还必须包含包名.
+			D. 其他通知可以通过方法名称引入该切入点.
+			E. 实例：
+				/**
+				 * 定义一个方法，用于声明切点表达式，一般，该方法不需要执行任何语句
+				 * 使用 @Pointcut 定义切点表达式
+				 * 其他通知只需要调用方法名来引用切点表达式
+				 * @param
+				 * @return
+				 * @Descripton
+				 * @date 2019年8月28日 上午9:52:06
+				 */
+				@Pointcut(value = "execution(* com.li.spring.mock.aop.ArithmeticCalculatorImpl.*(..))")
+				public void declarePointExpresstion() {}
+		
+				//@Before(value="com.li.spring.mock.aop.LoggingAspect.declarePointExpresstion()")，//其他包需要类引用
+				@Before(value="declarePointExpresstion()")
+				public void before(JoinPoint joinPoint) {
+					String methodName = joinPoint.getSignature().getName();
+					List<Object> args = Arrays.asList(joinPoint.getArgs());
+					System.out.println("the method " + methodName + " begin with " + args);
+				}
+		⑦ 用基于 XML 的配置声明切面
+			A. 除了使用 AspectJ 注解声明切面, Spring 也支持在 Bean 配置文件中声明切面. 这种声明是通过 aop schema 中的 XML 元素完成的.
+			B. 正常情况下, 基于注解的声明要优先于基于 XML 的声明. 通过 AspectJ 注解, 切面可以与 AspectJ 兼容, 而基于 XML 的配置则是 Spring 专有的. 由于 AspectJ 得到越来越多的 AOP 框架支持, 所以以注解风格编写的切面将会有更多重用的机会.
+			C. 基于 XML ---- 声明切面
+				a. 当使用 XML 声明切面时, 需要在 <beans> 根元素中导入 aop 命名空间
+				b. 在 Bean 配置文件中, 所有的 Spring AOP 配置都必须定义在 <aop:config> 元素内部. 对于每个切面而言, 都要创建一个 <aop:aspect> 元素来为具体的切面实现引用后端 Bean 实例. 
+				c. 切面 Bean 必须有一个标示符, 供 <aop:aspect> 元素引用
+				d. <aop:aspect>声明切面时可以使用order属性指定切面的优先级
+			D. 基于 XML ---- 声明切入点
+				a. 切入点使用 <aop:pointcut> 元素声明
+				b. 切入点必须定义在 <aop:aspect> 元素下, 或者直接定义在 <aop:config> 元素下.
+				c. 定义在 <aop:aspect> 元素下: 只对当前切面有效
+				d. 定义在 <aop:config> 元素下: 对所有切面都有效
+				e. 基于 XML 的 AOP 配置不允许在切入点表达式中用名称引用其他切入点. 
+			E.  基于 XML ---- 声明通知
+				a. 在 aop Schema 中, 每种通知类型都对应一个特定的 XML 元素. 
+				b. 通知元素需要使用 <pointcut-ref> 来引用切入点, 或用 <pointcut> 直接嵌入切入点表达式.  method 属性指定切面类中通知方法的名称.
+			F. 实例
+				<!-- 配置AOP -->
+				<aop:config>
+					<!-- 配置切点表达式 -->
+					<aop:pointcut
+						expression="execution(* com.li.spring.mock.aop.xml.ArithmeticCalculator.*(..))"
+						id="pointcut" />
+					<!-- 配置切面及通知 -->
+					<aop:aspect order="1" ref="loggingAspect1">
+						<aop:before method="beforeMethod" pointcut-ref="pointcut"/>
+						<aop:after method="afterMethod" pointcut-ref="pointcut"/>
+						<aop:after-returning method="afterReturning" pointcut-ref="pointcut" returning="result"/>
+						<aop:after-throwing method="afterThrowing" pointcut-ref="pointcut" throwing="e"/>
+					</aop:aspect>
+					<aop:aspect order="0" ref="validationAspect1">
+						<aop:before method="validation" pointcut-ref="pointcut"/>
+					</aop:aspect>
+				</aop:config>
+四、Spring 对 JDBC 的支持
+	1. JdbcTemplate 简介
+		① 为了使 JDBC 更加易于使用, Spring 在 JDBC API 上定义了一个抽象层, 以此建立一个 JDBC 存取框架.
+		② 作为 Spring JDBC 框架的核心, JDBC 模板的设计目的是为不同类型的 JDBC 操作提供模板方法. 每个模板方法都能控制整个过程, 并允许覆盖过程中的特定任务. 通过这种方式, 可以在尽可能保留灵活性的情况下, 将数据库存取的工作量降到最低.
+		③ Spring 对 JDBC 的支持需要引入如下的包
+			A. spring-jdbc-4.3.22.RELEASE.jar
+			B. spring-tx-4.3.22.RELEASE.jar
+		④ 在spring容器中配置JdbcTemplate，需要传入DataSource数据源
+			<bean id="jdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate">
+				<property name="dataSource" ref="dataSource"></property>
+			</bean>
+	2. JdbcTemplate 的使用
+		① 使用 JdbcTemplate 更新数据库
+			A. update（更新）：
+				a. 支持insert、update、delete等更新操作
+				b. API：update(String sql, Object... args)
+				c. 实例：
+				String sql = "INSERT INTO customer VALUES(?, ?, ?)";
+				jdbcTemplate.update(sql, "10001", "LiXL", 200);
+			B. beachUpdate（批量更新）
+				a. 可以同时插入一批数据
+				b. API: batchUpdate(String sql, List<Object[]> batchArgs)
+				c. 参数：Object数组组成的list
+				d. 实例：
+				String sql = "INSERT INTO customer VALUES(?, ?, ?)";
+				List<Object[]> batchArgs = new ArrayList<>();
+				batchArgs.add(new Object[] { "10002", "LiXL", 200 });
+				batchArgs.add(new Object[] { "10003", "LiXL", 200 });
+				batchArgs.add(new Object[] { "10004", "LiXL", 200 });
+				batchArgs.add(new Object[] { "10005", "LiXL", 200 });
+				jdbcTemplate.batchUpdate(sql, batchArgs);
+		② 使用 JdbcTemplate 查询数据库
+			A. queryForObject（查询单行）
+				a. 获取一条记录
+				b. 参数：需要传入RowMapper<>接口的实现类BeanPropertyRowMapper<>对象，
+						 该对象需要传入一个获取数据对应的类作为泛型，并提供一个对应类的类类型作为参数
+				c. API: queryForObject(String sql, RowMapper<Customer> rowMapper, Object... args)
+				d. 实例
+				String sql = "SELECT customer_id customerId, customer_name customerName, balance FROM customer WHERE customer_id = ?";
+				RowMapper<Customer> rowMapper = new BeanPropertyRowMapper<>(Customer.class);
+				Customer customer = jdbcTemplate.queryForObject(sql, rowMapper, "10001");
+			B. query（查询多行）
+				a. 获取一组数据
+				b. 参数：需要传入RowMapper<>接口的实现类BeanPropertyRowMapper<>对象
+				c. API：query(String sql, RowMapper<Customer> rowMapper Object... args)
+				d. 实例：
+				String sql = "SELECT customer_id customerId, customer_name customerName, balance FROM customer";
+				RowMapper<Customer> rowMapper = new BeanPropertyRowMapper<>(Customer.class);
+				List<Customer> customers = jdbcTemplate.query(sql, rowMapper);
+			C. queryForObject（单值查询）
+				a. 获取单个值
+				b. 参数：获取某个值对应的类类型
+				c. API: queryForObject(String sql, Class<Long> requiredType)
+				d. 实例：
+				String sql = "SELECT COUNT(*) FROM customer";
+				long count = jdbcTemplate.queryForObject(sql, Long.class);
+		③ 简化 JDBC 模板查询
+			A. 每次使用都创建一个 JdbcTemplate 的新实例, 这种做法效率很低下.
+			B. JdbcTemplate 类被设计成为线程安全的, 所以可以再 IOC 容器中声明它的单个实例, 并将这个实例注入到所有的 DAO 实例中.
+			C. JdbcTemplate 也利用了 Java 1.5 的特定(自动装箱, 泛型, 可变长度等)来简化开发
+			D. Spring JDBC 框架还提供了一个 JdbcDaoSupport 类来简化 DAO 实现. 该类声明了 jdbcTemplate 属性, 它可以从 IOC 容器中注入, 或者自动从数据源中创建.
+			E. 举例：
+				a. 方式一：
+				
+				public class CustomerDao {
+					@Autowired
+					private JdbcTemplate jdbcTemplate;
+				}
+				b. 方式二：
+				/**
+				由于JdbcDaoSupport需要手动传入一个JdbcTemplate或者DataSource，而JdbcDaoSupport中
+				setDataSource(dataSource)声明为不可重写，因此需要重新定义一个setDataSource2方法将数据源传入JdbcDaoSupport中
+				因此可以直接调用getJdbcTemplate()获取JdbcTemplate对象
+				*/
+				@Repository
+				public class TestJdbcDaoSupport extends JdbcDaoSupport {
+
+					@Autowired
+					public void setDataSource2(DataSource dataSource){
+						setDataSource(dataSource);
+					}
+					
+					public JdbcTemplate getJdbcTemplate() {
+						return getJdbcTemplate();
+					}
+				}
+		④ 在 JDBC 模板中使用具名参数
+			A. 在经典的 JDBC 用法中, SQL 参数是用占位符 ? 表示,并且受到位置的限制. 定位参数的问题在于, 一旦参数的顺序发生变化, 就必须改变参数绑定. 
+			B. 在 Spring JDBC 框架中, 绑定 SQL 参数的另一种选择是使用具名参数(named parameter). 
+			C. 具名参数: SQL 按名称(以冒号开头)而不是按位置进行指定. 具名参数更易于维护, 也提升了可读性. 具名参数由框架类在运行时用占位符取代
+			D. 具名参数只在 NamedParameterJdbcTemplate 中得到支持
+				a. 在 SQL 语句中使用具名参数时, 可以在一个 Map 中提供参数值, 参数名为键
+				b. 也可以使用 SqlParameterSource 参数
+				c. 批量更新时可以提供 Map 或 SqlParameterSource 的数组
+				d. 配置NamedParameterJdbcTemplate，因为带有参数的构造器，需要手动传入DataSource
+				<bean id="namedParameterJdbcTemplate" 
+					class="org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate">
+					<constructor-arg name="dataSource" ref="dataSource"></constructor-arg>
+				</bean>
+			E. 在 SQL 语句中使用具名参数时, 可以在一个 Map 中提供参数值, 占位符名为键
+			F. 也可以使用 SqlParameterSource接口的实现类BeanPropertySqlParameterSource 作为参数，该参数要求传入一个需要保存数据的类作为参数，并且具名参数需要使用该类的属性
+			H. 批量更新时可以提供 Map 或 SqlParameterSource 的数组
+			I. 实例
+				a. 使用SqlParameterSource作为参数
+					String sql = "INSERT INTO book_store(book_name, price) VALUES(:bookName, :price)";
+					BookStore bookStore = new BookStore();
+					bookStore.setBookName("C++语言程序设计");
+					bookStore.setPrice(150);
+					
+					SqlParameterSource parameterSource = new BeanPropertySqlParameterSource(bookStore);
+					namedParameterJdbcTemplate.update(sql, parameterSource);
+				b. 使用Map作为参数
+					String sql = "INSERT INTO book_store VALUES(:bookId, :bookName, :price)";
+					Map<String, Object> paramMap = new HashMap<String, Object>();
+					paramMap.put("bookId", 20001);
+					paramMap.put("bookName", "Java语言程序设计");
+					paramMap.put("price", 100);
+					namedParameterJdbcTemplate.update(sql, paramMap);
+	4. Spring中的事务管理
+		① 事务简介
+			A. 事务管理是企业级应用程序开发中必不可少的技术,  用来确保数据的完整性和一致性. 
+			B. 事务就是一系列的动作, 它们被当做一个单独的工作单元. 这些动作要么全部完成, 要么全部不起作用
+			C. 事务的四个关键属性(ACID)
+				a. 原子性(atomicity): 事务是一个原子操作, 由一系列动作组成. 事务的原子性确保动作要么全部完成要么完全不起作用.
+				b. 一致性(consistency): 一旦所有事务动作完成, 事务就被提交. 数据和资源就处于一种满足业务规则的一致性状态中.
+				c. 隔离性(isolation): 可能有许多事务会同时处理相同的数据, 因此每个事物都应该与其他事务隔离开来, 防止数据损坏.
+				d. 持久性(durability): 一旦事务完成, 无论发生什么系统错误, 它的结果都不应该受到影响. 通常情况下, 事务的结果被写到持久化存储器中
+		② 事务管理的问题
+			A. 必须为不同的方法重写类似的样板代码：比如：
+				a. 修改默认自动提交的行为
+				b. 事务提交
+				c. 异常回滚
+			B. 一段代码是特定于 JDBC 的, 一旦选择类其它数据库存取技术, 代码需要作出相应的修改
+		③ Spring 中的事务管理
+			A. 作为企业级应用程序框架, Spring 在不同的事务管理 API 之上定义了一个抽象层. 而应用程序开发人员不必了解底层的事务管理 API, 就可以使用 Spring 的事务管理机制.
+			B. Spring 既支持编程式事务管理, 也支持声明式的事务管理. 
+			C. 编程式事务管理: 将事务管理代码嵌入到业务方法中来控制事务的提交和回滚. 在编程式管理事务时, 必须在每个事务操作中包含额外的事务管理代码. 
+			D. 声明式事务管理: 大多数情况下比编程式事务管理更好用. 它将事务管理代码从业务方法中分离出来, 以声明的方式来实现事务管理. 事务管理作为一种横切关注点, 可以通过 AOP 方法模块化. Spring 通过 Spring AOP 框架支持声明式事务管理.
+		④ Spring 中的事务管理器
+			A. Spring 从不同的事务管理 API 中抽象了一整套的事务机制. 开发人员不必了解底层的事务 API, 就可以利用这些事务机制. 有了这些事务机制, 事务管理代码就能独立于特定的事务技术了.
+			B. Spring 的核心事务管理抽象是，它为事务管理封装了一组独立于技术的方法. 无论使用 Spring 的哪种事务管理策略(编程式或声明式), 事务管理器都是必须的.
+		⑤ Spring 中的事务管理器的不同实现
+			A. 在应用程序中只需要处理一个数据源, 而且通过 JDBC 存取
+			B. 在 JavaEE 应用服务器上用 JTA(Java Transaction API) 进行事务管理
+			C. 用 Hibernate 框架存取数据库
+			D. 事务管理器以普通的 Bean 形式声明在 Spring IOC 容器中
+		⑥ 用 @Transactional 注解声明式地管理事务
+			A. 除了在带有切入点, 通知和增强器的 Bean 配置文件中声明事务外, Spring 还允许简单地用 @Transactional 注解来标注事务方法. 
+			B. 为了将方法定义为支持事务处理的, 可以为方法添加 @Transactional 注解. 根据 Spring AOP 基于代理机制, 只能标注公有方法.
+			C. 可以在方法或者类级别上添加 @Transactional 注解. 当把这个注解应用到类上时, 这个类中的所有公共方法都会被定义成支持事务处理的. 
+			D. 在 Bean 配置文件中只需要启用 <tx:annotation-driven> 元素, 并为之指定事务管理器就可以了. 
+			E. 如果事务处理器的名称是 transactionManager, 就可以在<tx:annotation-driven> 元素中省略 transaction-manager 属性. 这个元素会自动检测该名称的事务处理器.
+			F. 举例：
+				<!-- a. 配置事务管理器，该事务管理的是JDBC，因此需要传入一个数据源 -->
+				<bean id="transactionManager" 
+					class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+					<property name="dataSource" ref="dataSource"></property>
+				</bean>
+				b. 导入事务tx的命名空间
+				<!-- c. 开启事务注解，如果事务管理器的名称为transactionManager，则transaction-manager属性可以省略 -->
+				<tx:annotation-driven transaction-manager="transactionManager"/>
+				d. 在方法上添加@Transactional注解，声明该方法为事务
+				@Transactional//添加事务注解
+				@Override
+				public void buyBook() {
+		⑦ 用事务通知声明式地管理事务
+			A. 事务通知声明式
+				a. 事务管理是一种横切关注点
+				b. 为了在 Spring 2.x 中启用声明式事务管理, 可以通过 tx Schema 中定义的 <tx:advice> 元素声明事务通知, 为此必须事先将这个 Schema 定义添加到 <beans> 根元素中去.
+				c. 声明了事务通知后, 就需要将它与切入点关联起来. 由于事务通知是在 <aop:config> 元素外部声明的, 所以它无法直接与切入点产生关联. 所以必须在 <aop:config> 元素中声明一个增强器通知与切入点关联起来.
+				d. 由于 Spring AOP 是基于代理的方法, 所以只能增强公共方法. 因此, 只有公有方法才能通过 Spring AOP 进行事务管理.
+			B. 用事务通知声明式地管理事务示例代码		
+				<!-- a. 配置事务管理器 -->
+				<bean id="transactionManager" 
+					class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+					<property name="dataSource" ref="dataSource"></property>
+				</bean>
+				
+				<!-- b. 配置事务属性 -->
+				<tx:advice id="txAdvice" transaction-manager="transactionManager">
+					<tx:attributes>
+						<!-- 根据方法名指定事务的属性 -->
+						<tx:method name="buyBook" propagation="REQUIRES_NEW"/>
+						<tx:method name="*"/>
+					</tx:attributes>
+				</tx:advice>
+				
+				<!-- c. 配置事务切入点，以及把事务切入点和事务关联起来 -->
+				<aop:config>
+					<!-- d. 配置事务切点表达式 -->
+					<aop:pointcut expression="execution(* com.li.spring.mock.transation.service.*.*(..))" 
+					id="txPointcut"/>
+					<!-- e. 将切点与事务属性结合起来 -->
+					<aop:advisor advice-ref="txAdvice" pointcut-ref="txPointcut"/>
+				</aop:config>
+		⑧ 事务传播属性
+			A. 当事务方法被另一个事务方法调用时, 必须指定事务应该如何传播. 例如: 方法可能继续在现有事务中运行, 也可能开启一个新事务, 并在自己的事务中运行.
+			B. 事务的传播行为可以由传播属性指定. Spring 定义了 7  种类传播行为.
+				a. REQUIRED: 如果有事务在运行，当前的方法就在这个事务内运行，否则，就启动一个新的事务，并在自己的事务内运行
+				b. REQUIRED_NEW: 当前方法必须启动新的事务，并在它自己的事务内运行，如果有事务正在运行，应该将它挂起
+				c. SUPPORTS: 如果有事务正在运行，当前方法就在这个事务内运行，否则它可以不允许在事务中。
+				d. NOT_SUPPORTED: 当前的方法不应该运行在事务中，如果有运行事务，将它挂起
+				e. MANDATORY: 当前方法必须运行在事务内部，如果没有正在运行的事务，就抛出异常
+				f. NEVER: 当前方法不应该运行在事务中，如果有正在运行的事务，则抛出异常
+				g. NESTED: 如果有事务在运行，当前的方法就应该在这个事务的嵌套事务内部运行，否则，就启动一个新的事务，并在它自己的事务内运行
+				h. 一般最常用的是REQUIRED、REQUIRED_NEW事务传播行为
+			C. 事务传播属性可以在 @Transactional 注解的 propagation 属性中定义
+			D. 举例：
+				@Transactional(propagation=Propagation.REQUIRES_NEW)
+				public void buyBook(String bookName, String customerId)
+		⑨ 并发事务所导致的问题
+			A. 当同一个应用程序或者不同应用程序中的多个事务在同一个数据集上并发执行时, 可能会出现许多意外的问题
+			B.  并发事务所导致的问题可以分为下面三种类型:
+				a. 脏读: 对于两个事物 T1, T2, T1  读取了已经被 T2 更新但 还没有被提交的字段. 之后, 若 T2 回滚, T1读取的内容就是临时且无效的.
+				b. 不可重复读:对于两个事物 T1, T2, T1  读取了一个字段, 然后 T2 更新了该字段. 之后, T1再次读取同一个字段, 值就不同了.
+				c. 幻读:对于两个事物 T1, T2, T1  从一个表中读取了一个字段, 然后 T2 在该表中插入了一些新的行. 之后, 如果 T1 再次读取同一个表, 就会多出几行.
+			C. 事务的隔离级别
+				a. 从理论上来说, 事务应该彼此完全隔离, 以避免并发事务所导致的问题. 然而, 那样会对性能产生极大的影响, 因为事务必须按顺序运行. 
+				b. 在实际开发中, 为了提升性能, 事务会以较低的隔离级别运行.
+				c. 事务的隔离级别可以通过隔离事务属性指定
+			D. Spring 支持的事务隔离级别
+				a. 隔离级别：
+					(1) DEFAULT: 使用底层数据库的默认隔离级别，对于大多数数据库来说，默认隔离级别都是READ_COMMITED
+					(2) READ_UNCOMMITTED: 允许事务读取未被其他事务提交的变更，脏读、不可重复读和幻读都会出现
+					(3) READ_COMMITED: 只允许事务读取已经被其他事务提交的变更，可以避免脏读，但不可重复读和幻读问题仍然可能会出现
+					(4) REPEATABLE_READ: 确保事务可以多次从一个字段中读取相同的值，在这个事务持续期间，禁止其他事务对这个事务进行变更，
+					可避免脏读和不可重复读，但幻读问题仍然存在
+					(5) SERIALIZBLE: 确保事务可以从一个表中读取相同的行，在这个事务持续期间，禁止其他事务对该表执行插入，更新和删除操作，
+					所有并发性问题都可以避免，但是性能十分低下
+				b. 事务的隔离级别要得到底层数据库引擎的支持, 而不是应用程序或者框架的支持
+				c. Oracle 支持的 2 种事务隔离级别：READ_COMMITED , SERIALIZABLE
+				d. Mysql 支持 4 中事务隔离级别.
+			E. 设置隔离事务属性
+				a. 用 @Transactional 注解声明式地管理事务时可以在 @Transactional 的 isolation 属性中设置隔离级别，最常用的取值为READ_COMMITTED.
+				b. 举例
+				@Transactional(isolation=Isolation.READ_COMMITTED)
+				public void buyBook(String bookName, String customerId)
+		⑩ 设置回滚事务属性
+			A. 默认情况下只有未检查异常(RuntimeException和Error类型的异常)会导致事务回滚. 而受检查异常不会
+			B. 事务的回滚规则可以通过 @Transactional 注解的 rollbackFor 和 noRollbackFor 属性来定义. 这两个属性被声明为 Class[] 类型的, 因此可以为这两个属性指定多个异常类.
+				a. rollbackFor:  遇到时必须进行回滚
+				b. noRollbackFor: 一组异常类，遇到时必须不回滚
+			C. 默认情况下，Spring的声明式事务对所有运行时的异常进行回滚，也可以通过对应的属性进行设置，通常取默认值即可
+			D. 举例：
+			@Transactional(rollbackFor = LackOfBalanceExecption.class, noRollbackFor = LackOfBookException.class)
+			public void buyBook(String bookName, String customerId)
+		①①超时和只读属性
+			A. 由于事务可以在行和表上获得锁,  因此长事务会占用资源, 并对整体性能产生影响. 
+			B. 如果一个事物只读取数据但不做修改, 数据库引擎可以对这个事务进行优化.
+			C. 超时事务属性: 事务在强制回滚之前可以保持多久. 这样可以防止长期运行的事务占用资源.
+			D. 只读事务属性: 表示这个事务只读取数据但不更新数据, 这样可以帮助数据库引擎优化事务.
+			E. 设置超时和只读事务属性
+				a. 超时和只读属性可以在 @Transactional 注解中定义.超时属性以秒为单位来计算.
+				b. 如果一个事务设置只读且进行更新操作或者事务超时，则运行时会抛出异常且强制回滚
+				c. 举例：
+				@Transactional(readOnly=false, timeout=3)
+				public void buyBook(String bookName, String customerId)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+			
+		
+				

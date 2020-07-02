@@ -1,0 +1,41 @@
+一、Hello Struts2
+	1. Struts2概述
+		①Struts2是一个用来开发MVC应用程序的框架，它提供了Web应用程序开发过程的一些常见问题的解决方案：
+			A. 对于来自用户输入数据进行合法性验证
+			B. 统一的布局
+			C. 国际化和本地化
+			D. 支持Ajax
+			E. 表单的重复提交
+			F. 文件的上传下载
+		②Struts2 Vs Struts1
+			A. 在体系结构方面更加优秀
+				a. 类更少，更高效：在Struts2中无需使用“ActionForm”来封装请求参数
+				b. 扩展更容易：Struts2通过拦截器完成框架的大部分工作，在Struts2中插入一个拦截器对象相当简便易行
+			B. 更容易测试
+				即使不使用浏览器也可以对基于Struts2的应用进行测试
+		③从Struts1升级到Struts2
+			A. Struts2从本质上讲已经不是Struts1扩展而来的，说它是一个换了品牌标签的WebWork更合适
+			B. 从Struts1升级到Struts2
+				a. Struts1里使用ActionServlet作为控制器；Struts2使用了一个过滤器作为控制器
+				b. Struts1中每个HTML表单都对应一个ActionForm实例；Struts2中，HTML表单将被直接映射到一个POJO
+				c. Struts1的验证逻辑编写在ActionForm中；Struts2中的验证逻辑编写在Action中
+				d. Struts1中，Action类必须继承org.apache.struts.action,Action类；Struts2中任何一个POJO都可以是一个Action类
+				e. Struts2在页面里面使用OGNL来显示各种对象模型，可以不再使用EL和JSTL
+		④下载Struts2
+			A. 打开浏览器输入：http://struts.apache.org/
+			B. 点击超链接“Download”，打开下载页面
+			C. 选择struts-2.5.20-all.zip下载
+	2. Struts2的Hello World
+		①搭建Struts2的环境
+			A. 加入jar包：复制D:\Program Files\OpenSource\Struts2\struts-2.5.20\apps\struts2-rest-showcase\WEB-INF\lib
+			下的所有jar包到当前web应用的lib目录下
+			B. 在web.xml中配置Struts2：复制D:\Program Files\OpenSource\Struts2\struts-2.5.20\apps\struts2-rest-showcase\WEB-INF
+			下的web.xml文件的过滤器配置到当前web应用的web.xml文件中
+			C. 在当前web应用的classpath在添加Struts2的配置文件struts.xml：复制D:\Program Files\OpenSource\Struts2\struts-2.5.20\apps\
+			struts2-rest-showcase\WEB-INF\classes\struts.xml到当前web应用的src目录下
+		② 添加DTD约束
+			A. 复制struts.xml配置文件中的http://struts.apache.org/dtds/struts-2.5.dtd
+			B. 打开eclipse->点击window->preferences->选择XML->点击XML Catalog->点add
+			在key中输入http://struts.apache.org/dtds/struts-2.5.dtd，在key type中选择URI
+			点击File System，在D:\Program Files\OpenSource\Struts2\struts-2.5.20\src\core\src\main\resources目录下找到与key中版本相对应的.dtd
+			OK即完成，struts.xml中同时按住alt+/,如出现提示即添加DTD成功

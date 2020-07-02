@@ -1,0 +1,879 @@
+十二、Gateway新一代网关
+	1. 概念简介
+		① 官网：
+			A. 上一代Zuul 1.x：https://github.com/Netflix/zuul/wiki
+			B. 当前gateway：https://cloud.spring.io/spring-cloud-static/spring-cloud-gateway/2.2.1.RELEASE/reference/html/
+		② 核心概念：
+			A. Cloud全家桶中有个很重要的组件就是网关，在1.x版本中都是采用Zuul网关，但在2.x版本中，Zuul的升级一直跳票，Spring Cloud最后自己研发了一个网关替代Zuul。
+			B. Spring Cloud Gateway，是原Zuul的1.x版的替代
+			C. Gateway是在Spring生态系统之上投建的API网关，基于Spring 5，Spring Boot 2和Project Reactor等技术。
+			D. Gateway旨在提供一种简单而有效的方式来对API进行路由，以及提供一些强大的过滤器功能，例如：熔断、限流、重试等。
+			E. Spring Cloud Gateway作为Spring Cloud生态系统中的网关，目标是替代Zuul，在Spring Cloud 2.0以上的版本中，没有对新版本的Zuul 2.0以上最新高性能版本进行集成，
+			仍然还是使用的Zuul 1.x非Reator模式的老版本。而为了提升网关性能，SpringCloud Gateway是基于WebFlux框架实现的，而WebFlux框架底层则使用了高性能的Reactor模式的
+			通信框架Netty。
+			F. Spring Cloud Gateway的目标是提供统一的路由方式且基于Filter链的方式提供了网关基本功能，例如：安全，监控/指标，和限流
+			G. 总结：SpringCloud Gateway使用的Webflux中的reactor-netty响应时编程组件，底层使用了Netty通讯框架
+		③ 作用：
+			A. 反向代理
+			B. 鉴权
+			C. 流量控制
+			D. 熔断
+			E. 日志监控
+		④ 微服务架构网关在哪里
+			-------------------------------------------------------------------
+			|			------------		---------		------------	|
+			| 外部请求	| 手持终端 |		| Html5 |		| Open接口 |	|
+			|			------------		---------		------------	|
+			|				 |					|				  |			|
+			|				 |------------------|-----------------|			|
+			|									↓							|
+			|							   ------------						|
+			| 负载均衡（Nginx）			   | 负载均衡 |						|
+			|							   ------------						|
+			|									|							|
+			|					----------------|----------------			|
+			|					↓								↓			|
+			|				--------						--------		|
+			| 网关			| 网关 |						| 网关 |		|
+			|				--------						--------		|
+			|					|---------------|---------------|			|
+			|					|---------------|---------------|			|
+			|					↓				↓				↓			|
+			|				-----------		-----------		-----------		|
+			| 微服务		| 微服务A |		| 微服务B |		| 微服务C |		|
+			|				-----------		-----------		-----------		|
+			-----------------------------------------------------------------
+		⑤ Zuul 1.x和Gateway的比较
+			A. 为什么选择Gateway
+				a. Netflix对于2.x迟迟不发布
+					(1) 一方面因为Zuul 1.x已经进入了维护阶段，而且Gateway与SpringCloud团队研发的，值得信赖。并且很多功能Zuul都没有，用起来也非常简单便捷
+					(2) Gateway是基于异步非阻塞模型上进行开发的，性能方面不需要担心。虽然Netflix早就发布了新的Zuul 2.x，但Spring Cloud貌似没有整合计划。
+					而且Netflix相关证件都宣布进入维护期，不知前景如何。
+					(3) 多方面综合考虑Gateway是很理想的网关选择。
+				b. SpringCloud Gateway具有如下特性
+					(1) 基于Spring 5，Project Reactor和Spring Boot2.0进行构建
+					(2) 动态路由，能够匹配任何请求属性
+					(3) 可以对路由指定Predicate（断言）和Filter（过滤器）
+					(4) 继承Hystrix的断路器功能
+					(5) 继承Spring Cloud服务发现功能
+					(6) 易于编写的Predicate（断言）和Filter（过滤器）
+					(7) 请求限流功能
+					(8) 支持路径重写
+				c. SpringCloud Gateway与Zuul的区别，在Spring Cloud Finchley正式版之前，Spring Cloud推荐的网关是Netflix提供的Zuul
+					(1) Zuul 1.x是一个基于阻塞I/O的API Gateway
+					(2) Zuul 1.x基于Servlet 2.5使用阻塞架构，它支持长连接（如webSocket）Zuul的设计模式和Nginx较像，每次I/O操作都是从工作
+					线程中选择一个执行，请求线程被阻塞到工作线程完成，但是差别是Nginx用C++实现，而Zuul用Java实现，而JVM本身会有第一次加载较
+					慢的情况，使得Zuul的性能相对较差
+					(3) Zuul 2.x理念更先进，想基于Netty非阻塞和支持长连接，但SpringCloud目前还没有整合。Zuul 2.x的性能较Zuul 1.x有较大提升。在
+					性能方面，根据官方提供的基准测试，Spring Cloud Gateway的RPS（每秒请求数）是Zuul的1.6倍。
+					(4) Spring Cloud Gateway建立在Spring 5，Project Reactor 和 Spring Boot2.0之上，使用费=非阻塞API
+					(5) Spring Cloud Gateway还支持WebSocket，并且与Spring的紧密集成拥有更好的开发体验。
+			B. Zuul 1.x模型
+				a. Spring Cloud 中所集成的Zuul版本，采用的是Tomcat容器，使用的是传统的Servlet IO处理模式
+				b. Servlet的生命周期由Servlet container进行生命周期管理
+					(1) container启动时构造Servlet对象并调用Servlet.init()进行初始化；
+					(2) container运行时接受请求，并为每个请求分配一个线程（一般从线程池中获取空闲线程）然后调用service()。
+					(3) container关闭时调用Servlet.destory()销毁Servlet。
+												   ---------------------							   -------------
+						--------------------	   |				   | ----------------------------> |   init()  |
+						| client request 1 | ----> | 				   |	   ------------			   -------------
+						--------------------	   |				   | ----> | Thread A | ----|	   |		   |
+												   |				   |  	   ------------		|	   |		   |
+						--------------------	   |				   |	   ------------		|	   |		   |
+						| client request 2 | ----> | Servlet Container | ----> | Thread B | ----|----> | service() | Servlet
+						--------------------	   |				   |	   ------------		|	   |		   |
+												   |				   |	   ------------		|	   |		   |
+						--------------------	   |				   | ----> | Thread C | ----|	   |		   |
+						| client request 2 | ----> |				   |	   ------------			   -------------
+						--------------------       |				   |-----------------------------> | destory() |
+												   ---------------------							   -------------
+				c. 上述模式的缺点：
+					(1) servlet 是一个简单的网络I/O模型，当请求进入Servlet container时，Servlet container就会为其绑定一个线程，在并发不高的场景下这种模型是适用的，
+					但是一旦高并发（比如：用JMeter压测），线程数量就会上涨，而线程资源代价是昂贵的（上线文切换，内存消耗大）严重影响请求的处理时间，在一些简单业务
+					场景下，不希望为每个request分配一个线程，只需要1个或几个线程就能应对极大并发请求，这种业务场景下Servlet模型没有优势。
+					(2) 所以Zuul 1.x 是基于Servlet之上的一个阻塞式处理模型，即spring实现了处理所有request请求的一个Servlet（DispatcherServlet）并由该Servlet阻塞处理
+					请求，所有SpringCloud Zuul无法摆脱Servlet模型的弊端
+			C. Gateway模型
+				a. WebFlux官网：https://docs.spring.io/spring/docs/current/spring-framework-reference/web-reactive.html#spring-webflux
+				b. 说明
+					(1) 传统的Web框架，比如说：struts2，springmvc等都是基于Servlet API与Servlet容器基础之上运行的
+					(2) 但是，在Servlet 3.1之后有了异步非阻塞的支持，而WebFlux是一个典型的非阻塞异步的框架，它的核心是基于Reactor的相关API实现的。相对于传统的web框架
+					来说，它可以运行在诸如Netty，Undertow及支持Servlet 3.1的容器上。非阻塞式+函数式编程（Spring5必须使用java8）
+					(3) Spring WebFlux是Spring 5.0引入的新的响应式框架，区别于Spring MVC，它不需要依赖Servlet API，它是完全异步非阻塞的，并且基于Reactor来实现响应式规范
+	2. 三大核心概念
+		① Route（路由）：构建网关的基本模块，它由ID，目标URI，一系列断言和过滤器组成，如果断言为true则匹配该路由
+		② Predicate（断言）：参考Java8的java.util.function.Predicate，开发人员可以匹配HTTP请求中的所有内容（请求头或者请求参数），如果请求与断言相匹配则进行路由
+		③ Filter（过滤）：指的是Spring框架中GatewayFilter的实例，使用过滤器，可以在请求被路由前或者之后对请求进行修改。
+		④ 总体：web请求，通过一些匹配条件，定位到真正的服务节点，并在这个转发过程的前后，进行一些精细化控制，Predicate就是我们的匹配条件，而filter，就可以理解为一个无所
+		不能的拦截器，有了这两个元素，再加上目标URI，就可以实现一个具体的路由了
+	3. Gateway工作流程
+		① 官网总结
+			A. 客户端向Spring Cloud Gateway发出请求，然后在Gateway Handler Mappering中找到请求相匹配的路由，将其发送到Gateway Web Handler
+			B. Handler再通过指定的过滤器链来将请求发送到我们实际的服务业务逻辑，然后返回。过滤器之间用虚线分开是因为过滤器可能会在发送代理请求之前（pre）或之后（post）执行业务逻辑。
+			C. Filter在“pre”类型的过滤器可以做参数校验、权限检验、流量控制、日志输入、协议装换等，在“post”类型的过滤器中可以做响应内容、响应头的修改，日志的输出，流量监控等有着非常
+			重要的作用。
+								------------------------------------------------------------------------------------------------------------
+								|	Spring Cloud Gateway												 ----------		  ----------	   | 	  ---------------------
+								|																  |----> | Filter | ----> | Filter | -----------> |				      |
+		-----------------		| ---------------------------		 -----------------------	  |	     ----------		  ----------	   |      |				      |
+		| Gateway Clien | <---> | | Gateway Handler Mapping | <----> | Gateway Web Handler | ---- |.................................	   |      | Proxied Service   |
+		-----------------		| ---------------------------		 -----------------------	  |	     ----------		  ----------	   |      |				      |
+								|																  <----- | Filter | <---- | Filter | <-----|----- |				      |
+								|																	     ----------		  ----------	   |      ---------------------
+								-------------------------------------------------------------------------------------------------------------
+		② 核心逻辑：路由转发+执行过滤器链
+	4. 入门配置
+		① 新建Module：cloud-gateway-gateway9527
+		② 改POM
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-starter-gateway</artifactId>
+			</dependency>
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+			</dependency>
+		③ 写YML
+			server:
+			  port: 9527
+
+			spring:
+			  application:
+				name: cloud-gateway
+
+			eureka:
+			  instance:
+				hostname: cloud-gateway-service
+			  client:
+				register-with-eureka: true
+				fetch-registry: true
+				service-url:
+				  defaultZone: http://eureka7001.com:7001/eureka
+		④ 主启动类
+		⑤ 9527网关路由映射
+			A. cloud-provider-payment8001的controller访问地址：/payment/get/{id} 和 /payment/lb
+			B. 目前不想暴露8001端口，希望在8001外面套一层9527
+		⑥ YML新增网关配置
+			spring:
+			  cloud:
+				gateway:
+				  routes:
+					- id: payment_route1          # 路由ID，没有固定规划但要求唯一，建议配合服务名
+					  uri: http://localhost:8001  # 匹配后提供服务的路由地址
+					  predicates:
+						- Path=/payment/get/**    # 断言，路径相匹配的进行路由
+
+					- id: payment_route1
+					  uri: http://localhost:8001
+					  predicates:
+						- Path=/payment/lb/**
+		
+		⑦ 测试：
+			A. 启动7001
+			B. 启动8001
+			C. 启动9527网关，9527服务网关启动时出现以下异常
+				a. 异常信息：Spring MVC found on classpath, which is incompatible with Spring Cloud Gateway at this time. Please remove spring-boot-starter-web dependency.
+				b. 原因是：Spring Cloud Gateway使用的Spring WebFlux是Spring 5.0引入的新的响应式框架，区别于Spring MVC，它不需要依赖Servlet API
+				c. 解决方法是将spring-boot-starter-web和spring-boot-starter-actuator依赖去掉
+			D. 访问说明：
+				a. 添加网关前：http://localhost:8001/payment/get/1
+				b. 添加网关后：http://localhost:9527/payment/get/1
+		⑧ 使用硬编码方式配置路由规则——代码中注入RouteLocator的Bean
+			@Configuration
+			public class GatewayConfig {
+
+				@Bean
+				public RouteLocator customerRouteLocator(RouteLocatorBuilder routeLocatorBuilder) {
+					RouteLocatorBuilder.Builder routes = routeLocatorBuilder.routes();
+					// https://news.baidu.com/guonei
+					routes.route("payment_route3", r -> r.path("/guonei")
+							.uri("https://news.baidu.com/guonei")).build();
+					routes.route("payment_route4", r -> r.path("/guoji")
+							.uri("https://news.baidu.com/guoji")).build();
+					return routes.build();
+				}
+			}
+			通过浏览器访问http://localhost:9527/guoji会转发到https://news.baidu.com/guoji地址
+	5. 通过微服务名实现动态路由
+		① 默认情况下Gateway会根据注册中心注册的服务列表，以注册中心上微服务名为路径创建动员路由进行转发，从而实现动态路由的功能
+		② 主启动：一个Eureka7001和两个服务提供者8001/8002
+		③ POM，需要引入spring-cloud-starter-netflix-eureka-client依赖，以达到在注册中心获取服务名称的实例
+		④ YML
+			A. 需要注意的是uri协议为lb，表示启用Gateway的负载均衡功能
+			B. lb://serviceName 是Spring Cloud Gateway在微服务中自动为我们创建的负载均衡URI
+			C. YML配置修改
+				spring:
+				  application:
+					name: cloud-gateway
+				  cloud:
+					gateway:
+					  discovery:
+						locator:
+						  enabled: true              		# 开启从注册中心动态创建路由的功能，利用微服务名进行路由
+					  routes:
+						- id: payment_route1          		# 路由ID，没有固定规划但要求唯一，建议配合服务名
+						  # uri: http://localhost:8001  	# 匹配后提供服务的路由地址
+						  uri: lb://CLOUD-PAYMENT-SERVICE 	# 匹配后提供服务的路由地址
+						  predicates:
+							- Path=/payment/get/**    		# 断言，路径相匹配的进行路由
+
+						- id: payment_route2
+						  # uri: http://localhost:8001
+						  uri: lb://CLOUD-PAYMENT-SERVICE
+						  predicates:
+							- Path=/payment/lb/**
+			D. 访问http://localhost:9527/payment/lb，成功通过访问微服务的名称动态路由到对应的地址，并实现负载均衡
+	6. Predicate的使用
+		① Predicate的概念：类似于SQL语句中WHERE条件的AND，精确匹配路由地址
+		② Route Predicate Factories
+			A. Spring Cloud Gateway将路由匹配作为Spring WebFlux HandlerMapping基础架构的一部分
+			B. Spring Cloud Gateway 包括许多内置的Route Predicate过程。所有这些Predicate都与HTTP请求的不同属性匹配，多个Route Predicate工厂可以进行组合
+			C. Spring Cloud Gateway 创建Route对象时，使用RoutePredicateFactory创建Predicate对象，Predicate对象可以赋值给Route，Spring Cloud Gateway包含许多
+			内置的Route Predicate Factories
+			D. 所有这些谓词都匹配HTTP请求的不同属性。多种谓词工厂可以组合，并通过逻辑AND
+		③ 常见的Route Predicate
+			A. After Route Predicate
+				a. 表示在什么时间之后，
+				b. 时间类型为：java.time.ZonedDateTime;
+				c. YML配置：
+					predicates:
+					  - Path=/payment/get/**          # 断言，路径相匹配的进行路由
+					  - After=2020-06-10T18:35:53.592+08:00[Asia/Shanghai]
+			B. Before Route Predicate
+			C. Between Route Predicate
+			D. Cookie Route Predicate
+				a. 不带cookie访问：curl http://localhost:9527/payment/lb，访问404
+				b. 带cookie访问： curl http://localhost:9527/payment/lb --cookie "uname=LiXL"
+				c. YML，Cookie Route Predicate需要两个参数，Cookie name和正则表达式，路由规则会通过获取对应的Cookie name值和正则表达式进行匹配，如果匹配成功则
+				执行路由，如果没有匹配上则不执行
+				d. YML配置：
+					predicates:
+					  - Path=/payment/lb/**
+					  - Cookie=uname,LiXL
+			E. Header Route Predicate
+				a. 带请求头X-Request-Id的访问：curl http://localhost:9527/payment/lb -H "X-Request-Id:1"
+				b. YML配置：
+					predicates:
+					  - Path=/payment/lb/**
+					  - Header=X-Request-Id,\d+
+			F. Host Route Predicate
+				a. 带请求头Host（主机名）的访问：curl http://localhost:9527/payment/lb -H "Host:li.com"
+				b. YML配置：
+					predicates:
+					  - Path=/payment/lb/**
+					  - Host=**.li.com
+			G. Method Route Predicate：规定的请求方式
+			H. Path Route Predicate：规定请求地址
+			I. Query Route Predicate：带查询的请求，需要两个参数，参数名和正则表达式
+			J. 小总结：Predicate是为了实现一组匹配规则，让请求过来找到对应的Route进行处理
+	7. Filter的使用
+		① Gateway Filter Factories：路由过滤器可用于修改进入的HTTP请求和返回的HTTP响应，路由过滤器只能指定路由进行使用，Spring Cloud Gateway内置了很多过滤器，
+		他们都由GatewayFilter的工厂类产生。
+		② Sprig Cloud Gateway的Filter
+			A. 生命周期：pre（请求之前）和post（请求之后）
+			B. 种类：GatewayFilter（单一）和GlobalFilter（全局）
+		③ 自定义过滤器，定义全局GlobalFilter
+			A. 两个主要接口：GlobalFilter，Ordered
+			B. 作用：全局日志记录和统一网关鉴权
+			C. 案例代码：
+			D. 启动：不需要修改YML，直接启动
+			E. 测试：
+				a. 错误测试：http://localhost:9527/payment/lb
+				b. 正确启动：http://localhost:9527/payment/lb?uname=li
+十三、Spring Cloud Config分布式配置中心
+	1. 概述：
+		① 分布式系统面临的——配置问题：微服务意味着要将单体应用中的业务拆分成一个个子服务，每个服务的粒度相对较小，因此系统中会出现大量的服务。由于么个服务都需要进行必要的配置信息
+		才能够运行，所以一套集中式的、动态的配置管理设施是必不可少的。Spring Cloud提供了ConfigServer来解决这个问题。
+		② Spring Cloud Config：
+			A. Spring Cloud Config为微服务提供集中化的外部配置支持，配置服务器为各个不同微服务应用的所有环境提供了一个中心化的外部配置。
+			------------	------------	------------
+			| Client A |	| Client B |	| Client C |
+			------------	------------	------------
+				 |				 |				  |
+				 |---------------|----------------|
+								 ↓
+						 -----------------		 ------------------------		----------		 -------------------------
+						 | Config Server | ----> | Local Git repository | ----> | 云服务 | ----> | Remote Git Repository |
+						 -----------------		 ------------------------		----------		 -------------------------
+			B. Spring Cloud Config 分成服务端和客户端两部分
+				a. 服务端：服务端也称为分布式配置中心，它是一个独立的微服务应用，用来连接配置服务器并为客户端提供获取配置信息，加密/解密信息等访问接口
+				b. 客户端：客户端则是通过指定的配置中心来管理应用资源，以及与业务相关的配置内容，并在启动的时候从配置中心获取和加载配置信息，这样就有助于对环境配置
+				进行版本管理，并且可以通过git客户端工具来方便管理和访问配置内容
+		③ 作用：
+			A. 集中管理配置文件
+			B. 不同环境使用不同配置，动态化的配置更新，分环境部署比如dev/prod/beta/test/release
+			C. 运行期间动态调整配置，不再需要在每个服务部署的机器上编写配置文件，服务会想配置中心统一拉取配置自己的信息
+			D. 当配置发生变动时，服务不需要重启即可感知到配置的变化并应用新的配置
+			E. 将配置信息以Rest接口的形式暴露
+		④ 与GitHub的整合配置：由于Spring Cloud Config默认使用Git开存储配置文件（也有其他方式，比如支持SVN和本地文件），但最推荐的还是Git，而且使用的是HTTP/HTTPS访问的形式
+		⑤ 官网：https://cloud.spring.io/spring-cloud-static/spring-cloud-config/2.2.1.RELEASE/reference/html/
+	2. Config服务端配置与测试
+		① 使用Git开存储配置文件步骤
+			A. 在GitHub中新建一个名为springcloud-config的新Repository
+			B. 由上一步获得刚新建的Git地址：https://github.com/LiXL2648/springcloud-config.git
+			C. 在本地新建本地库springcloud-config
+				a. 打开Git命令行窗口，进入到D:\WorkSpace\Git&GitHub\SpringCloud2020
+				b. 新建本地库springcloud-config并初始化：mkdir springcloud-config，git init
+				c. 新建config-dev.yml，config-test.yml和config-prod.yml不同环境的配置文件，并添加和提交到本地库：git add 文件名，git commit -m "message" 文件名
+				d. 在本地库创建远程库的别名：git remote add origin https://github.com/LiXL2648/springcloud-config.git
+				e. 将本地库的文件添加到远程库：git push origin master
+		② 新建Module模块cloud-config-center3344，它即为Spring Cloud的配置中心模块cloudConfig Center
+		③ 改POM，引入spring-cloud-config-server模块
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-config-server</artifactId>
+			</dependency>
+		④ 写YML
+			spring:
+			  application:
+				name: cloud-config-center
+			  cloud:
+				config:
+				  server:
+					git:
+					  uri: https://github.com/LiXL2648/springcloud-config.git
+					  search-paths:
+						- springcloud-config
+				  label: master
+		
+		⑤ 主启动：需要使用@EnableConfigServer注解
+			@SpringBootApplication
+			@EnableEurekaClient
+			@EnableConfigServer
+			public class ConfigCenterMain3344 {
+
+				public static void main(String[] args) {
+					SpringApplication.run(ConfigCenterMain3344.class, args);
+				}
+			}
+		⑥ 测试通过Config微服务是否可以从GitHub上获取配置内容
+			A. 启动微服务3344
+			B. 访问：http://localhost:3344/master/config-dev.yml
+		⑦ 配置读取规则：
+			A. /{label}/{application}-{profile}.yml
+				a. master分支：http://localhost:3344/master/config-dev.yml
+				b. dev分支：http://localhost:3344/dev/config-dev.yml
+			B. /{application}-{profile}.yml
+				a. 默认获取的是master分支
+				b. 获取GitHub上内容的地址：http://localhost:3344/config-dev.yml
+			C. /{application}/{profile}[/{label}]
+				a. label可省略
+				b. 获取GitHub上内容的地址：http://localhost:3344/config/dev
+			D. 总结：
+				a. label：分支（branch）
+				b. application：配置文件名(可以使用服务名作为文件名)
+				c. profile：环境（dev/test/prod）
+	3. Config客户端配置与测试
+		① 新建Module模块：cloud-config-center3355
+		② 改POM，引入spring-cloud-starter-config
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-starter-config</artifactId>
+			</dependency>
+		③ 写YML：
+			A. bootstrap.yml
+				a. application.yml是用户级的资源配置项，bootstrap.yml是系统级的，优先级更高
+				b. Spring Cloud会创建一个“Bootstrap Context”，作为Spring应用的“Application Context”的父上下文。初始化的时候，“Bootstrap Context”负责从外部源加载配置属性并解析
+				配置。这两个上下文共享一个从外部获取的Environment。
+				c. Bootstrap属性有高优先级，默认情况下，他们不会被本地配置覆盖，Boostrap Context和Application Context有不同的约定，所以新增了一个bootstrap.yml文件，保证
+				Bootstrap Context和Application Context配置的分离。
+				d. 要将Client模块下的application.yml文件改为bootstrap.yml，因为bootstrap.yml是比application.yml先加载的，bootstrap优先级高于application.yml
+			B. YML文件内容：
+				spring:
+				  application:
+					name: cloud-config-client
+				  cloud:
+					config:
+					  label: master               # 分支名
+					  name: config                # 文件名
+					  profile: dev                # 读取后缀名称
+					  uri: http://localhost:3344  # 配置中心地址，以上三个配置项综合：http://localhost:3344/master/config-dev.yml
+			C. 主启动类
+			E. 业务类：
+				@RestController
+				public class ConfigClientController {
+
+					@Value("${config.info}")
+					private String configInfo;
+
+					@GetMapping("/configInfo")
+					public String getConfigInfo() {
+						return configInfo;
+					}
+				}
+			F. 测试：
+				a. 启动服务注册中心7001和和服务总配置3344
+				b. 启动服务配置客户端3355
+				c. 在浏览器访问：http://localhost:3355/configInfo
+			G. 成功实现了客户端3355访问SpringCloud Config3344同GitHub获取配置信息
+			H. 当通过GitHub修改config-dev上的内容时，通过服务端能够获取GitHub修改的值，而通过客户端在没有重启的情况下获取到的是修改前的值，如何解决分布式配置动态刷新问题
+	4. Config客户端动态刷新，手动版
+		① 避免每次更新配置都要重启客户端服务
+		② 动态刷新步骤：
+			A. 修改客户端服务3355模块
+			B. 需要引入依赖：spring-boot-starter-actuator
+			C. 修改YML，暴露监控的端点
+				management:
+				  endpoints:
+					web:
+					  exposure:
+						include: "*"
+			D. 在业务类controller中添加@RefreshScope注解
+			E. 当通过GitHub修改config-dev上的内容时，通过服务端能够获取GitHub修改的值，而通过客户端在没有重启的情况下获取到的还是修改前的值。以上配置没有生效。
+			F. 需要运维人员发送POST请求刷新3355
+				a. 请求必须是POST
+				b. 请求地址：curl -X POST "http://localhost:3355/actuator/refresh"
+			G. 再次通过客户端在没有重启的情况下获取服务配置中心在GitHub的内容时是动态更新的值，前提是需要发送POST请求刷新客户端。
+		③ 剩余的问题：假如有多个微服务客户端3355/3366/3377，每个微服务都要执行一次POST请求刷新客户端，如何广播，一次通知，出处生效进而实现大范围自动刷新。
+十四、Spring Cloud Bus消息总线
+	1. 概述：
+		① 结合Spring Cloud Config实现分布式自动刷新配置功能
+		② Spring Cloud Bus概念：
+			A. Bus支持两种消息代理：RabbitMQ和Kafka
+			B. Spring Cloud Bus 是用来将分布式系统的节点与轻量级消息系统链接起来的框架，它整合了Java的事件处理机制和消息中间件的功能。
+				-----------------------------------------------------------------------------------------------------------------------------------------
+				|	------------  1. Push updated   ---------------------------------   2.Source   -----------------									|
+				|	| 运维人员 | -----------------> | Git Repository greeting:hello | <----------> | Config Server |									|
+				|	------------       config	    ---------------------------------    config    -----------------									|
+				|																4b. Pull Update	  	  	  |			5b. Pull Update						|
+				|														   -------------------------------|------------------------------				|
+				|														   ↓						  	  ↓							 	↓				|
+				|		------------	3. POST /bus/refresh	------------------------	  ------------------------		------------------------	|
+				|		| 运维人员 | -------------------------> | APP A greeting:hello |	  | APP B greeting:hello |		| APP C greeting:hello |	|
+				|		------------							------------------------	  ------------------------		------------------------	|
+				|															|							  ↑							 	↑				|
+				|															|							  |								|				|
+				|															|   4a. Send Message	-------------	5a. Receive Message	|				|
+				|															----------------------> | Cloud Bus | -----------------------				|
+				|																					-------------										|
+				-----------------------------------------------------------------------------------------------------------------------------------------
+			
+		③ Spring Cloud Bus的功能：Spring Cloud Bus能管理和传播分布式系统间的消息，就像一个分布式执行器，可用于广播状态更改，时间推送等，也可以当做微服务间的通信通道
+			---------------------------------------------------------------------------------------------
+			|				Config Server 本地仓库														|
+			|						-------													|			|
+			|						| Git |													|			|
+			|						-------													|			|
+			|						   ↑													|			|
+			|						   |													|			|
+			|						   |		  获取配置内容	-------------    接收消息	|			|
+			|				   ------------------ ------------> | Service B | <------------ |			|
+			|	-------		   |				|				-------------				|			|
+			|	| Git |	-----> | Config Servver | -----------------发送消息--------------->	| 消息总线	|
+			|	-------		   |				| 				-------------    接收消息	|			|
+			|				   ------------------ ------------> | Service A | <------------	|			|
+			|						   |		  获取配置内容	------------				|			|
+			|						   |													|			|
+			|					POST /bus/refresh											|			|
+			|						   ↓													|			|
+			|					  ------------												|			|
+			|					  | 运维人员 |												|			|
+			|					  ------------												|			|
+			|																							|
+			---------------------------------------------------------------------------------------------
+		④ 为何被称为总线
+			A. 总线：在微服务架构的系统中，通常会使用轻量级的消息代理来构建一个共用的消息主题，并让系统中所有微服务实例都连接上来，由于该主题中产生的消息会被所有实例监听和消费，
+			所以实例监听和消费，所以称它为消息总线。在总线上各个实例，都可以方便地广播一些需要让其他连接在该主题上的实例都知道的消息
+			B. 基本原理：ConfigClient实例都监听MQ中同一个topic（默认是SpringCloudBus）。当一个服务刷新数据的时候，它会把这个消息放到Topic中，这样其他监听同一个Topic的服务就能得
+			到通知去更新自身的配置
+	2. Spring Cloud Bus 动态刷新全局广播
+		① 必须先具备良好的RabbitMQ环境
+		② 演示广播效果，增加复杂度，再以3355为模板制作一个3366，该Module与3355一致
+		③ 设计思想
+			A. 方案一：利用消息总线触发一个客户端/bus/refresh，而刷新所有客户端的配置
+			B. 方案二：利用消息总线触发一个服务端ConfigServer的/bus/refresh，而刷新所有客户端的配置
+			C. 方案二架构显然更加合适，方案一不合适的原因如下：
+				a. 打破了微服务的职责单一性，因为微服务本身是业务模块，它本身不应该承担配置刷新的职责
+				b. 破坏了微服务各节点的对等性
+				c. 有一定的局限性。例如：微服务在迁移时，它的网络地址常常会发生变化，此时如果想要做到自动刷新，那就会增加更多的修改
+		④ 给cloud-config-center3344配置中心服务端添加消息总线支持
+			A. 改POM，引入依赖：spring-cloud-starter-bus-amqp
+				<dependency>
+					<groupId>org.springframework.cloud</groupId>
+					<artifactId>spring-cloud-starter-bus-amqp</artifactId>
+				</dependency>
+			B. 写YML，添加以下配置
+				spring:
+				  rabbitmq:
+					host: 192.168.107.6
+					port: 5672
+					username: guest
+					password: guest
+				
+				management:
+				  endpoints:
+					web:
+					  exposure:
+						include: "bus-refresh"
+		⑤ 给cloud-config-center3355和cloud-config-center3366客户端添加消息总线支持
+			A. 改POM，引入依赖：spring-cloud-starter-bus-amqp
+				<dependency>
+					<groupId>org.springframework.cloud</groupId>
+					<artifactId>spring-cloud-starter-bus-amqp</artifactId>
+				</dependency>
+			B. 写YML，添加以下配置
+		⑥ 测试
+			A. 启动cloud-eureka-server7001，cloud-config-center3344，cloud-config-center3355和cloud-config-center3366
+			B. 运维工程师
+				a. 修改GitHub上配置文件修改版本号
+				b. 发送POST请求：curl -X POST "http://localhost:3344/actuator/bus-refresh"，一次发送，处处生效
+			C. 访问地址：
+				a. 3344：http://localhost:3344/master/config-dev.yml
+				b. 3355：http://localhost:3355/configInfo
+				c. 3366：http://localhost:3366/configInfo
+		⑦ 一次修改，广播通知，处处生效。
+	3. Spring Cloud Bus 动态刷新定点通知
+		① 定点通知：只通知3355，不通知3366
+			A. 指定具体某一个实例生效而不是全部
+			B. 公式：http://localhost:3344/actuator/bus-refresh/{destination}
+			C. /bus-refresh请求不再发送到具体的服务实例上，而是发给Config Server通过destination参数类指定需要更新配置的服务或者实例
+		② 案例：
+			A. 以刷新运行在3355端口上config-client为例
+			B. 给cloud-config-center3344发送POST请求刷新3355：curl -X POST "http://localhost:3344/actuator/bus-refresh/cloud-config-client:3355"
+十五、Spring Cloud Stream 消息驱动
+	1. 消息驱动概述
+		① Spring Cloud Stream：
+			A. 核心概念：屏蔽底层消息中间件的差异，降低切换成本，统一消息的编程模型。
+			B. 什么是Spring Cloud Stream
+				a. 官方定义Spring Cloud Stream官方定义Spring Cloud Stream是一个构建消息驱动微服务框架
+				b. 应用程序通过inputs或者outputs来与Spring Cloud Stream中的binder对象交互
+				c. 通过我们配置来binging(绑定)，而Spring Cloud Stream 的binder对象负责与消息中间件交互，所以，我们只需要搞清楚如何与Spring Cloud Stream交互就可以方便使用
+				消息驱动的方式
+				d. 通过使用Spring Integration来连接消息代理中间件以实现纤细事件驱动，Spring Cloud Stream为一些供应商的消息中间件产品提供了个性化的自动配置实现，引用了发布
+				订阅、消息组和消息分区的三个核心概念。
+				e. 目前仅支持RabbitMQ、Kafka
+			C. 官网：
+				a. 官方文档大纲：https://spring.io/projects/spring-cloud-stream，Spring Cloud Stream是用于构建于共享消息传递系统连接的高度可伸缩事件驱动微服务框架，该框架提供了
+				一个灵活的编程模型，它建立在已经建立和熟悉的Spring熟语和最佳实践上，包括支持持久化的发布/订阅、消息组以及消息分区的三个核心概念。
+				b. API手册：https://cloud.spring.io/spring-cloud-static/spring-cloud-stream/3.0.1.RELEASE/reference/html/
+				c. Spring Cloud Stream中文指导手册：https://m.wang1314.com/doc/webapp/topic/20971999.html
+		② 设计思想：
+			A. 标准MQ：
+				-------	  Message	---------	Message   -------
+				| Pub | ----------> | Queue | ----------> | Sub |
+				-------		  		---------		 	  -------
+									  BROKER	
+				a. 生产者/消费者之间靠消息媒介传递消息内容：Message
+				b. 消息必须走特定的通道：消息通道MessageChannel
+				c. 消息通常里的消息如何被消费，谁负责收发处理：消息通道MessageChannel的子接口SubscribableChannel，由MessageHandler消息处理器订阅
+			B. 为什么要用Spring Cloud Stream
+				a. 如果用到了RabbitMQ和Kafka，由于这两个消息中间件的架构不同，向RabbitMQ有exchange，Kafka有Topic和Partition分区
+				b. stream凭什么可以统一底层的差异
+					(1) 在没有绑定器这个概念的情况下，我们的SpringBoot应用要直接与消息中间件进行信息交互的时候，由于各消息中间件构建的初衷不同，他们的实现细节上有较大的差异性
+					(2) 通过定义绑定器作为中间层，完美实现了应用程序与消息中间件细节之间的隔离
+					(3) 通过向应用程序暴露统一的Channel通道，使得应用程序不需要再考虑各种不同的消息中间件实现。
+					(4) 通过定义绑定器Binder作为中间层，实现了应用程序消息与消息中间件细节之间的隔离
+				c. Binder：
+					(1) 在没有绑定器这个概念的情况下，我们的SpringBoot应用要直接与消息进行信息交互的时候，由于各消息中间件构建的初衷不同，他们的实现细节上会有较大的差异性。
+					通过定义绑定器作为中间件，完美地实现了应用程序与消息中间件细节之间的隔离。Stream对消息中间件的进一步封装，可以做到代码层面对中间件的无感，甚至于动态的切换中间
+					件（rabbitmq切换为kafka），使得微服务开发的高度解耦，服务可以关注更多自己的业务流程。
+					(2) 通过定义绑定器Binder作为中间层，实现了应用程序与消息中间件细节之间的隔离。 
+					(3) INPUT对应消息生产者，OUTPUT对应消息消费者。
+			C. Stream中的消息通信方式遵循了发布-订阅模式：Topic主题进行广播
+				a. 在RabbitMQ就是Exchange
+				b. 在Kafka中就是Topic
+		③ Spring Cloud Stream标准流程套路
+			A. 消息生产者处理业务逻辑，然后通过绑定器Spring Cloud Stream，通过消息源Source，通道Channel和绑定器Binder将消息发布给MQ（RabbitMQ或者Kafka），消息消费者也通过Spring Cloud
+			Stream的Binder获取消息并发送通道channel，然后进行解读Sink最后由消息消费者进行业务逻辑处理。
+			B. Binder：很方便的连接中间件，屏蔽差异
+			C. Channel：通道，是队列Queue的一种抽象，在消息通讯系统中就是实现存储和转发的媒介，通过Channel对队列进行配置
+			D. Source和Sink：简单的可以理解为参照对象是Spring Cloud Stream自身，从Stream发布消息就是输出，接受消息就是输入
+		④ 编码API和常用注解
+			A. Middleware：中间件，目前只支持RabbitMQ和Kafka
+			B. Binder：Binder是应用与消息中间件之间的封装，目前实行了Kafka和RabbitMQ的Binder，通过Binder可以很方便的连接中间件，可以动态的改变消息类型（对应于Kafka的Topic，RabbitMQ的
+			Exchanger），这些都可以通过配置文件来实现
+			C. @Input：注解标识输入通道，通过该输入通道直接收到的消息进入应用程序
+			D. @Output：注解标识输出通道，发布的消息将通过该通道离开应用程序
+			E. @StreamListener：监听队列，用于消费者的队列的消息接收
+			F. EnableBinding：值信道channel和exchange绑定在一起。
+	2. 案例说明：
+		① RabbitMQ环境已经搭建好
+		② 工程证新建三个子工程
+			A. cloud-stream-rabbitmq-provider8801，作为生产者进行发消息模块
+			B. cloud-stream-rabbitmq-consumer8802，作为消费者进行消息接收模块
+			C. cloud-stream-rabbitmq-consumer8803，作为消费者进行消息接收模块
+	3. 消息驱动之生产者
+		① 新建Module模块cloud-stream-rabbitmq-provider8801
+		② 改POM，添加spring-cloud-starter-stream-rabbit依赖
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-starter-stream-rabbit</artifactId>
+			</dependency>
+		③ 写YML，配置消息驱动
+			spring:
+			  application:
+				name: cloud-stream-provider
+			  cloud:
+				stream:
+				  binders: # 在此处配置要绑定的rabbitmq的服务信息
+					defaultRabbit: # 表示定义的名称，用于binding整合
+					  type: rabbit # 消息组件类型
+					  environment: # 设置rabbitmq的相关环境配置
+						spring:
+						  rabbitmq:
+							host: 192.168.107.6
+							port: 5672
+							username: guest
+							password: guest
+				  bindings: # 服务的整合处理
+					output: # 这个名字是一个通道的名称
+					  destination: studyExchange # 表示要使用的exchange名称定义
+					  content-type: application/json # 设置消息类型，本次为json，文本则设置“text/plain”
+					  binder: defaultRabbit # 设置要绑定的消息服务的具体设置
+		④ 主启动
+		⑤ 业务类：
+			A. 发送消息接口：
+				public interface MessageProvider {
+					public String send();
+				}
+			B. 发送消息接口实现
+				import cn.hutool.core.util.IdUtil;
+				import com.li.springcloud.service.MessageProvider;
+				import lombok.extern.slf4j.Slf4j;
+				import org.springframework.beans.factory.annotation.Autowired;
+				import org.springframework.cloud.stream.annotation.EnableBinding;
+				import org.springframework.cloud.stream.messaging.Source;
+				import org.springframework.integration.support.MessageBuilder;
+				import org.springframework.messaging.MessageChannel;
+
+				@EnableBinding(Source.class) //定义消息推送管道
+				@Slf4j
+				public class MessageProviderImpl implements MessageProvider {
+
+					@Autowired
+					private MessageChannel output;
+
+					@Override
+					public String send() {
+						String serial = IdUtil.simpleUUID();
+						output.send(MessageBuilder.withPayload(serial).build());
+						log.info("serial: " + serial);
+						return null;
+					}
+				}
+			C. Controller类：
+				@RestController
+				public class SendMessageController {
+
+					@Autowired
+					private MessageProvider messageProvider;
+
+					@GetMapping("/sendMessage")
+					public String sendMessage() {
+						return messageProvider.send();
+					}
+				}
+		⑥ 测试：
+			A. 启动7001Eureka
+			B. 启动RabbitMQ
+			C. 启动8001，在RabbitMQ中会存在一个交换器：studyExchange
+			D. 多次访问访问http://localhost:8801/sendMessage，在Rabbitmq中会出现峰值流量的变化
+	4. 消息驱动之消费者
+		① 新建Module模块cloud-stream-rabbitmq-consumer8802和cloud-stream-rabbitmq-consumer8803
+		② POM依赖的内容参考cloud-stream-rabbitmq-provider8801的依赖一致
+		③ 写YML，与cloud-stream-rabbitmq-provider8801最大的区别是，cloud-stream-rabbitmq-provider8801是output消息，而
+		cloud-stream-rabbitmq-consumer8802，和cloud-stream-rabbitmq-consumer8803是input消息
+			spring:
+			  application:
+				name: cloud-stream-consumer
+			  cloud:
+				stream:
+				  binders: # 在此处配置要绑定的rabbitmq的服务信息
+					defaultRabbit: # 表示定义的名称，用于binding整合
+					  type: rabbit # 消息组件类型
+					  environment: # 设置rabbitmq的相关环境配置
+						spring:
+						  rabbitmq:
+							host: 192.168.107.6
+							port: 5672
+							username: guest
+							password: guest
+				  bindings: # 服务的整合处理
+					input: # 这个名字是一个通道的名称
+					  destination: studyExchange # 表示要使用的exchange名称定义
+					  content-type: application/json # 设置消息类型，本次为json，文本则设置“text/plain”
+					  binder: defaultRabbit # 设置要绑定的消息服务的具体设置
+		④ 业务类
+			import lombok.extern.slf4j.Slf4j;
+			import org.springframework.beans.factory.annotation.Value;
+			import org.springframework.cloud.stream.annotation.EnableBinding;
+			import org.springframework.cloud.stream.annotation.StreamListener;
+			import org.springframework.cloud.stream.messaging.Sink;
+			import org.springframework.messaging.Message;
+			import org.springframework.stereotype.Controller;
+
+			@Slf4j
+			@Controller
+			@EnableBinding(Sink.class)
+			public class ReceiveMessageController {
+
+				@Value("${server.port}")
+				private String serverPort;
+
+				@StreamListener(Sink.INPUT)
+				public void input(Message<String> message) {
+					log.info("消费者8802, 接受到的消息：" + message.getPayload() + ", serverPort：" + serverPort);
+				}
+			}
+		⑤ 测试：8801发送消息后，8802成功接受到消息
+	5. 分组消费与持久化
+		① 修改cloud-stream-rabbitmq-consumer8803的配置和业务类
+		② 启动7001服务注册，8801消息生产，8802和8803消息消费
+		③ 启动后考虑的两个问题：重复消息和消息持久化
+		④ 重复消费：目前是8802和8803同时收到了8801发送的消息，存在重复消费问题，原因是8802和8803处于不同的分组，不同分组之间是可以全面消费的（重复消费）
+			A. 访问http://localhost:8801/sendMessage发送消息，8802和8803同时收到了8801发送的消息
+			B. 如何解决：分组和持久化属性group
+			C. 生产实际案例
+				a. 比如在如下场景中，订单系统我们做集群部署，都会从RabbitMQ中获取订单信息，那如果一个订单同时被两个服务获取到，那么就会造成数据错误，我们的避免这种情况，这时我们就
+				可以使用Stream中的消息分组来解决
+				b. 注意：在Stream中处于同一个group中的多个消费者是竞争关系，就能够保证消息只会被其中一个应用消费一次，不同组是可以全面消费的（重复消费）
+		⑤ 分组
+			A. 故障现象：重复消费
+			B. 导致原因：默认分组group是不同的，组流水号不一样，被认为不同组，可以消费
+			C. 原理：微服务应用放置于同一个group中，就能够保证消息只会被其中一个应用消费一次。不同的组是可以同时消费的，同一个组内会发生竞争关系，只有一个可以消费。
+			C. 将8802/8803设置为不同组，并自定义分组
+				a. group：LiXL和LiLX
+				b. 8002和8803修改YML，即添加spring.cloud.stream.binders.input.group=groupName属性
+				c. 结论，默认没有配置分组的情况下，不同消息消费者会分成不同的组，并存在消息重复消费问题
+			D. 8802/8803实现了轮询分组，每次只有一个消费者，8801模块发布的消息只能被8802或者8803其中一个接收，这样就避免了重复消费
+			E. 将8802/8803设置为相同组，并自定义相同分组
+				a. group：Li
+				b. 8002和8803修改YML，即设置spring.cloud.stream.binders.input.group=groupName属性相同
+				c. 结论：同一个组的多个微服务实例，每次只有微服务消费消息
+		⑥ 持久化
+			A. 通过上述，解决了重复消费问题，再看看持久化
+			B. 停止8802/8803并去掉8802的分组group：Li
+			C. 8801先发送4条消息到rabbitmq
+			D. 先启动8802，无分组属性配置，后台没有打印了MQ的消息
+			E. 再启动8803，有分组属性配置，后台打印了来自MQ的消息
+			F. 结论：配置了分组后，持久化功能也相应地开启，重启之后会接收到来自MQ的消息，而没有配置分组，则没有开启持久化，重启之后会错过消息。
+十六、Spring Cloud Sleuth 分布式请求链路跟踪
+	1. 概述：	
+		① 为什么会出现这个技术，需要解决哪些问题：在微服务框架中，一个由客户端发起的请求再后端系统中会经过多个不同的服务节点调用来协同产生最后的请求结果，每一个前段请求
+		都会形成一条复杂的分布式服务调用链路，链路中的任何一环出现高延时或者错误都会引起整个请求最后的失败
+		② Spring Cloud Sleuth：
+			A. 官网：https://github.com/spring-cloud/spring-cloud-sleuth
+			B. Spring Cloud Sleuth提供了一套完整的服务跟踪的解决方案，在分布式系统中提供追踪解决方案并且兼容支持了zipkin
+	2. zipkin
+		① 下载：
+			A. Spring Cloud F版起已经不需要自己构建Zinkin Server了，只需要调用jar包即可
+			B. 下载网址：https://dl.bintray.com/openzipkin/maven/io/zipkin/java/zipkin-server/
+			C. zipkin-server-2.12.9-exec.jar
+			D. 运行：java -jar zipkin-server-2.12.9-exec.jar
+		② docker安装zipkin镜像
+			A. 下载zipkin镜像：docker pull openzipkin/zipkin
+			B. 启动zipkin容器：docker run -d --name zipkin -p 9411:9411 f78348ccf657
+		③ 运行控制台
+			A. http://localhost:9411/zipkin/ 或者 http://192.168.107.6:9411/zipkin/
+			B. 术语：
+				a. 一条链路通过Trace id唯一标识，Span标识发起的请求信息，个span通过parent id关联起来
+																							-----------------		-----------------
+																					 |----> | Span id = D	| ----> | Span id = E	|
+			--------------------	   -----------------	   -----------------	 |		| Parent id = C |		| Parent id = D |
+			| Span id = A	   |	   | Span id = B   |	   | Span id = C   |	 |		-----------------		-----------------
+			| Parent id = null | ----> | Parent id = A | ----> | Parent id = B | ----|		-----------------		-----------------
+			--------------------	   -----------------	   -----------------	 |		| Span id = F	|		| Span id = G	|
+																					 |----> | Parent id = C	| ----> | Parent id = F	|
+																							-----------------		-----------------
+				b. 名称解释：
+					(1) Trace：类似于树结构的Span集合，表示一条调用链路，存在唯一标识
+					(2) span：表示调用链路来源，通俗的理解span就是一次请求信息
+	3. 搭建链路监控步骤
+		① 启动zipkin
+		② 服务提供者
+			A. 修改cloud-provider-payment8001
+			B. 改POM：引入依赖spring-cloud-starter-zipkin
+				<dependency>
+					<groupId>org.springframework.cloud</groupId>
+					<artifactId>spring-cloud-starter-zipkin</artifactId>
+				</dependency>
+			C. 写YML
+				spring:
+				  zipkin:
+					base-url: http://192.168.107.6:9411
+				  sleuth:
+					sampler:
+					  probability: 1 # 采样率介于0到1之间，1则表示全部采集，一般采集一半即可
+			D. 业务类：PaymentController
+				@GetMapping("/payment/zipkin")
+				public String paymentZipkin() {
+					return "paymentZipkin";
+				}
+		③ 服务消费者（调用方）
+			A. 修改cloud-consumer-order80
+			B. 改POM：引入依赖：spring-cloud-starter-zipkin
+				<dependency>
+					<groupId>org.springframework.cloud</groupId>
+					<artifactId>spring-cloud-starter-zipkin</artifactId>
+				</dependency>
+			C. 写YML
+				spring:
+				  zipkin:
+					base-url: http://192.168.107.6:9411
+				  sleuth:
+					sampler:
+					  probability: 1 # 采样率介于0到1之间，1则表示全部采集，一般采集一半即可
+			D. 业务类：OrderController
+				@GetMapping("/consumer/payment/zipkin")
+				public String paymentZipkin() {
+					return restTemplate.getForObject(PAYMENT_URL + "/payment/zipkin", String.class);
+				}
+		④ 依次启动Eureka7001，cloud-provider-payment8001和cloud-consumer-order80，用80多次通过地址http://localhost/consumer/payment/zipkin调用8001
+		⑤ 打开浏览器访问：http://192.168.107.6:9411
+			
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	

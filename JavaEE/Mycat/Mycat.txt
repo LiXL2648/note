@@ -1,0 +1,1137 @@
+一、入门概述
+	1. Mycat是什么
+		① Mycat 是数据库 中间件
+		② 数据库中间件
+			A. 是一类连接软件组件和应用的计算机软件， 以便于软件各部件之间的沟通 。
+			B. 例子 Tomcat web 中间件 。
+			C. 数据库 中间件 连接 java 应用程序和数据库
+		③ 为什么要用 Mycat
+			A. Java 与数据库紧耦合 。
+			B. 高访问量高并发对数据库的压力 。
+			C. 读 写请求数据不一致
+		④ 数据库中间件对比
+			A. Cobar 属于阿里 B2B 事业群，始于 2008 年，在阿里服役 3 年多，接管 3000+ 个 MySQL 数据库的 schema,
+			集 群日处理在线 SQL 请求 50 亿次以上。由于 Cobar 发 起人的离职， Cobar 停止维护。
+			B. My cat 是开源社区在阿里 cobar 基础上进行二次开发，解决了 cobar 存在的问题，并且加入了许多新
+			的功能在其中。青出于蓝而胜于蓝。
+			C. OneProxy 基于 MySQL 官方的 proxy 思想利用 c 进行开发的， OneProxy 是一款商业收费的中间件。舍
+			弃了一些功能，专注在性能和稳定性上。
+			D. kingshard 由小团队用 go 语言开发，还需要发展，需要不断完善 。
+			E. Vite ss 是 Youtube 生产在使用 架构很复杂。不支持 MySQL 原生协议，使用需要大量改造成本 。
+			F. Atlas 是 3 60 团队基于 mysql proxy 改写 ，功能还需完善 ，高并发下不稳定 。
+			G. MaxScale 是 mariadb MySQL 原作者维护的一个版本 研发的中间件
+			H. MySQLRout e 是 MySQL 官方 Oracle 公司发布的中间件
+		⑤ Mycat 的 官网：http://www.mycat.io/
+	2. Mycat能干什么
+		① 读写分离
+							   ↗  master
+							↗		↑	
+		java	===》	Mycat		| MySQL 主从复制
+							↘		|	
+							   ↘  slave
+		② 数据分片
+			垂直拆分 分库 、 水平拆分 分表 、 垂直 水平拆 分 分库分表
+								应用服务器
+									↑
+									↓
+							   数据库中间件
+						    ↙		↑	    ↘
+					     ↙		    ↓		   ↘
+					主机1	      主机2		     主机3
+				   ↙	↘        ↙  ↘         ↙ ↘
+				 分片1 分片2   分片1  分片2   分片1  分片2
+		③ 多数据源整合
+		
+		Client	 财务、订单表等		多主同时写入、高可靠性、适合系统关键表
+					      ↗		galera cluster
+					   ↗
+				    ↗
+			     ↗	用户表、字典	主从故障切换
+		Mycat ----------------->	MySQL
+				 ↘	表，常规数据	Master/Slver
+				    ↘			
+					   ↘		
+						  ↘		存储大量一次性非业务数据
+					日志类数据		NoSQL
+	3. Mycat原理
+		① Mycat 的原理中最重要的一个动 词是“拦截”，它拦截 了用户发送过来 的 SQL 语句，首先对 SQL
+		语句做了 一些特定的分析：如分片分析、路由分析、读写分离分析、缓存分析等，然后将此 SQL 发
+		往后端的真实数据库 并将返回的结果做适当的处理，最终再返回给用户 。如图
+							|---------------------------------------
+							|			       Mycat			   |			 ↙	 dnl prov='zhejiang'
+							|解		分		路		读写	缓	   |       ↗  ↙↗  DB1 @ MySQL1
+			select * from	|析=====片======由======分离====存=====|     ↗  ↙ ↗	 
+			orders where	|SQL	分		分		分析	分	...|  ↗ ↙	↗
+			prov='浙江';	|		析		析				析	   | ↗↙ ↗
+		应用 ============》	|									   |↙------------->dn2 prov='shangjai'
+							|分		排		聚		结			 ↙| 	  ↘		 DB2 @ MYSQL2
+							|页		序		合		果		   ↙  |        ↘
+						<===|处======处======处======合======↙	   |          ↘
+							|理		理		理		并			   |            ↘  dn3 pro='beijing'
+							|--------------------------------------|		        DB3 @ MYSQL3
+											Mycat “拦截”
+		②这种方式把数据库的分布式从代码中解耦出来 ，程序员察觉不出来后台使用 M y cat 还是MySQL 。
+二、安装启动
+	1. 安装前的准备
+		① 准备两台已安装好MySQL服务的机器
+			192.168.107.8
+			192.168.107.29
+		② 在两台机器上安装JDK1.8
+			jdk-8u241-linux-x64.tar.gz
+		③ 分别在两台机器上配置好MySQL和JDK1.8的环境变量
+			A. 打开 /etc/profile文件：vim /etc/profile
+			B. 将以下环境变量信息配置在mysqld的节点下
+				export PATH=$PATH:/usr/local/mysql/bin
+				
+				export JAVA_HOME=/opt/jdk1.8.0_241
+				export JAVA_BIN=/opt/jdk1.8.0_241/bin
+				export PATH=$PATH:$JAVA_HOME/bin
+				export CLASSPATH=.:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar
+			C. 配置完成后保存退出，之后分别重启两台机器
+	2. 安装mycat
+		① 在192.168.107.8的机器上 解压Mycat-server-1.6.7.1-release-20190627191042-linux.tar.gz 到/usr/local/目录下
+			tar -zxvf Mycat-server-1.6.7.1-release-20190627191042-linux.tar.gz -C /usr/local/
+		② 解压完成后进入到/usr/local/mycat/conf目录下，并查看目录下文件
+			cd /usr/local/mycat/conf
+		③ 三个配置文件
+			①schema.xml 定义逻辑库，表、分片节点等内容
+			②rule.xml：定义 分片 规则
+			③server.xml 定义用户以及系统相关变量，如端口等
+	3. 启动mycat
+		① 修改配置文件 server.xm
+			修改用户信息，与MySQL区分，如下
+			<user name="mycat">
+				<property name="password">2648</property>
+				<property name="schemas">TESTDB</property>
+			</user>
+		② 修改配置文件 schema.xml
+			A.删除 <schem> 标签间的表信息, dataNode 标签只留一个, dataHost 标签只留一个, <writeHost>和<readHost> 只留一 对
+				<?xml version="1.0"?>
+				<!DOCTYPE mycat:schema SYSTEM "schema.dtd">
+				<mycat:schema xmlns:mycat="http://io.mycat/">
+					<schema name="TESTDB" checkSQLschema="false" sqlMaxLimit="100" dataNode="dn1">
+					</schema>
+					<dataNode name="dn1" dataHost="host1" database="testdb" />
+					<dataHost name="host1" maxCon="1000" minCon="10" balance="0"
+						writeType="0" dbType="mysql" dbDriver="native" switchType="1" slaveThreshold="100">
+					<heartbeat>select user()</heartbeat>
+					<!-- can have multi write hosts -->
+					<writeHost host="hostM1" url="localhost:3306" user="root"
+						password="2648">
+					<!-- can have multi read hosts -->
+						<readHost host="hostS1" url="192.168.107.29:3306" user="root" password="2648" />
+					</writeHost>
+					</dataHost>
+				</mycat:schema>
+			B. 注意：
+				a. <schema> 的name属性需要与server.xm的<property name="schemas">TESTDB</property>保持一致
+				b. 需要在<schema>标签中增加dataNode="dn1"属性
+				c. <dataNode>的name属性需和<schema> 的dataNode="dn1"属性需要保持一致，修改dataHost为host1，
+				并定义该节点的实际数据库属性database="testdb"
+				d. <dataHost>的name属性需和<dataNode> 的dataHost="host1"属性保持一致，默认负载均衡类型balance取值为0，即不开启主从分离机制
+				e. 修改<writeHost>的host属性为hostM1，并且其写的数据库为本地数据库，url为localhost:3306，密码为2648，如果该url不使用本地数据库
+				而是使用ip地址进行配置的话，当使用mycat做查询时会出现 ERROR 1184 (HY000): Invalid DataSource:0的异常
+				f. <readHost>配置的是读机的数据库信息，即192.168.107.29机器的mysql信息。
+				g. 修改完后之后将<mycat:schema>标签以下的注释信息全部删除，仅剩18行配置信息，之后保存退出
+		③ 验证验证数据库访问情况
+			A. Mycat 作为数据库中间件要和数据库部署在不同机器上，所以要验证远程访问情况。
+				a. 在192.168.107.8上访问192.168.107.29的数据库
+					mysql -uroot -p2648 -h 192.168.107.29 -P 3306
+				b. 在192.168.107.39上访问192.168.107.8的数据库
+					mysql -uroot -p123123 -h 192.168.107.8 -P 3306
+			B. 如远程访问报错，在两台机器的mysql中建对应用户
+				a. 在192.168.107.8上建立192.168.107.29数据库的用户
+					grant all privileges on *.* to root@'192.168.107.29' identified by '2648';
+				b. 在192.168.107.29上建立192.168.107.8数据库的用户
+					grant all privileges on *.* to root@'192.168.107.8' identified by '2648';
+				c. 最后需要关闭两台机器的防火墙，否则也将访问不成功
+			C. 重新验证数据库访问情况，此时两台机器互相访问成功
+		④ 启动程序
+			A. 控制台启动：去 mycat/bin 目录下执行 mycat console
+			B. 后台启动：去 mycat/bin 目录下执行 mycat start
+			C. 为了能第一时间看 到启动日志 ，方便定位问题 ，我们选择 ① 控制台启动./mycat console
+			D. 在Linux任意路径都可以执行的执行文件的位置是：/bin,/usr/bin,/usr/local/bin,/sbin,/usr/sbin,/usr/local/sbin
+		⑤ 启动时可能出现报错
+			A. 如果操作系统是CentOS 6.8可能会出现域名解析失败错误，如下
+				JVM exited while loading the application
+				错误：代理抛出异常：java.net.MalformedURLException: Local host name unknown: java.net.unknownHostException: Ke: Ke: 
+				域名解析暂时失败
+				Launcing a JVM...
+			B. 可以按照以下步骤解决
+				① 查看主机名：hostname
+				② 使用vim修改/etc/hosts文件，在127.0.0.1 和::1后面增加机器名
+					127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4 LiXL
+					::1         localhost localhost.localdomain localhost6 localhost6.localdomain6 LiXL
+				③ 修改后重新启动网络服务
+				④ 两台机器都需要进行以上步骤
+	4. 	登录mycat 
+		① 登录后台管理窗口
+			A. 此登录方式用于管理，维护 Mycat
+				a. mysql -umycat -p2648 -P 9066 -h 192.168.107.8
+				b. 常用命令如下show database，show @@help
+			B. 登录数据窗口，此登录方式用于通过Mycat查询数据，我们选择这种方式访问 Mycat
+				a. mysql -umycat -p123456 -P 8066 -h 192.168.140.128
+三、搭建读写分离
+	1. 我们通过Mycat 和 MySQL 的主从复制配合搭建数据库的读写分离实现 MySQL 的高可用性 。
+	我们将搭建：一主一从 、双主双从两种读写分离模式。
+	2. 搭建一主一从
+		① 架构图：一个主机用于处理所有写请求，一台从机负责所有读请求，架构图如下
+											↗	master 1
+		客户端1↘					写    ↗	       |
+				 ↘					    ↗		   ↓
+				    ↘			      ↗   读  ↗slave 1
+					   ↘		    ↗     ↗ ↗master 2
+						 ↘			    ↗   ↗写	   |
+		客户端2	-----------> Mycat	  ↗ ↗	       |
+						  ↗	 ↘	 ↘    ↘  读	   ↓
+						↗			↘  ↘   ↘ slave 2
+					  ↗			  ↘  写 ↘   master 3
+				   ↗				    ↘	       |
+		客户端3	↗						读  ↘      ↓
+												slave 3
+		② 搭建 MySQL数据库主从复制
+			A. MySQL 主从复制原理										
+					Master                              slave 
+			  |------------------           |------------------------------
+			  |	DB1             |           |                             |
+			  |	 |		        |		    |	SQL thread --> DB Changes |
+			  |	 | Date Changes	|			|	   |↑                     |
+			  |	 |				|			|  read|| Replay              |
+			  |	 ↓				|			|	   ↓|                     |
+			  |	Binary<---------|-----------|----- IO/                    |
+			  |	log-------------|-----------|----> thread                 |
+			  |-----------------|           |-----------------------------|
+			B.  主机配置 （192.168.107.8），修改配置文件：vim /usr/local/mysql/my.cnf
+				a. 主服务器唯一ID
+					server-id=1
+				b. 启用二进制日志
+					log-bin=mysql-bin
+				c. 设置不要复制的数据库 可设置多个
+					binlog-ignore-db=mysql
+					binlog-ignore-db=information_schema
+					binlog-ignore-db=performance_schema
+				d. 设置需要复制的数据库
+					binlog-do-db=testdb
+				e. 设置 logbin 格式
+					binlog_format=STATEMENT
+			C. binlog 日志三种格式
+				a. STATEMENT：默认，特点是将所有的写操作全都复制到logbin文件下，然后复制到从机去运行，但是会造成数据不一致
+				b. ROW：ROW 模式不记录写操作，而是记录每一行的改变，可以保证主从复制没有问题，缺点是当存在全表更新时，
+				该模式需要记录全表每一行的变化，效率太低
+				c. MIXED：该模式的特点是，当不存在数据不一致的时候使用STATEMENT模式，当存在数据不一致的时候使用ROW 模式，
+				该模式识别不了系统变量
+			D. 从机配置（192.168.107.29），修改配置文件：vim /usr/local/mysql/my.cnf
+				a. 从服务器唯一 ID
+					server-id=2
+				b. 启用中继日志
+					relay-log=mysql-relay
+			E. 主机、从机重启 MySQL 服务
+			F. 主机从机都关闭防火墙
+			G. 在主机上建立帐户并授权 slave，并查看master的状态
+				a. GRANT REPLICATION SLAVE ON *.* TO 'slave'@'%' IDENTIFIED BY '2648'
+				b. show master status;
+				c. 记录下 File 和 Position 的值
+				d. 执行完此步骤后不要 再操作主服务器 M y SQL ，防止主服务器状态值变化
+			H. 在从机上配置需要复制的主机
+				a. 复制主机的命令
+					CHANGE MASTER TO MASTER_HOST='主机IP',
+					MASTER_USER='slave',
+					MASTER_PASSWORD='密码',
+					MASTER_LOG_FILE='mysql-bin.File值',MASTER_LOG_POS=Position值;
+				b. 启动从服务器复制功能
+					start slave;
+				c. 查看从服务器状态，以列的形式查看
+					show slave status\G;
+				d. 下面两个参 数都是 Yes ，则说明主从配置成功
+					Slave_IO_Running: Yes
+					Slave_SQL_Running: Yes
+			I. 主机新建库、新建表、 insert记录，从机复制
+			J. 如何停止从服务复制功能和如何重新配置主从
+				stop slave
+				reset master
+		③ 修改 Mycat 的配置文件 schema.xml
+			A. 之前的配置已分配了读写主机 ，验证是否已实现读写分离
+				a. 在写主机插入：insert into mytbl values (1,@@hostname)，主从主机数据不一致了
+				b. 在Mycat里查询：select * from mytbl;
+				c. 查询的数据是MASTER上的数据，因此未实现读写分离的效果
+			B. 修改dataHost 的 balance属性，通过此属性配置读写分离的类型， 负载均衡类型，目前的取值有4 种：
+				a. balance="0", 不开启读写分离机制，所有读操作都发送到当前可用的 writeHost 上。
+				b. balance="1"，全部的 readHost 与 stand by writeHost 参与 select 语句的负载均衡，简单的说，当双主双从模式(M1->S1，M2->S2，并且 M1 与 M2 互为主备)，正常情况下，M2,S1,S2 都参与 select 语句的负载均衡。
+				c. balance="2"，所有读操作都随机的在 writeHost、readhost 上分发。
+				d. balance="3"，所有读请求随机的分发到 readhost 执行，writerHost 不负担读压力
+			C. 为了能看到读写分离的效果，把balance设置成2，会在两个主机间切换查询
+				<dataHost name="host1" maxCon="1000" minCon="10" balance="2"
+					writeType=writeType="0" dbType="mysql" dbDriver="native" switchType="1"
+				slaveThreshold="100">
+			D. 启动 Mycat
+			E. 验证读写分离
+				a. 在写主机数据库表 mytbl 中插入 带系统变量 数据 造成主从数据不一致
+				INSERT INTO mytbl VALUES(2,@@hostname);
+				b. 在Mycat 里查询 mytbl 表，可以看到查询语句在主从两个主机间切换
+	3. 搭建双主双从
+		① 一个主机m1 用于处理所有写请求， 它的从机 s1 和另一台主机 m2 还有它的从机 s2 负责所有读请
+		求 。当 m1 主机宕机后 m2 主机负责写请求 m1 、 m2 互为备机。 架构图如下
+	
+	
+		客户端1 ↘                                 ↗ master1--------->slave1
+				  ↘                     主     ↗      | ↑
+					 ↘                      ↗         ↓ |
+						↘                ↗   备 ↗  master2--------->slave2
+						   ↘         ↗     ↗
+		客户端2--------------->  Mycat   ↘↗  主
+		   |               ↗         ↘     ↘
+		   |            ↗               ↘      ↘  master(N-1)----->slave(N-1)
+		   |          ↗                     ↘         | ↑
+		   |       ↗                        备 ↘       ↓ |
+		客户端N ↗                                ↘ masterN--------->slaveN
+		
+		② 准备工作
+			A. 四台已安装过MySQL的主机
+			编号		 角色			IP地址				机器名
+			  1          Master1		192.168.107.8       Ke
+              2          Slave1         192.168.107.29      LiXL
+			  3          Master2        192.168.107.27      LiXC
+			  4          Slave2         192.168.107.30      LILX
+			B. 其他准备工作参照一主一从的搭建。
+		③ 搭建 MySQL 数据库主从复制（双主双从）
+			A. 双主机配置
+				a. Master1配置，修改配置文件：vim /etc/my.cnf
+					#主服务器唯一 ID
+					server-id=1
+					#启用二 进制日 志
+					log-bin=mysql-bin
+					#设置不要复制的数据库 可设置多个
+					binlog-ignore-db=mysql
+					#设置需要复制的数据库
+					binlog-do-db=testdb
+					#设置 logbin 格式
+					binlog_format=STATEMENT
+					#在作为从数据库的时候， 有写入操作 也要更新二进制日志文件
+					log-slave-updates
+					#表示自增长字段每次递增的量，指自增字段的起始值，其默认值是 1 取值范围是 1 .. 65535
+					auto-increment-increment=2
+					#表示自增长字段从哪个数开始，指字段一次递增多少，他的取值范围是 1 .. 65535
+					auto-increment-offset=1
+				b. Master2 配置, 修改配置文件：vim /etc/my.cnf
+					server-id=3
+					log-bin=mysql-bin
+					binlog-ignore-db=mysql
+					binlog-do-db=testdb
+					binlog_format=STATEMENT
+					log-slave-updates
+					auto-increment-increment=2
+					auto-increment-offset=2
+			B. 双从机配置
+				a. Slave1 配置，修改配置文件：vim /etc/my.cnf
+					#从服务器唯一 ID
+					server-id=2
+					#启用中继日志
+					relay-log=mysql-relay
+				b. Slave2 配置，修改配置文件：vim /etc/my.cnf
+					server-id=4
+					relay-log=mysql-relay
+			C. 启动 Mycat
+			D. 验证读写分离
+				a. 在写主机 Master 1 数据库表 mytbl 中插入 带系统变量 数据 造成主从数据不一致
+					INSERT INTO mytbl VALUES(3, @@hostname)
+				b. 在 Mycat 里查询 mytbl 表可以看到查询语句在 Master2 、Slava1、 Slava2 主从三个主机间切换
+			E. 抗风险能力
+				a. 停止数据库 Master1
+				b. 在 Mycat 里插入数据依然成功， Master2 自动切换为写主机
+					INSERT INTO mytbl VALUES(3 ,@@hostname)
+				c. 启动数据库 Master1，Master1自动切换成读主机
+				d. 在 Mycat 里查询 mytbl 表可以看到查询语句在 Master1、 Slava1、 Slava2主从三个主机间切换
+				e. Master1、 Master2 互做备机，负责写的主机宕机，备机切换负责写操作，保证数据库读写分离高可用性。
+四、垂直拆分--分库
+	1. 一个数据库由很多表的构成，每个表对应着不同的业务，垂直切分是指按照业务将表进行分类，
+	分布到不同的数据库上面，这样也就将数据或者说压力分担到不同的库上面，如下图：
+				   -------------------------------------------------
+				   |					 垂直切分                  |
+				   |   ----------------------------------------	   |			
+				   |   |应				  用服				务|    |
+				   |   ----------------------------------------    |
+				   |   |				   ||				|      |
+				   |   |				   ↓↓				|      |
+				   |   |				单数据库			|      |
+				   |   |				database			|      |
+				   |   |				   ↑↑				|      |
+				   |   ↓				   ↓↓				|      |
+				   |  用户系统<---------->订单交易系统<--->支付系统|
+				   |   user				  order             pay    |
+                   -------------------------------------------------
+	系统被切分成了，用户，订单交易，支付几个模块。
+	2. 如何划分表
+		① 一个问题：在两台主机上的两个数据库中的表，能否关联查询，答案是不可以关联查询。
+		② 分库的原则：有紧密关联关系的表应该在一个库里，相互没有关联关系的表可以分到不同的库里 。
+		③ 数据库中的表结构
+			A. 客户表 rows：20万
+			CREATE TABLE customer(
+				id INT AUTO_INCREMENT,
+				NAME VARCHAR(200),
+				PRIMARY KEY(id)
+			);
+			B. 订单表 rows：600万
+			CREATE TABLE orders(
+				id INT AUTO_INCREMENT,
+				order_type INT,
+				customer_id INT,
+				amount DECIMAL(10,2),
+				PRIMARY KEY(id)
+			);
+			C. 订单详细表 rows：600万
+			CREATE TABLE orders_detail(
+				id INT AUTO_INCREMENT,
+				detail VARCHAR(2000),
+				order_id INT, 
+				PRIMARY KEY(id),
+			);
+			D. 订单状态字典表 rows:20
+			CREATE TABLE dict_order_type(
+				id INT AUTO_INCREMENT,
+				order_type VARCHAR(200),
+				PRIMARY KEY(id),
+			);
+		④ 以上四个表如何分库？客户表分在一个数据库 ，另外三张都需要关联查询 ，分在另外一个数据库 。
+	4.3 实现分库
+		① 修改 schema.xml 配置文件
+			<schema name="TESTDB" checkSQLschema="false" sqlMaxLimit="100" dataNode="dn1">
+				<table name="customer" dataNode="dn2" ></table>
+			</schema>
+			<!-- <dataNode name="dn1" dataHost="host1" database="testdb" /> -->
+			<dataNode name="dn1" dataHost="host1" database="orders" />
+			<dataNode name="dn2" dataHost="host2" database="orders" />
+			<dataHost name="host1" maxCon="1000" minCon="10" balance="0"
+					writeType="0" dbType="mysql" dbDriver="native" switchType="1"  slaveThreshold="100">
+				<heartbeat>select user()</heartbeat>
+				<!-- can have multi write hosts -->
+				<writeHost host="hostM1" url="localhost:3306" user="root"
+								   password="2648">
+						<!-- can have multi read hosts -->
+						<readHost host="hostS1" url="192.168.107.29:3306" user="root" password="2648" />
+				</writeHost>
+
+				<!-- <writeHost host="hostM2" url="192.168.107.27:3306" user="root"
+								   password="2648">
+						<readHost host="hostS2" url="192.168.107.30:3306" user="root" password="2648" />
+				</writeHost> -->
+			</dataHost>
+
+			<dataHost name="host2" maxCon="1000" minCon="10" balance="2"
+					writeType="0" dbType="mysql" dbDriver="native" switchType="1"  slaveThreshold="100">
+				<heartbeat>select user()</heartbeat>
+				<!-- can have multi write hosts -->
+				<writeHost host="hostM2" url="192.168.107.27:3306" user="root"
+					password="2648">
+					<!-- can have multi read hosts -->
+					<readHost host="hostS2" url="192.168.107.30:3306" user="root" password="2648" />
+				</writeHost>
+			</dataHost>
+		② 新增两个空白库
+			A. 分库操作不是在原来的老数据库上进行操作，需要准备两台机器分别安装新的数据库
+			B. 在数据节点 dn 1 、 dn2 上分别创建数据库 orders
+				CREATE DATABASE orders;
+		③ 启动 Mycat，./mycat console
+		④ 访问 Mycat 进行分库
+			A. 访问 Mycat，mysql -umycat -p2648 -h192.168.107.8 -P8066
+			B. 切换到 TESTDB，use TESTDB;
+			C. 创建 4 张表，customer，orders，orders_detail,dect_order_detail
+			D. 查看表信息，可以看到成功分库
+五、水平拆分--分表
+	1. 相对于垂直拆分，水平拆分不是将表做分类，而是按照某个字段的某种规则来分散到多个库之中，每个表中包含一部分数据。
+	简单来说，我们可以将数据的水平切分理解为是按照数据行的切分，就是将表中的某些行切分 到一个数据库，
+	而另外的某些行又切分到其他的数据库中，如图：
+					-------------------------------------------------
+				   |					 垂直切分                  |
+				   |   ----------------------------------------	   |			
+				   |   |应				  用服				务|    |
+				   |   ----------------------------------------    |
+				   |   |				   ||				|      |
+				   |   |				   ↓↓				|      |
+				   |   |				单数据库			|      |
+				   |   |				database			|      |
+				   |   |				   ↑↑				|      |
+				   |   ↓				   ↓↓				|      |
+				   |  用户系统<---------->订单交易系统<--->支付系统|
+				   |  user				  order            pay     |
+                   |   |				   |                |      |
+				   |   ↓                   ↓                ↓      |
+				   |  用户                订单交易         支付    |
+				   |  user1               order1           pay1    |
+				   |  用户                订单交易         支付    |
+				   |  user2               order2           pay2    |
+				   |  用户                订单交易         支付    |
+				   |  user3               order3           pay3    |
+				   -------------------------------------------------
+	2. 实现分表
+		① 选择要拆分的表
+			MySQL 单表存储数据条数是有瓶颈的，单表达到 1000 万条数据就达到了瓶颈，会影响查询效率
+			需要进行水平拆分 分表 进行优化 。
+			例如：例子中的 orders、 orders_detail 都已经达到 600 万行数据，需要进行分表优化 。
+		② 分表字段
+			A. 以orders 表为例 ，可以根据不同字段进行分表
+			B. 分表字段：（id）按照主键或者创建时间，效果：查询订单注重时效性，历史订单查询被查询的次数少，如此
+			分片会造成一个节点访问多，一个访问少，查询次数不平均
+			C. 分表字段：（customer_id）客户id， 根据客户id进行分表，两个节点访问平均，一个客户的所有订单都在同一个节点
+		③ 修改配置 文件 schema xml
+			A. 为 orders 表设置数据节点为 dn1、 dn2 并指定分片规则为 mod_rule 自定义的名字
+			<table name="orders" dataNode="dn1,dn2" rule="mod_rule" ></table>，如下
+			<schema name="TESTDB" checkSQLschema="false" sqlMaxLimit="100" dataNode="dn1">
+                <table name="customer" dataNode="dn2" ></table>
+                <table name="orders" dataNode="dn1, dn2" rule="mod_rule" >
+                </table>
+			</schema>
+		④ 修改配置文件 rule.xml
+			A. 在 rule 配置文件里新增分片规则 mod_rule，并指定规则适用字段为 customer_id
+			B. 还有选择分片算法 mod-long （对字段求模运算） customer_id 对两个节点求模 ，根据结果分片
+			C. 配置算法 mod-long 参数 count 为 2 ，两个节点
+				<tableRule name="mod_rule">
+						<rule>
+								<columns>customer_id</columns>
+									<algorithm>mod-long</algorithm>
+						</rule>
+				</tableRule>
+				....
+				<function name="mod-long" class="io.mycat.route.function.PartitionByMod">
+						<!-- how many data nodes -->
+						<property name="count">2</property>
+				</function>
+		⑤ 在数据节点 dn2 上建 orders 表
+		⑥ 重启 Mycat，让配置生效
+		⑦ 访问 Mycat 实现分片
+			a. 在 mycat 里向 orders 表插入数据 INSERT 字段不能省略
+			INSERT INTO orders(id, order_type, customer_id, amount) VALUES (1, 101, 100, 100100);
+			INSERT INTO orders(id, order_type, customer_id, amount) VALUES (2, 101, 100, 100030);
+			INSERT INTO orders(id, order_type, customer_id, amount) VALUES (3, 101, 101, 120000);
+			INSERT INTO orders(id, order_type, customer_id, amount) VALUES (4, 101, 101, 103000);
+			INSERT INTO orders(id, order_type, customer_id, amount) VALUES (5, 102, 101, 100400);
+			INSERT INTO orders(id, order_type, customer_id, amount) VALUES (6, 102, 100, 100020);
+			b. 在 mycat、 dn1、 dn2 中查看 orders 表数据，分表成功
+	3. Mycat 的分片 join
+		① Orders 订单表已经进行分表操作了，和它关联的 orders_detail 订单详情表如何进行 join 查询 。
+		② 我们对 orders_detail 也要进行分片操作。Join 的 原理如下图
+												  
+							-----------------------		↗   	 DB1@MySQL1
+							|					  |	  ↗		↗	 ↙
+		select * from orders|		Mycat    	  |	↗		 ↗	   ↙
+		inner join 			-----------------------		  ↗	 ↙
+		orders_detail..		|	    分片分析      |	↘ ↗	   ↙
+							|					  |	↗↘     ↙
+		应用  ----------->	|					  |-----↘-↙--↙>DB2@MySQL2
+							|					  |	↘  ↙  ↙
+							|					  |	 ↙↘↙
+						<---------- 合并结果-------   ↙   ↘ 
+							|					  |         ↘
+							|					  |			   ↘DB3@MySQL3
+							-----------------------
+								    Mycat "拦截"
+									
+		③ ER 表：Mycat 借鉴了 NewSQL 领域的新秀 Foundation DB 的设计思路，Foundation DB 创新性的提出了 Table Group 的概念，
+		其将子表的存储位置依赖于主表，并且物理上紧邻存放，因此彻底解决了JION 的效率和性能问题，根据这一思路，
+		提出了基于 E R 关系的数据分片策略，子表的记录与所关联的父表记录存放在同一个数据分片上。
+			A. 修改 schema xml 配置文件
+			<table name="orders" dataNode="dn1, dn2" rule="mod_rule" >
+				<childTable name="orders_detail" primaryKey="id" joinKey="order_id" parentKey="id" />
+			</table>
+			B. 在 dn2 创建 orders_detail
+			C. 重启 Mycat
+			D. 访问 M ycat 向 orders_detail 表 插入数据
+				INSERT INTO orders_detail(id, detail, order_id) values(1,'detail1', 1);
+				INSERT INTO orders_detail(id, detail, order_id) values(2,'detail2', 2);
+				INSERT INTO orders_detail(id, detail, order_id) values(3,'detail3', 3);
+				INSERT INTO orders_detail(id, detail, order_id) values(4,'detail4', 4);
+				INSERT INTO orders_detail(id, detail, order_id) values(5,'detail5', 5);
+				INSERT INTO orders_detail(id, detail, order_id) values(6,'detail6', 6);
+			E. 在 mycat、dn1、dn2中运行两个表 join 语句
+			Select o.*, od.detail from orders o inner join orders_detail od on o.id=od.order_id;
+	4. 全局表
+		① 在分片的情况下，当业务表因为规模而进行分片以后，业务表与这些附属的字典表之间的关联，
+		就成了比较 棘手的问题，考虑到字典表具有以下几个特性：
+			A. 变动不频繁
+			B. 数据量总体变化不大
+			C. 数据规模不大，很少有超过数十万条记录
+		② 鉴于此，Mycat 定义了一种特殊的表，称之为“全局表”，全局表具有以下特性：
+			A. 全局表的插入、更新操作会实时在所有节 点上执行，保持各个分片的数据一致性
+			B. 全局表的查询操作，只从一个节点获取
+			C. 全局表可以跟任何一个表进行 JOIN 操作
+		③ 将字典表或者符合字典表特性的一些表定义为全局表，则从另外一个方面，很好的解决了数据
+		JOIN 的难题。通过全局表基于 ER 关系的分片策略，Mycat 可以满足 80% 以上的企业应用开发
+			A. 修改 schema.xml 配置文件
+				<table name="dict_order_type" dataNode="dn1, dn2" type="global" ></table>
+			B. 在 dn 2 创建 dict_order_type 表
+			C. 重启 Mycat
+			D. 访问 Mycat 向 dict_order_type 表插入数据
+				INSERT INTO dict_order_type(id, order_type) VALUES(101,'type1');
+				INSERT INTO dict_order_type(id, order_type) VALUES(102,'type2');
+			E. 在 Mycat、dn1、dn2 中查询表数据
+	5. 常用分片规则
+		① 取模：此规则为对分片字段求摸运算。也是水平分表最常用规则。5.2 配置分表中 orders 表采用了此规则 。
+		② 分片枚举：
+			A. 通过在配置文件中配置可能的枚举 id，自己配置分片，本规则适用于特定的场景，比如有些业务
+			需要按照省份或区县来做保存，而全国省份区县固定的，这类业 务使用本条规则。
+			B. 修改 schema.xml 配置文件
+			<table name="orders_ware_info" dataNode="dn1, dn2" rule="sharding_by_intfile" ></table>
+			C. 修改 rule.xml 配置文件
+				<tableRule name="sharding_by_intfile">
+					<rule>
+						<columns>areacode</columns>
+						<algorithm>hash-int</algorithm>
+					</rule>
+				</tableRule>
+				...
+				<function name="hash-int" class="io.mycat.route.function.PartitionByFileMap">
+					<property name="mapFile">partition-hash-int.txt</property>
+					<property name="type">1</property>
+					<property name="defaultNode">0</property>
+				</function>
+			D. 参数含义
+				a. columns：分片字段 
+				b. algorithm：分片函数
+				c. mapFile: 标识配置文件名称
+				d. type：0代表分片字段为 int 型、 非0代表分片字段为String
+				e. defaultNode： 默认节点小于 0 表示不设置默认节点，大于等于 0 表示设置默认节点，设置默认节点 
+				如果碰到不识别的枚举值，就让它路由到默认节点 ，如不设置不识别就报错
+			E. 修改 partition-hash-int.txt 配置文件，表示分片字段对应的节点
+				110=0
+				120=1
+			F. 重启 Mycat
+			G. 访问 Mycat 创建表，订单归属区域信息表
+				CREATE TABLE orders_ware_info(
+					id INT AUTO_INCREMENT comment '编号', 
+					order_id INT comment '订单编号', 
+					address VARCHAR(200) comment '地址', 
+					areacode VARCHAR(20) comment '区域编号', 
+					PRIMARY KEY(id)
+				);
+				INSERT INTO orders_ware_info(id, order_id, address, areacode) VALUES(1, 1, '北京', '110');
+				INSERT INTO orders_ware_info(id, order_id, address, areacode) VALUES(2, 2, '广东', '120');
+			H. 查询 Mycat、dn1、dn2 可以看到数据分片效果
+		③ 范围约定
+			A. 此分片适用于，提前规划好分片字段某个范围属于哪个分片。
+			B. 修改 schema.xml 配置文件
+				<table name="payment_info" dataNode="dn1, dn2" rule="auto_sharding_long" ></table>
+			C. 修改 rule .xml 配置文 件
+			<tableRule name="auto_sharding_long">
+				<rule>
+					<columns>order_id</columns>
+					<algorithm>rang-long</algorithm>
+				</rule>
+			</tableRule>
+			...
+			<function name="rang-long"
+				class="io.mycat.route.function.AutoPartitionByLong">
+				<property name="mapFile">autopartition-long.txt</property>
+				<property name="defaultNode">0</property>
+			</function>
+			D. 参数含义：
+				a. columns：分片字段 
+				b. algorithm：分片函数
+				c. mapFile: 标识配置文件名称
+				d. defaultNode： 默认节点小于 0 表示不设置默认节点，大于等于 0 表示设置默认节点，设置默认节点 
+				如果碰到不识别的枚举值，就让它路由到默认节点 ，如不设置不识别就报错
+			E. 修改 autopartition long txt 配置文件, 
+				0-102=0：0 - 102在dn1节点上
+				103-200=1：103 - 200在电脑节点上
+			F. 重启 Mycat
+			G. 访问 Mycat 创建表，支付信息表
+				CREATE TABLE payment_info(
+					id INT AUTO_INCREMENT comment '编号', 
+					order_id INT comment '订单编号', 
+					payment_status INT comment '支付状态', 
+					PRIMARY KEY(id)
+				);
+			H. 插入数据
+				INSERT INTO payment_info(id, order_id, payment_status) VALUES(1, 101, 0);
+				INSERT INTO payment_info(id, order_id, payment_status) VALUES(2, 102, 1);
+				INSERT INTO payment_info(id, order_id, payment_status) VALUES(3, 103, 0);
+				INSERT INTO payment_info(id, order_id, payment_status) VALUES(4, 104, 1);
+			I. 查询 Mycat、dn1、dn2 可以看到数据分片效果
+		④ 按日期（天）分片
+			A. 此规则为按天分片。设定时 间格式 、范围
+			B. 修改 schema.xml 配置文件
+				<table name="login_info" dataNode="dn1, dn2" rule="sharding_by_date" ></table>
+			C. 修改 rule .xml 配置文件
+				 <tableRule name="sharding_by_date">
+					<rule>
+							<columns>login_date</columns>
+							<algorithm>shardingByDate</algorithm>
+					</rule>
+				</tableRule>
+				...
+				<function name="shardingByDate"
+					class="io.mycat.route.function.PartitionByDate">
+					<property name="dateFormat">yyyy-MM-dd</property>
+					<property name="sBeginDate">2020-01-01</property>
+					<property name="sEndDate">2020-01-04</property>
+					<property name="sPartionDay">2</property>
+				</function>
+			D. 参数含义：
+				a. columns：分片字段 
+				b. algorithm：分片函数
+				c. dateFormat：日期格式
+				d. sBeginDate ：开始日期
+				e. sEndDate：结束日期则代表数据达到了这个日期的分片后循环从开始分片插入
+				f. sPartionDay：分区天数，即默认从开始日期算起，分隔 2 天一个分区
+			E. 重启 Mycat
+			F. 访问 Mycat 创建表，用户登录信息表
+				CREATE TABLE login_info(
+					id INT AUTO_INCREMENT comment '编号', 
+					user_id INT comment '用户编号', 
+					login_date date comment '登录日期', 
+					PRIMARY KEY(id)
+				);
+			G. 插入数据
+				INSERT INTO login_info(id, user_id, login_date) VALUES (1, 101, '2020-01-01');
+				INSERT INTO login_info(id, user_id, login_date) VALUES (2, 102, '2020-01-02');
+				INSERT INTO login_info(id, user_id, login_date) VALUES (3, 103, '2020-01-03');
+				INSERT INTO login_info(id, user_id, login_date) VALUES (4, 104, '2020-01-04');
+				INSERT INTO login_info(id, user_id, login_date) VALUES (5, 101, '2020-01-05');
+				INSERT INTO login_info(id, user_id, login_date) VALUES (6, 102, '2020-01-06');
+				INSERT INTO login_info(id, user_id, login_date) VALUES (7, 103, '2020-01-07');
+				INSERT INTO login_info(id, user_id, login_date) VALUES (8, 104, '2020-01-08');
+			H. 查询 Mycat、dn1、dn2 可以看到数据分片效果
+	6. 全局序列
+		① 在实现分库分表的情况下，数据库自增主键已无法保证自增主键的全局唯一。为此，Mycat 提供了全局 sequence，
+		并且提供了包含本地配置和数据库配置等多种实现方式
+		② 本地文件
+			A. 此方式Mycat 将 sequence 配置到文件中，当使用到 sequence 中的配置后，Mycat 会更新classpath中的 
+			sequence_conf.properties 文件中 sequence 当前的值。
+			B. 优点：本地加载，读取速度较快
+			C. 缺点 抗风险能力差 M ycat 所在主机宕机后 ，无法读取本地文件 。
+		③ 数据库方式
+			A. 利用数据库一个表来进行计数累加。但并不是每次生成序列都读写数据库，这样效率太低。Mycat 会预加载一部分号段
+			到 Mycat 的内存中，这样大部分读写序列都是在内存中完成的。如果内存中的号段用完了Mycat 会再向数据库要一次。
+			B. 如果Mycat 崩溃了 ，那内存中的序列将会失效，Mycat 重新启动后会向数据库申请新的号段，原有号段会弃用。
+			也就是说如果 Mycat 重启，那么损失是当前的号段没用完的号码，但是不会因此出现主键重复
+		④ 建库序列脚本
+			A. 在 dn1 上创建全局序列表
+			CREATE TABLE MYCAT_SEQUENCE(NAME VARCHAR(50) NOT NULL, current_value INT NOT
+			NULL, increment INT NOT NULL DEFAULT 100, PRIMARY KEY(NAME)) ENGINE=INNODB;
+			B. 创建全局序列所需函数
+			DELIMITER $$
+			CREATE FUNCTION mycat_seq_currval(seq_name VARCHAR(50)) RETURNS VARCHAR(64)
+			DETERMINISTIC
+			BEGIN
+			DECLARE retval VARCHAR(64);
+			SET retval="-999999999,null";
+			SELECT CONCAT(CAST(current_value AS CHAR),",",CAST(increment AS CHAR)) INTO retval FROM
+			MYCAT_SEQUENCE WHERE NAME=seq_name;
+			RETURN retval;
+			END $$
+			DELIMITER ;
+			
+			DELIMITER $$
+			CREATE FUNCTION mycat_seq_setval(seq_name VARCHAR(50),VALUE INTEGER) RETURNS VARCHAR(64)
+			DETERMINISTIC
+			BEGIN
+			UPDATE MYCAT_SEQUENCE
+			SET current_value = VALUE
+			WHERE NAME = seq_name;
+			RETURN mycat_seq_currval(seq_name);
+			END $$
+			DELIMITER ;
+
+			DELIMITER $$
+			CREATE FUNCTION mycat_seq_nextval(seq_name VARCHAR(50)) RETURNS VARCHAR(64)
+			DETERMINISTIC
+			BEGIN
+			UPDATE MYCAT_SEQUENCE
+			SET current_value = current_value + increment WHERE NAME=seq_name;
+			RETURN mycat_seq_currval(seq_name);
+			END $$
+			DELIMITER ;
+			C. 初始化序列表记录
+			INSERT INTO MYCAT_SEQUENCE(NAME, current_value, increment) VALUES('ORDERS', 400000, 100);
+			D. 修改 Mycat 配置
+				a. 修改 sequence_db_conf.properties
+				b. 意思是 ORDERS 这个序列在 dn1 这个节点上，具体 dn1 节点是哪台机子，请参考 schema.xml
+			E. 修改 server.xml
+				全局序列类型 0 本地文件 1 数据库方式 2 时间戳方式 。此处 应该 修改 成 1 。
+				<property name="sequnceHandlerType">1</property>
+			F. 重启 Mycat
+				a. 验证全局序列, 登录 Mycat，插入数据
+				insert into orders(id, order_type, customer_id, amount) values(next value for MYCATSEQ_ORDERS, 102, 101, 1000);
+				b. 注意：第一次插入数据时会报 ERROR 1064 (HY000)
+				c. 因此在第一次向数据库中插入数据时，next value for MYCATSEQ_ORDERS需要用引号包括，后续插入即可正常插入
+			G. 查询数据
+			H. 重启 Mycat 后 ，再次插入数据 ，再查询
+		⑤ 时间戳方式
+			A. 全局序列ID=64位二进制(42(毫秒)+5(机器 ID)+5(业务编码)+12(重复累加) 换算成十进制为 18 位数的 long 类型，每毫秒可以并发 12 位二进制的累加。
+			B. 优点：配置简单
+			C. 缺点 18 位 ID 过长
+		⑥ 自主生成全局序列
+			A. 可在
+				a. java 项目里自己生成全局序列 ，如 下
+				b. 根据业务逻辑组合
+				c. 可以利用 redis 的单线程原子性 incr 来生成序列
+				d. 但自主生成需要单独在工程中用 java 代码实现 还是推荐使用 Mycat 自带全局序列 。
+六、基于 HA 机制的 Mycat 高可用
+	1. 在实际项目中 Mycat 服务也需要考虑高可用性，如果 Mycat 所在服务器出现宕机 ，或 Mycat 服务故障，
+	需要有备机提供服务，需要考虑 Mycat 集群。
+	2. 高可用方案
+		① 我们可以使用 HAProxy + Keepalived 配合两台 Mycat 搭起 Mycat 集群 ，实现高可用性 。 HAProxy
+		实现了 Mycat 多节点的集群高可用和负载均衡，而 HAProxy 自身的高可用则可以通过 Keepalived 来实现。
+						--------------				--------------
+						| HAProxy    |				| HAProxy    |
+						| Keepalived |				| Keepalived |
+						-------------- ↘		  ↙--------------
+							  |           ↘    ↙         |
+							  |             ↘↙           |
+							  ↓            ↙   ↘           ↓
+						  -----------	↙		  ↘  -----------  
+						  |	 Mycat  |                 |  Mycat  |
+						  -----------				  -----------
+							  |							   |
+							  ↓							   ↓
+						------------------------------------------
+						|	 dn1             dn2          dn3    |
+						------------------------------------------
+		② 准备好的机器
+			编号		机器名			IP地址					角色	
+			1			Ke				192.168.107.8			Mycat1
+			2			LiXL			192.168.107.29			HAProxy + Keepalived（Master）
+			3			LiXC			192.168.107.27			Mycat2
+			4			LILX			192.168.107.30			HAProxy + Keepalived（Backup）
+	3. 安装配置 HAProxy
+		① 安装 HAProxy
+			A. HAProxy下载官网：http://download.openpkg.org/components/cache/haproxy/
+			B. 下载好 HAProxy 安装包（haproxy-1.8.5.tar.gz），传到 opt 目录下
+			C. 解压 haproxy-1.8.5.tar.gz 到 /usr/local/src 下
+				tar -zxvf haproxy-1.8.5.tar.gz -C /usr/local/src
+			D. 进入解压后的目录，查看内核版本进行编译
+				a. cd /usr/local/src/haproxy-1.8.5
+				b. uname -r
+					2.6.32-642.el6.x86_64
+				c. make TARGET=linux2628 PREFIX=/usr/local/haproxy ARCH=x86_64
+				d. 参数解释
+					(1) TARGET=linux2628：指定内核版本，即使用uname -r查看内核版本时，2.6.32即为系统的内核
+					当前系统内核如果超过了2.6.28，即TARGET=linux2628，如果小于2.6.28，即TARGET=linux26
+					(2) ARCH=x86_64：指定系统的位数
+					(3) PREFIX=/usr/local/haproxy：指定HAProxy的安装路径
+			E. 编译完成后，进行安装
+				make install PREFIX=/usr/local/haproxy
+			F. 安装完成后创建目录、创建 HAProxy 配置文件
+				mkdir -p /usr/data/haproxy
+				vim /usr/local/haproxy/haproxy.conf
+			G. 向配置文件中插入以下配置信息并保存
+				global
+					log 127.0.0.1	local0
+					#log 127.0.0.1	local1 notice
+					#log lo ghost	local0 info
+					maxconn 4096
+					chroot /usr/local/haproxy
+					pidfile /usr/data/haproxy/haproxy.pid
+					uid 99
+					gid 99
+					daemon
+					#debug
+					#quiet
+					
+				defaults
+					log		global
+					mode 	tcp
+					option 	abortonclose
+					option 	redispatch
+					retries 3
+					maxconn 2000
+					timeout	connect	5000
+					timeout client	50000
+					timeout server	50000
+
+				listen proxy_status
+					bind :48066
+					mode tcp
+					balance roundrobin
+					server mycat_1 192.168.107.8:8066 check inter 10s
+					server mycat_2 192.168.107.27:8066 check inter 10s
+						
+				frontend admin_stats
+					bind :7777
+					mode http
+					stats enable
+					option httplog
+					maxconn 10
+					stats refresh 30s
+					stats uri /admin
+					stats auth admin:2648
+					stats hide-version
+					stats admin if TRUE
+		② 启动验证
+			A. 启动 HAProxy
+				/usr/local/haproxy/sbin/haproxy -f /usr/local/haproxy.conf
+			B. 查看 HAProxy 进程
+				ps -ef|grep haproxy
+			C. 在浏览器中输入地址：
+				a. http://192.168.107.29:7777/admin，
+				b. 在弹出框中输入用户名：admin，密码：2648
+				c. 如果Mycat主备机均已启动，则可以看到两个mycat的状态为绿色
+			D. 验证负载均衡 ，通过 HAProxy 访问 Mycat
+	4. 配置 Keepalived
+		① 安装 Keepalived
+			A. Keepalived 下载官网：https://www.keepalived.org/download.html
+			B. 将下载好的Keepalived安装包keepalived-1.4.5.tar.gz，传到/opt目录下
+			C. 解压 keepalived-1.4.5.tar.gz 到usr/local/src
+				tar -zxvf keepalived-1.4.5.tar.gz -C /usr/local/src
+			D. 安装依赖插件
+				yum install -y gcc openssl-devel popt-devel
+			E. 进入解压后的目录 进行配置 进行编译
+				cd /usr/local/src/keepalived-1.4.5
+				./configure --prefix=/usr/local/keepalived
+			F. 进行编译完成后，进行安装
+				make && make install
+		② 运行前配置
+			A. cp /usr/local/src/keepalived-1.4.5/keepalived/etc/init.d/keepalived /etc/init.d
+			B. mkdir /etc/keepalived
+			C. cp /usr/local/keepalived/etc/keepalived/keepalived.conf /etc/keepalived/
+			D. cp /usr/local/src/keepalived-1.4.5/keepalived/etc/sysconfig/keepalived /etc/sysconfig/
+			E. cp /usr/local/keepalived/sbin/keepalived /usr/sbin/
+		③ 修改配置文件
+			A. vim /etc/keepalived/keepalived.conf
+			B. 将文件的所有内容修改为以下内容
+				! Configuration File for keepalived
+
+				global_defs {
+					notification_email {
+						1634491328@qq.com
+					}
+					notification_email_from keepalived@showjoy.com
+					smtp_server 127.0.0.1
+					smtp_connect_timeout 30
+					router_id LVS_DEVEL
+					vrrp_skip_check_adv_addr
+					vrrp_garp_interval 0
+					vrrp_gna_interval 0
+				}
+
+				vrrp_instance VI_1 {
+					#主机配 MASTER，备机配BACKUP
+					state MASTER
+					#所在机器网卡
+					interface eth0
+					virtual_router_id 51
+					#数值越大优先级越高
+					priority 100
+					advert_int 1
+					authentication {
+						auth_type PASS
+						auth_pass 1111
+					}
+					virtual_ipaddress {
+						#虚拟IP
+						192.168.107.26
+					}
+				}
+
+				virtual_server 192.168.107.26 48066 {
+					delay_loop 6
+					lb_algo rr
+					lb_kind NAT
+					persistence_timeout 50
+					protocol TCP
+					real_server 192.168.107.29 48066 {
+						weight 1
+						TCP_CHECK {
+							connect_timeout 3
+							retry 3
+							delay_before_retry 3
+						}
+					}
+					real_server 192.168.107.30 48066 {
+						weight 1weight 1
+						TCP_CHECK {
+							connect_timeout 3
+							nb_get_retry 3
+							delay_before_retry 3
+						}
+					}
+				}
+		④ 启动验证
+			A. 启动 Keepalived：service keepalived start
+			B. 登录验证：mysql -umycat -p2648 -h192.168.107.26 -P48066
+			
+	5. 测试高可用
+		① 关闭 mycat
+		② 通过虚拟 ip 查询数据
+七、Mycat 安全设置
+	1. 权限配置
+		① user 标签权限控制：目前Mycat 对于中间件的连接控制并没有做太复杂的控制，目前只做了中间件逻辑库级别的读
+		写权限控制。是通过 server.xml 的 user 标签进行配置 。
+			A. server.xml 配置文件 user 部分
+				<user name="mycat">
+					<property name="password">2648</property>
+					<property name="schemas">TESTDB</property>
+				</user>
+
+				<user name="user">
+					<property name="password">user</property>
+					<property name="schemas">TESTDB</property>
+					<property name="readOnly">true</property>
+				</user>
+			B. 配置说明
+				a. name：应用连接中间件逻辑库的用户名
+				b. password：该用户对应的密码
+				c. TESTDB：应用当前连接的逻辑库中所对应的逻辑表。schemas 中可以配置一个或多个
+				d. readOnly：应用连接中间件逻辑库所具有的权限。true 为只读，false 为读写都有，默认为 false
+			C. 测试案例
+				a. 测试案例一
+					(1) 使用 user 用户 ，权限为只读 readOnly true
+					(2) 验证是否可以查询出数据 验证是否可以写入数据
+					(3) 用 user 用户登录，运行命令如下
+						mysql -uuser -puser -h192.168.107.8 -P8066
+					(4) 切换到 TESTDB 数据库 ，查询 orders 表数据，如下：
+						use TESTDB;
+						select * from mytbl;
+					(5) 可以查询到数据
+					(6) 执行插入数据sql，如下：
+						insert into mytbl(id, name) values(1, '')
+					(7) 可看到运行结果 ，插入失败 只有只读权限
+						ERROR 1405 （HY000）:User readonly
+				b. 测试案例二
+					(1) 使用 mycat 用户 ，权限为 可 读 写 readOnly fa lse
+					(2) 验证是否可以查询出数据 验证是否可以写入数据
+					(3) 用 mycat 用户登录，运行命令如下：
+						mysql -umycat -p2648 -h192.168.107.8 -P8066
+					(4) 切换到 TESTDB 数据库，查询 orders 表数据，如下
+						use TESTDB;
+						select * from  mytbl;
+					(5) 可以查询到数据
+					(6) 执行插入数据 sql，如下
+						insert into mytbl(id, name) values(1, '')
+		③ privileges 标签权限控制
+			A. 在user 标签下的 privileges 标签可以对逻辑库（schema）、表 table ）进行精细化的 DML 权限控制。
+			B. privileges 标签下的 check 属性，如为 true 开启权限检查，为 false 不开启，默认为 false 。由于Mycat 
+			一个用户的 schemas 属性可配置多个逻辑库（schema，所以 privileges 的下级节点 schema 节点同样可配置多个，
+			对多库多表进行细粒度的 DML 权限控制 。
+			C. server.xml 配置文件 privileges 部分，以下为配置TESTDB逻辑库中的mytbl没有删除权限
+			 <user name="mycat">
+				<property name="password">2648</property>
+				<property name="schemas">TESTDB</property>
+
+				<!-- 表级 DML 权限设置 -->
+				<privileges check="true">
+					<schema name="TESTDB" dml="1111" >
+						<table name="mytbl" dml="1110"></table>
+						<!-- <table name="tb02" dml="1111"></table> -->
+					</schema>
+				</privileges>
+			</user>
+			D. 配置说明
+				DML权限		增加（insert）		更新（update）	查询（select）	删除（delete）
+				0000		禁止				禁止			禁止			禁止
+				0001		禁止				禁止			禁止			允许
+				0011		禁止				禁止			允许			禁止
+				0111		禁止				允许			允许			允许
+				1111		允许				允许			允许			允许
+			E. 测试案例
+				a. 测试案例一
+					(1) 使用 mycat 用户 privileges 配置 mytbl 表 权限为 禁止增删改查 dml="0000"
+					验证是否可以查询出数据 验证是否可以写入数据
+					(2) 重启 mycat 用 mycat 用户登录，运行命令如下:
+						mysql -umycat -p2648 -h192.168.107.8 -P8066
+					(3) 切换到 TESTDB 数据库，查询 mytbl 表数据，如下
+						use TESTDB;
+						select * from  mytbl;
+					(4) 禁止用户查询数据
+						ERROR 3012（HY000）：The statement DML privilege check is not passed, reject for user 'mycat'
+					(5) 其他增删改的权限也全都被禁止
+				b. 测试案例二
+					(1) 使用 mycat 用户 privileges 配置 mytbl 表权限为 可以 增删改查 dml= 1111，验证是否可以查询出数据
+					 验证是否可以写入数据
+					(2) 重启 mycat 用 mycat 用户登录，运行命令如下
+						mysql -umycat -p2648 -h192.168.107.8 -P8066
+					(3) 切换到 TESTDB 数据库，查询 mytbl 表数据，如下
+						use TESTDB;
+						select * from  mytbl;
+					(4) 查询数据成功
+					(5) 其他增删改的权限也全都被允许
+	2. SQL 拦截
+		① firewall标签用来定义防火墙； 
+			A. firewall 下 whitehost 标签用来定义 IP 白名单
+			B. blacklist 用来定义SQL 黑名单。
+		② 白名单
+			A. 可以通过设置白名单实现某主机某用户 可以访问 Mycat，而其他主机用户禁止访问。
+			B. 设置白名单，设置server.xml 配置文件 firewall 标签，以下配置只有192.168.107.8 的mycat 用户可以访问
+				<firewall>
+				    <whitehost>
+						<host host="192.168.107.8" user="mycat"/>
+				    </whitehost>
+				</firewall>
+			C. 重启 Mycat 后 192.168.107.8 主机使用 mycat 用户访问
+				a. mysql -umycat -p2648 -h192.168.107.8 -P8066
+				b. 可以正常访问
+				c. 在此主机换 user 用户访问，禁止访问
+				d. 在192.168.107.29 主机用 mycat 用户访问，禁止访问
+		③ 黑名单
+			A. 可以通过设置黑名单实现 Mycat 对具体 SQL 操作的拦截如增删改查等操作的拦截。
+			B. 设置黑名单
+				a. server.xml 配置文件 firewall 标签，配置禁止 mycat 用户进行修改操作
+					<firewall>
+						<whitehost>
+							<host host="192.168.107.8" user="mycat"/>
+						</whitehost>
+
+						<blacklist check="true">
+							<property name="updateAllow">false</property>
+						</blacklist>
+					</firewall>
+				b. 重启 Mycat 后 192.168.107.8 主机使用 mycat 用户访问
+					mysql -umycat -p2648 -h192.168.107.8 -P8066
+				c. 切换 TESTDB 数据库后，执行修改数据语句
+				d. 运行后发现已禁止修改数据操作
+					ERROR 3012 （HY000）：The statement is unsafe SQL，reject for user 'mycat '
+			C.  可以设置的黑名单 SQL 拦截功能列表
+				配置项				缺省值				描述
+				selectAllow			true				是否允许执行 SELECT 语句
+				deleteAllow			true				是否允许执行 delete 语句
+				updateAllow			true				是否允许执行 UPDATE 语句
+				insertAllow			true				是否允许执行 INSERT 语句
+				createTableAllo		true				是否允许创建表
+				setAllow			true				是否允许使用 SET 语法
+				alterTableAllow		true				是否允许执行 Alter Table 语句
+				dropTableAllow 		true				是否允许修改表
+				commitAllow			true				是否允许执行 commit 操作
+				rollbackAllow		true				是否允许执行 roll back 操作
+八、Mycat-web 配置使用
+	1. ZooKeeper 安装
+		① 下载安装包：http://zookeeper.apache.org/
+		② 安装包拷贝到 Linux 系统 opt 目录下，并解压
+			tar -zxvf zookeeper-3.4.11.tar.gz
+		③ 进入 ZooKeeper 解压后的配置目录 conf ，复制配置文件并改名
+			cp cp zoo_sample.cfg zoo.cfg
+		④ 进入 ZooKeeper 的命令目录 bin，运行启动命令
+			./zkServer.sh start
+		⑤ ZooKeeper 服务端口为 2181，查看服务已经启动
+			netstat -ant|grep 2181
+	2. Mycat-web 安装
+		① 下载安装包 http://www.mycat.io/
+		② 安装包拷贝到 Linux 系统 opt 目录下，并解压到/usr/local/
+			tar -zxvf Mycat- web-1.0-SNAPSHOT-20170102153329-linux.tar.gz -C /usr/local/
+		③ 进入 mycat-web 的 目录下运行以控制台的方式启动命令
+			cd /usr/local/mycat-web/
+			./start.sh &
+		④ Mycat-web 服务端口为 8082，查看服务已经启动
+			netstat -nat|grep 8082
+		⑤ 通过地址访问服务
+			http://192.168.107.29/mycat/
+	3. Mycat-web 配置
+		① 先在注册中心配置 ZooKeeper 地址，配置后刷新页面，可见
+		② 接着进入到mycat服务管理，在ZooKeeper配置中心中绑定mycat的IP和逻辑库名称等
+	4. Mycat 性能监控指标
+		在Mycat-web 上可以进行 Mycat 性能监控，例如：内存分享、流量分析、连接分析、活动线程分析等等。
+	
+
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	

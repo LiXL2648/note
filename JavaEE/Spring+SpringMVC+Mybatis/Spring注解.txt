@@ -1,0 +1,1023 @@
+一、Spring注解驱动开发
+	1. 容器
+		① AnnotationConfigApplicationContext
+			A. 配置类
+			B. 包扫描
+		② 组件添加
+			A. @ComponentScan
+			B. @Bean
+				a. 指定初始化销毁
+				b. 初始化其他方式
+					(1) InitializingBean（初始化设置值之后）
+					(2) DisposableBean（销毁）
+					(3) JSR250
+						(A) @PostConstruct
+						(B) @PreDestroy
+				c. BeanPostProcessor
+			C. @Configuration
+			D. @Component
+			E. @Service
+			F. @Controller
+			G. @Repository
+			H. @Conditional
+			I. @Primary
+			J. @Lazy
+			k. @Scope
+			L. @Import
+			M. ImportSelector
+			N. 工厂模式
+				a. FactoryBean
+					(1) &beanName获取Factory本身
+		③ 组件赋值
+			A. @Value
+			B. @Autowired
+				a. @Qualifier
+				b. 其他方式
+					(1) @Resources（JSR250）
+					(2) @Inject（JSR330，需要导入javax.inject）
+			C. @PropertySource
+			D. @PropertySources
+			E. @Profile
+				a. Environment
+				b. -Dspring.profiles.active=test
+		④ 组件注入
+			A. 方法参数
+			B. 构造器注入
+			C. ApplicationContextAware
+				a. ApplicationContextAwareProcessor
+			D. xxxAware
+		⑤ AOP
+			A. @EnableAspectJAutoProxy
+			B. @Before/@After/@AfterReturning/@AfterThrowing/@Around
+			C. @Pointcut
+		⑥ 声明式事务
+			A. @EnableTransactionManagement
+			B. @Transactional
+	2. 扩展原理
+		① BeanFactoryPostProcessor
+			A. Spring容器标准初始化之后执行（BeanPostProcessor之前），此时bean还未创建
+			B. Spring容器初始化两大步
+				a. 加载保存和读取所有bean配置
+				b. 按照之前的配置创建bean
+		② BeanDefinitionRegistryPostProcessor
+			A. BeanFactoryPostProcessor子类，可自定义添加bean定义
+			B. BeanDefinetionRegistry
+				a. BeanDefinetionBuilder
+		③ ApplicationListener
+			A.  @EventListener
+		④ Spring容器创建过程
+	3. web
+		① servlet3.0
+			A. ServletContainerInitializer
+			B. Registration
+				a. ServletRegistration
+				b. FilterRegistration
+			C. ServletContext
+		② 异步请求	 	
+二、容器
+	1. 容器的简介
+		① 重要特性：控制反转（IOC）和依赖注入（DI）
+		② Spring认为所有的组件都应该放在IOC容器中，然后组件之间的关系通过容器进行自动装配，也就是依赖注入
+	2. AnnotationConfig和ApplicationContext
+		① 配置类：
+			A. 基于配置版本的Spring容器，如果要在IOC容器中添加bean，则必须在IOC容器中通过以下方式
+				<bean id="emp" class="com.li.springAnnotation.bean.Emp">
+					<property name="empName" value="LiXL"></property>
+					<property name="age" value="18"></property>
+				</bean>
+				ApplicationContext applicationContext = new ClassPathXmlApplicationContext("applicationContext.xml");
+				Emp emp = (Emp)applicationContext.getBean("emp");
+			B. 基于注解版的Spring容器的配置步骤
+				a. 首先先创建一个类MainConfig
+				b. 在该类上面使用@Configuration声明该类是一个配置类
+					@Configuration
+					public class MainConfig {
+				c. 在该类中注册bean的步骤是
+					(1) 在该类中声明一个方法，方法的返回值是该Bean在容器中类型，方法名则是该Bean在容器中的id值
+					(2) 在方法上使用@Bean注解注册该Bean
+					(3) 在@Bean注解中使用value属性可以为注册的Bean起一个名字
+					(4) 举例：
+						@Bean("emp")
+						public Emp emp01() {
+							return new Emp("LiXL", 18);
+						}
+				d. 使用AnnotationConfigApplicationContext或者Bean
+					ApplicationContext applicationContext = new AnnotationConfigApplicationContext(MainConfig.class);
+					Emp emp = (Emp) applicationContext.getBean("emp");
+		② 包扫描	
+			A. 基于配置文件版的包扫描的步骤是
+				a. 在applicationContext.xml配置文件上导入context的命名空间
+				b. 使用<context:component-scan>标签指明要扫描的包名
+					<context:component-scan base-package="com.li.springAnnotation"></context:component-scan>
+				c. 配置完成后，在扫描包及其子包下，如果存在类使用了@service、@repository或者@component注解，则该类将会被注册到IOC容器中
+			B. 基于注解版的包扫描的步骤是
+				a. 在配置类上使用注解@ComponentScan并通过通过value属性指明要扫描的包
+					@Configuration
+					@ComponentScan(value = "com.li.springAnnotation")
+					public class MainConfig {
+				b. 指定要排除的规则
+					a. 使用@ComponentScan 的excludeFilters属性，指明需要排除的规则
+					b. excludeFilters 属性值是一个Filter类型数组，可以指定多种排除规则
+					c. @Filter注解中需要指定type：即按照什么类型进行排除，有以下可选择值
+						(1) ANNOTATION：按照注解进行排除，该方式是最常用的
+							@Filter(type = FilterType.ANNOTATION, classes = { Controller.class })
+						(2) ASSIGNABLE_TYPE：按照给定的类型进行排除
+							@Filter(type = FilterType.ASSIGNABLE_TYPE, classes = { EmpService.class})
+						(3) ASPECTJ：按照切面进行排除
+						(4) REGEX：按照正则表达式进行排除
+						(5) CUSTOM：自定义，排除规则，需要实现TypeFilter
+							@Filter(type = FilterType.CUSTOM, classes = { MyTypeFilter.class })
+					d. 举例：
+						@ComponentScan(value = "com.li.springAnnotation", excludeFilters = {
+								@Filter(type = FilterType.ANNOTATION, classes = { Controller.class})
+						})
+				c. 指定只包含的规则
+					a. 使用@ComponentScan 的includeFilters属性，指明需要包含的规则
+					b. includeFilters属性值是一个Filter类型的数组，可以指定多种包含规则
+					c. 使用 includeFilters时，需要使用@ComponentScan 的useDefaultFilters属性为false，禁用默认的过滤规则，includeFilters属性才能生效
+					d. 举例：
+						@ComponentScan(value = "com.li.springAnnotation", includeFilters = {
+								@Filter(type = FilterType.ANNOTATION, classes = { Controller.class })
+						}, useDefaultFilters = false)
+				d. JDK8版本支持使用多个@ComponentScan注解，但是JDK7版本及以下的版本不支持，但是可以使用@ComponentScans注解，该注解的value属性是一个@ComponentScan数组
+					@ComponentScans(value = {
+							@ComponentScan(value = "com.li.springAnnotation", includeFilters = {
+									@Filter(type = FilterType.ANNOTATION, classes = { Controller.class })
+							}, useDefaultFilters = false)
+					})
+			C. TypeFilter：包扫描自定规则需要实现的接口，该接口有一个match(MetadataReader metadataReader, MetadataReaderFactory factory)方法
+				a. MetadataReader：读取到的当前正在扫描的类信息，API：
+					(1) AnnotationMetadata getAnnotationMetadata()：获取当前类的注解信息
+					(2) ClassMetadata getClassMetadata()：获取当前正在扫描类的信息
+					(3) Resource getResource()获取当前类资源（类路径等）
+				b. MetadataReaderFactory：可以获取到其他任何类的信息
+				c. 举例：
+					public class MyTypeFilter implements TypeFilter {
+						public boolean match(MetadataReader metadataReader, MetadataReaderFactory factory)
+								throws IOException {
+							// AnnotationMetadata annotationMetadata = metadataReader.getAnnotationMetadata();
+							ClassMetadata classMetadata = metadataReader.getClassMetadata();
+							// Resource resource = metadataReader.getResource();
+							String className = classMetadata.getClassName();
+							if (EmpRepository.class.getName().equals(className)) {
+								return true;
+							}
+							return false;
+						}
+					}
+	2. 组件添加
+		① @Scope设置组件作用域，该注解的属性有以下可选择
+			A. singleton：多实例：IOC容器启动时并不会创建对象，在每次获取对象时，IOC容器才会创建对象
+			B. prototype：单实例，IOC启动时，会创建对象存在IOC容器中，以后获取时，都是从容器中获取
+			C. request：同一次请求创建一个实例
+			D. session：同一个session创建一个实例
+		② 懒加载：
+			A. 单实例bean：默认在容器中启动的时候创建对象
+			B. 懒加载：容器启动时不创建对象。第一次使获取Bean时，容器才创建对象并且初始化，保存在容器中
+			C. 使用@Lazy能够声明一个组件的加载方式为懒加载
+		③ @Conditional
+			A. 按照一定的条件进行判断，满足条件给容器注册Bean
+			B. @Conditional注解可以注释在类上，也可以注册在方法上
+			C. @Conditional注解需要传入一个Condition类型的数组
+			D. Condition：接口，传入@Conditional注解中的元素需要实现Condition接口，该接口的matches方法有两个参数
+				a. ConditionContext：判断条件能够适应的上下文（环境），
+					(1) ConfigurableListableBeanFactory getBeanFactory()：获取IOC使用的beanFactory	
+					(2) ClassLoader getClassLoader()：获取类加载器
+					(3) Environment getEnvironment()：获取环境，封装了运行时信息，环境变量和虚拟机变量
+					(4) BeanDefinitionRegistry getRegistry()：获取bean定义的注册类，可以判断容器中bean中的情况，也可以给容器注册Bean
+				b. AnnotatedTypeMetadata：当前标注了@Conditional的类或者方法的注解信息
+			E. 修改运行时虚拟机系统名称参数
+				a. 选中单元测试类中的方法名，右键选择Run As -> Run Configurations
+				b. 选择Argument，在VM Argument中输入参数 -Dos.name=linux，点击Run重新运行
+			F. @Conditional如果加在类上，即满足condition中的判断时，该配置类中所有配置的注册bean才会生效，可以对类中的组件统一设置
+			G . 举例：
+				@Conditional(value = {  WindowsCondition.class })
+				@Bean("bill")
+				public Emp emp02() {
+					return new Emp("Bill Gats", 60);
+				}
+
+				@Conditional(value = {  LinuxConditional.class })
+				@Bean("linus")
+				public Emp emp03() {
+					return new Emp("Linus", 50);
+				}
+				
+				public class LinuxConditional implements Condition {
+					public boolean matches(ConditionContext context,
+							AnnotatedTypeMetadata metadata) {
+						Environment environment = context.getEnvironment();
+						String property = environment.getProperty("os.name");
+						if (property.contains("linux")) {
+							return true;
+						}
+						return false;
+					}
+				}
+		④ @Import
+			A. 给容器注册组件：
+				a. 包扫描 + 组件标注注解（@Controller/@Service/@Repository/@Component）:该方法局限与自己写的类
+				b. @Bean：该方法可以导入第三方包中的组件
+				c. @Import：快速地给容器导入组件
+				d. FactoryBean：使用Spring提供的FactoryBean（工厂 Bean）
+			B. 使用@Bean的方式向容器中增加组件的方式太麻烦
+			C. 使用@Import：快速地给容器导入组件的步骤
+				a. 在配置类上使用@Import注解
+				b. 在@Import注解中传入要导入容器的组件
+				c. 通过@Import导入的Bean，在容器中会注册该组件并且该组件在容器中的id默认是该Bean的全类名
+				d. 举例：
+					@Import({ Date.class, String.class})
+					public class MainConfig {}
+			D. ImportSelector：通过@Import给容器中导入组件
+				a. 返回需要导入的组件的全类名数组
+				b. 自定义逻辑类需要实现ImportSelector接口，并重写selectImports方法，该方法的AnnotationMetadata参数是当前标注了@Import注解的类的注解信息
+				c. 将自定义逻辑类传入到@Import注解中，通过ImportSelector导入的Bean在IOC容器中的id为该组件的全类名
+				d. 举例：
+					public class MyImportSelector implements ImportSelector {
+						public String[] selectImports(AnnotationMetadata importingClassMetadata) {
+							return new String[] {"java.lang.StringBuilder", "java.lang.StringBuffer"};
+						}
+					}
+					
+					@Import({ Date.class, String.class, MyImportSelector.class})
+					public class MainConfig {}
+			E. ImportBeanDefinitionRegistrar：通过@Import给容器中导入自定义的组件
+				a. 通过ImportBeanDefinitionRegistrar向容器导入自定义的组件需要提供一个先实类，并
+				b. 需要重写ImportBeanDefinitionRegistrar接口的registerBeanDefinitions方法，该方法的参数
+					(1) AnnotationMetadata：当前标注了@Import注解的类的注解信息
+					(2) BeanDefinitionRegistry：BeanDefinition注册类，把所有需要添加到容器中
+				e. 调用BeanDefinitionRegistry的containsBeanDefinition(String beanName)，可以通过Bean的Id判断容器中是否存在指定的类
+				d. 调用BeanDefinitionRegistry的registerBeanDefinition(String beanName, BeanDefinition beanDefinition)方法手工注册Bean，该方法需要传入两个参数
+					(1) beanName：指定将Bean注册到容器中的id名
+					(2) BeanDefinition：注册到容器中的类的信息，使用RootBeanDefinition的实现类进行注册，该实现类需要传入一个要注册到容器的类
+				e. 将ImportBeanDefinitionRegistrar的实现类传入@Import注解中，即ImportBeanDefinitionRegistrar中注册的类将注册到IOC容器中
+				f. 举例
+					public class ImportBeanDefinitionRegistrarImpl implements
+						ImportBeanDefinitionRegistrar {
+						public void registerBeanDefinitions(
+								AnnotationMetadata importingClassMetadata,
+								BeanDefinitionRegistry registry) {
+							boolean definition = registry.containsBeanDefinition("emp");
+							if (definition) {
+								RootBeanDefinition beanDefinition = new RootBeanDefinition(StringBuffer.class);
+								registry.registerBeanDefinition("stringBuffer", beanDefinition);
+							}
+						}
+					}
+					@Import({ Date.class, String.class, MyImportSelector.class, 
+						ImportBeanDefinitionRegistrarImpl.class})
+		⑤ FactoryBean：Spring提供的工厂Bean，使用FactoryBean注册Bean的步骤
+			A. 声明一个FactoryBean
+				a. 定义一个FactoryBean接口的实现类，并重写FactoryBean接口的方法和指明注册类的信息
+				b. getObject()：指明返回的具体Bean
+				c. getObjectType()：指明返回的类型
+				d. isSingleton()：指明返回的Bean在容器中是单实例的还是多实例的，如果返回true，则表明该Bean是单实例，反之则是多实例
+			B. 使用@Bean将 FactoryBean注册到容器中
+			C. 在容器中获取FactoryBean，FactoryBean的类型是调用getObject()时返回组件的类型，而不是FactoryBean本身
+			D. 使用FactoryBean注册的Bean，默认获取的是工程Bean调用getObject()创建的对象，要获取工程Bean的本身，需要给bean的id前加一个&
+			
+			E. 举例：
+				public class DepFactoryBean implements FactoryBean<Dep> {
+					public Dep getObject() throws Exception {
+						System.out.println("FactoryBeanImpl …… getObject");
+						return new Dep();
+					}
+					public Class<?> getObjectType() {
+						return Dep.class;
+					}
+					public boolean isSingleton() {
+						return true;
+					}
+					
+				@Bean
+				public DepFactoryBean depFactoryBean() {
+					return new DepFactoryBean();
+				}
+				// 调用的是getObject()创建的对象
+				public void testFactoryBean() {
+					Object depFactoryBean = applicationContext.getBean("depFactoryBean");
+					System.out.println(depFactoryBean.getClass());
+				}
+				// 获取工程Bean的本身
+				public void testFactoryBean() {
+					Object depFactoryBean = applicationContext.getBean("&depFactoryBean");
+					System.out.println(depFactoryBean.getClass());
+					
+				}
+	3. Bean的生命周期
+		① bean 的生命周期：由bean的创建到bean的初始化再到bean的销毁过程，整个Bean的生命周期都由容器管理
+		② 可以自定义初始化和销毁方法，容器在Bean进行到当前声明周期的时候调用自定义的初始化和销毁方法
+		③ 对象创建
+			A. 单实例对象：在容器启动的时候创建
+			B. 多实例对象：每次获取的时候创建
+		④ 初始化：对象创建完成，并赋值好，调用初始化方法，初始化前后可以调用BeanPostProcessor的postProcessBeforeInitialization和postProcessAfterInitialization
+		⑤ 销毁：单实例：容器关闭的时候调用销毁方法。多实例不会管理这个bean，容器不会调用销毁方法
+		⑥ 在基于配置版的初始化和销毁方法是在Bean注册时，指定init-method和destroy-method
+		⑦ 基于注解版的自定义初始化和销毁方法有四种方式
+			A. 通过@Bean注解指定init-method和destroy-method
+				@Bean(initMethod = "init", destroyMethod = "destroy")
+			B. 通过Bean 实现InitializingBean接口（实现定义初始化逻辑），实现DisposableBean接口（实现定义销毁逻辑）
+				public class Location implements InitializingBean, DisposableBean {
+					public void destroy() throws Exception {
+						System.out.println("Location destroy ……");
+					}
+					public void afterPropertiesSet() throws Exception {
+						System.out.println("Location init ……");
+					}
+				}
+			C. 使用JSR250规范的注解
+				a. @PostConstruct：在Bean创建完成并且属性赋值完，执行初始化方法
+				b. @PreDestroy：容器在销毁Bean之前，通知我们进行清理工作
+				c. 举例：
+					@PreDestroy
+					public void destroy() {
+						System.out.println("Location destroy ……");
+					}
+					@PostConstruct
+					public void init() {
+						System.out.println("Location init ……");
+					}
+			D. BeanPostProcessor：Spring定义的Bean后置处理器，该处理器可以拦截到容器中所有Bean的注册
+				a. postProcessBeforeInitialization：在bean初始化之前被调用
+				b. postProcessAfterInitialization：在bean初始化之后被调用
+		⑧ Spring 在底层对BeanPostProcessor的使用
+			A. ApplicationContextAware：可以获取Spring的IOC容器
+				public class Location implements ApplicationContextAware {
+					private ApplicationContext applicationContext;
+					public void setApplicationContext(ApplicationContext applicationContext)
+							throws BeansException {
+						this.applicationContext = applicationContext;
+					}
+				}
+			B. bean赋值，注入其他组件，@Autowired，生命周期注解功能，@Async，XXXBeanPostProcessor，都是使用BeanPostProcessor完成的
+	4. 组件赋值
+		① @Value注解赋值，有以下方式进行赋值
+			A. 基本数值
+			B. SpEL表达式，#{}
+			C. 使用${}，可以获取配置文件中的值（环境变量中的值）
+		② @PropertySource：加载外部配置文件
+			A. 基于配置版的引入外部文件的步骤
+				a. 导入context的命令空间
+				b. 使用<context:property-placeholder location="classpath:application.properties"/>导入外部文件
+			B. 基于注解版的引入外部文件的步骤
+				a. 在配置类上使用@PropertySource引入外部配置文件，读取配置文件中的key/value保存到运行的环境变量中
+				b. 引入外部配置文件后，即可以使用@Value(${key})获取配置文件中的属性和属性值
+				c. 另外还能使用ApplicationContext的getEnvironment()的getProperty(String key)来获取配置文件中的属性
+				d. 举例
+					@PropertySource({ "classpath:application.properties" })
+					@Configuration
+					public class MainConfig {}
+
+					@Value("${location.county}")
+					private String county;
+				
+					Environment environment = applicationContext.getEnvironment();
+					String value = environment.getProperty("location.county");
+		② @PropertySources：可加载过个@PropertySource
+	5 自动装配
+		① Spring 利用依赖注入（DI），完成对IOC容器中各个组件的依赖关系赋值。
+		② @Autowired：自动注入，该注解是Spring规范的注解
+			A. 默认优先按照类型去容器中找到对应的组件，找到就赋值
+			B. 如果找到多个相同类型的组件，再将要赋值的属性的名称作为组件的id去容器中查找
+			C. 使用@Qualifier可以明确指定需要装配的组件id，而不是使用属性名进行装配
+			D. 自动装配默认一定要将属性赋值好，如若容器中没有对应的组件，则会报错。可以使用@Autowired(required = false)指定没有对应的组件时就不装配。
+			E. 可以使用@Primary，让Spring进行自动装配的时候，默认使用首选的Bean即指定@Primary注解的Bean，也可以继续使用@Qualifier指定需要装配的Bean的id
+		③ Spring还支持使用@Resource（JSR250的规范）和@Inject（JSR330的规范），该注解是Java规范的注解
+			A. @Resource：可以和@Autowired实现自动装配功能，但是该注解默认是按照属性的名称进行装配的，可以使用namw属性指明要装配Bean的id，不能支持
+			@Qualifier、@Primary和@Autowired(required = false)的功能
+			B. @Inject
+				a. 需要导入javax.inject的依赖
+					<dependency>
+						<groupId>javax.inject</groupId>
+						<artifactId>javax.inject</artifactId>
+						<version>1</version>
+					</dependency>
+				b. 功能和@Autowired一样可以支持@Primary和@Qualifier的功能，但是没有和@Autowired(required = false)有类似的属性
+		④ 自动装配功能是由AutowiredAnnotationBeanPostProcessor进行解析完成的。
+		⑤ @Autowired能够完成自动装配的位置有
+			A. 构造器（Constructor）
+				a. 默认加在IOC容器中的组件，容器启动后会调用无惨构造器创建对象，再进行初始化赋值等操作
+				b. @Autowired标注在构造器上时，Spring启动后就会调用标注了@Autowired的构造器完成创建对象，构造器中的自定义类型值是从IOC容器获取的
+				c. 举例：
+					@Autowired
+					public EmpController(EmpService empService) {
+						this.empService = empService;
+					}
+			B. 参数
+				a. 参数的值也是从IOC容器中获取
+				b. 标注在参数上时，类中不能存在无参构造器
+				c. 当类中只有一个有参构造器时，@Autowired可以省略
+				public void setEmpService(@Autowired  EmpService empService)
+				public EmpController(@Autowired EmpService empService)
+			C. 方法
+				a. @Autowired标注在方法上一般是setter，Spring创建当前对象，就会调用方法完成复制
+				b. 方法使用的参数，自定义类型的值是从IOC容器中获取的
+				c. 举例：
+					@Autowired
+					public void setEmpService(EmpService empService) {
+						this.empService = empService;
+					}
+			D. 属性
+				@Autowired
+				private EmpService empService;
+			E. 使用@Bean标注的方法创建对象时，方法的参数值也是从容器中获取的，参数上的@Autowired可以省略
+				@Bean
+				public EmpController empController(@Autowired EmpService empService) {
+					return new EmpController(empService);
+				}
+			F. @Autowired标注在方法上一般是使用@Bean+参数，并且无论是标注在方法上还是构造器或者参数上，@Autowired 都是默认不写的
+		⑥ 自定义组件如果要使用Spring底层的一些组件（Application，BeanFactory、……），只需要让自定义组件实现xxxAwire接口。容器在创建
+		组件时，会调用接口规定的方法，并类似方法回调的方式注入相关的组件，并可以把相关的组件抽取出来提供其他方法使用
+			A. 实现ApplicationContextAware接口，可以获取IOC容器
+			B. 实现BeanNameAware接口，可以获取当前Bean的名字
+			C. 实现EmbeddedValueResolverAware接口，可以获取当前运行时环境中的变量包括配置文件中的属性，解析字面值和SpEL表达式
+			D. XXXAware接口的实现是利用XXXAwareProcessor后置处理器进行处理的
+			E. 举例：
+				public class EmpController implements ApplicationContextAware, BeanNameAware, 
+					EmbeddedValueResolverAware{
+				private ApplicationContext applicationContext;
+				private StringValueResolver valueResolver;
+				// 可以获取IOC容器
+				public void setApplicationContext(ApplicationContext applicationContext)
+						throws BeansException {
+					this.applicationContext = applicationContext;
+					System.out.println(applicationContext);
+				}
+				// 获取当前Bean的名字
+				public void setBeanName(String name) {
+					System.out.println(name);
+				}
+				// 获取当前运行时环境中的变量包括配置文件中的属性，解析字面值和SpEL表达式
+				public void setEmbeddedValueResolver(StringValueResolver resolver) {
+					this.valueResolver = resolver;
+					String value = resolver.resolveStringValue("Hello ${location.county} #{2648}");
+					System.out.println(value);
+				}
+	6. @Profile：
+		① Spring 提供的可以根据当前环境，动态的激活和切换一系列组件的功能
+		② 以注册数据源为例，数据源注册的步骤
+			A. 导入数据源和数据库驱动
+				<dependency>
+					<groupId>c3p0</groupId>
+					<artifactId>c3p0</artifactId>
+					<version>0.9.1.1</version>
+				</dependency>
+				
+				<dependency>
+					<groupId>mysql</groupId>
+					<artifactId>mysql-connector-java</artifactId>
+					<version>5.1.47</version>
+				</dependency>
+			B. 将连接数据库的参数定义在外部配置文件中
+				jdbc.user=root
+				jdbc.password=2648
+				jdbc.driverClass=com.mysql.jdbc.Driver
+			C. 在配置类中将外部文件引入	
+				@PropertySource({ "classpath:application.properties" })
+					@Configuration
+					public class MainConfigProfile implements EmbeddedValueResolverAware {
+			D. 使用@Value和Spring底层的组件的方式结合获取外部文件的属性
+					@Value("${jdbc.user}")
+					private String user;			
+					private String driverClass;	
+					@Bean
+					public DataSource dataSourceTest(@Value("${jdbc.password}") String password) throws Exception {
+						ComboPooledDataSource dataSource = new ComboPooledDataSource();
+						dataSource.setUser(user);
+						dataSource.setPassword(password);
+						dataSource.setJdbcUrl("jdbc:mysql://localhost:3306/test");
+						dataSource.setDriverClass(driverClass);
+						return dataSource;
+					}
+					public void setEmbeddedValueResolver(StringValueResolver resolver) {
+						driverClass = resolver.resolveStringValue("${jdbc.driverClass}");
+					}
+		③ 使用@Profile：指定组件在哪个环境中才能被注册到容器中，不指定，任何环境都可以注册这个组件
+			A. 加了环境标识的Bean，只有这个环境被激活的时候才能注册到容器中。默认是default环境
+			B. 切换环境的方式
+				a. 使用命令行动态参数，在虚拟机参数位置，即选中单元测试类的中的测试方法，右键选择Run As -> Run Configuration，选择Arguments，在VM arguments中输入：
+				-Dspring.profiles.active=test，点击Run即可激活测试环境，而测试环境中的数据源才被加到容器中
+				b. 使用程序的方式激活环境
+					(1) 如果使用有参构造器创建AnnotationConfigApplicationContext的对象时，容器还没设置当前环境时就已经被创建好了，因此需要使用
+					AnnotationConfigApplicationContext的无参构造器来创建AnnotationConfigApplicationContext对象
+					(2) 调用AnnotationConfigApplicationContext 的getEnvironment()的setActiveProfiles(String .. profiles)来设置容器的环境，容器可以同时设置多个环境
+					(3) 调用 applicationContext.register(MainConfigProfile.class)注册主配置类
+					(4) 启动刷新容器 applicationContext.refresh();
+					(5) 举例：
+						AnnotationConfigApplicationContext applicationContext = new AnnotationConfigApplicationContext();
+						applicationContext.getEnvironment().setActiveProfiles("default", "prod");
+						applicationContext.register(MainConfigProfile.class);
+						applicationContext.refresh();
+			C. 当@Profile标识在配置类上时，只有指定当前的环境时，整个配置类里面的所有配置才生效
+			D. 没有标识任何环境的Bean，在任何环境中都是被加载的。
+二、AOP
+	1. 简介：动态代理
+		指程序在运行起劲动态的将某段代码切入到指定方法指定位置进行运行的编程方式
+	2. 构建Spring AOP的流程：
+		① 导入AOP依赖的工程
+			<dependency>
+				<groupId>org.springframework</groupId>
+				<artifactId>spring-aspects</artifactId>
+				<version>${spring-version}</version>
+			</dependency>
+			
+			<dependency>
+				<groupId>org.aspectj</groupId>
+				<artifactId>aspectjweaver</artifactId>
+				<version>1.8.13</version>
+			</dependency>
+		② 定义一个逻辑类MathCalculator和方法div，在业务逻辑运行时打印日志（方法运行之前，方法运行之后，方法的返回和方法的异常）
+			public class MathCalculator {
+				public int div(int i, int j) {
+					return i / j;
+				}
+			}
+		③ 定义一个日志切面类，切面里面的方法需要动态捕获MathCalculator类的div方法的运行流程，该方法称为通知方法，切面中的通知方法有：
+			A. 前置通知（@Before）：在目标方法运行之前被调用
+			B. 后置通知（@After）：在目标方法运行之后被调用
+			C. 返回通知（@AfterReturning）：在目标方法在正常返回的时候被调用
+			D. 异常通知（@AfterThrowing）：如果目标方法在运行出现异常时被调用
+			E. 环绕通知（@Around）：动态代理，手动推进目标方法允许，相当于整个AOP
+		④ 给切面类的目标方法标注运行的机制（通知注解），通知注解上需要指明切入点，即编写切点表达式，而如果所有的通知方法上的切点表达式相同的话
+		可以将切点表达式抽取出来，该切点表达式可以提供本类上引用也可以被其他切面引用
+		⑤ 将切面类和业务逻辑类（目标方法）都加入到容器中
+		⑥ 需要使用@Aspect标注，Spring才能够将该类声明为一个切面类
+		⑦ 基于配置版的开启基于注解的切面，需要在Spring的配置文件首先打开AOP的命名空间，然后使用<aop:aspectj-autoproxy>开启基于注解版的切面功能。
+		基于注解版的开启支持注解的切面，需要给配置类添加@EnableAspectJAutoProxy注解
+		⑧ 在通知方法的参数中可以引进JoinPoint，通过该对象可以获取目标方法的方法名和参数列表以及目标方法所在的类类型
+		⑨ 在返回通知和异常通知中还可以获取返回值或者异常对象，需要在通知注解中使用returning或者throwing指明将结果封装什么参数名上，若返回通知和异常
+		通知中使用JoinPoint并且获取结果，则JoinPoint需要放在参数列表的第一位，否则Spring无法识别导致程序报错。
+		⑩ AOP代码：
+			A. 定义一个逻辑类：
+				public class MathCalculator {
+					public int div(int i, int j) {
+						return i / j;
+					}
+				}
+			B. 定义一个切面类
+				@Aspect
+				public class LogAspects {
+					
+					@Pointcut("execution(public int com.li.springAnnotation.aop.MathCalculator.*(..))")
+					public void pointcut() {}
+
+					@Before("pointcut()")
+					public void logStart(JoinPoint joinPoint) {
+						List<Object> args = Arrays.asList(joinPoint.getArgs());
+						System.out.println(joinPoint.getSignature().getName() + " 运行 …… 参数列表是：{" + args + "}");
+					}
+					
+					@After("pointcut()")
+					public void logEnd(JoinPoint joinPoint) {
+						System.out.println(joinPoint.getSignature().getName() + " 结束 ……");
+					}
+					
+					@AfterReturning(value = "pointcut()", returning = "result")
+					public void logReturn(JoinPoint joinPoint, Object result) {
+						System.out.println(joinPoint.getSignature().getName() + " 正常返回 …… 运行结果是：" + result);
+					}
+					
+					@AfterThrowing(value = "pointcut()", throwing = "exception")
+					public void logException(JoinPoint joinPoint, Exception exception) {
+						System.out.println(joinPoint.getSignature().getName() + " 异常 …… 异常信息：" + exception.getMessage());
+					}
+				}
+			C. 将逻辑类和切面类添加到Spring的IOC容器中，并开启支持注解版的切面
+				@EnableAspectJAutoProxy
+				@Configuration
+				public class MainConfigAspects {
+
+					@Bean
+					public MathCalculator mathCalculator() {
+						return new MathCalculator();
+					}
+					
+					@Bean
+					public LogAspects logAspects() {
+						return new LogAspects();
+					}
+				}
+三、声明式事务
+	1. 搭建声明式事务的流程
+		① 导入数据库驱动、数据源以及JDBC事务的依赖
+		② 向IOC容器注册数据源
+		③ 注册 Spring 提供的操作数据库的工具JdbcTemplate到容器中
+		④ 定义一个Dao、Service和Bean类，并添加操作数据库逻辑，此时并没有添加任何事务，当出现逻辑错误，导致程序出错，事务仍然提交成功
+		⑤ 在Service类中为逻辑方法添加@Transactional注解，为该逻辑方法添加事务
+		⑥ 基于配置文件版的支持声明式事务需要在配置为文件上开启tx的命名空间，并且在配置文件中添加注解驱动<tx:annotation-driven/>， 
+		基于配置版支持声明式事务则需要在配置类上添加@EnableTransactionManagement注解，开启支持声明式事务驱动
+		⑦ 此时，声明式事务还不能起作用，运行程序时报没有找到PlatformTransactionManager类Bean的异常，该类用于管理事务，Spring使用
+		PlatformTransactionManager进行事务管理的实现类是DataSourceTransactionManager，基于配置版的支持声明式事务还需要开启事务管理器，
+		基于注解版的管理事务的方式是将DataSourceTransactionManager通过注解的方式注册到容器中开启事务管理器。
+		<bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+			<property name="dataSource" ref="dataSource"></property>
+		</bean>
+	2. 声明式事务代码
+		① 导入依赖
+			<dependency>
+				<groupId>org.springframework</groupId>
+				<artifactId>spring-jdbc</artifactId>
+				<version>${spring-version}</version>
+			</dependency>
+		② 定义逻辑组件并使用@Transactional注解
+			@Repository
+			public class EmpRepository {
+				@Autowired
+				private JdbcTemplate jdbcTemplate;
+				public void insertCustomer(Customer customer) {
+					String sql = "insert into customer(customer_name, balance) values(?, ?)";
+					jdbcTemplate.update(sql, customer.getCustomerName(), customer.getBalance());
+				}
+			}
+			
+			@Service
+			public class EmpService {
+				@Autowired
+				private EmpRepository empRepository;
+				@Transactional
+				public void insertCustomer(Customer customer) {
+					empRepository.insertCustomer(customer);
+					int i = 1 / 0;
+					System.out.println(i);
+				}
+			}
+		③ 注册数据源，使用Spring提供的JdbcTemplate工具，配置事务管理器，开启支持声明式事务注解的驱动
+		@PropertySource({ "classpath:application.properties" })
+		@Configuration
+		@ComponentScan(value = {"com.li.springAnnotation"})
+		@EnableTransactionManagement
+		public class MainConfigProfile implements EmbeddedValueResolverAware {
+			@Bean
+			public DataSource dataSource(@Value("${jdbc.password}") String password) throws Exception {
+				ComboPooledDataSource dataSource = new ComboPooledDataSource();
+				dataSource.setUser(user);
+				dataSource.setPassword(password);
+				dataSource.setJdbcUrl("jdbc:mysql://localhost:3306/test");
+				dataSource.setDriverClass(driverClass);
+				return dataSource;
+			}
+			
+			@Bean
+			public JdbcTemplate jdbcTemplate(DataSource dataSource) {
+				return new JdbcTemplate(dataSource);
+			}
+			
+			@Bean
+			public PlatformTransactionManager transactionManager(DataSource dataSource) {
+				return new DataSourceTransactionManager(dataSource);
+			}
+		}
+四、扩展原理：
+	1. BeanPostProcessor：Bean 后置处理器，Bean创建对象初始化千欧进行拦截工作的
+	2. BeanFactoryPostProcessor：BeanFactory 后置处理器，在BeanFactory标准初始化之后调用；调用时所有Bean的定义已经保存加载到BeanFactory， 
+	但是Bean的实例还未被创建
+	3. BeanDefinitionRegistryPostProcessor：
+		① 该接口是BeanFactoryPostProcessor的子接口，额外定义了一个方法postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry)，
+		它的执行时期是是在所有Bean定义信息将要被加载，但Bean实例还未被创建。
+		② BeanDefinitionRegistry是Bean定义信息的保存中心，以后BeanFactory就是按照BeanDefinitionRegistry里面保存的每一个Bean定义信息创建实例。
+		③ BeanDefinitionRegistryPostProcessor是优先于BeanFactoryPostProcessor被执行的，能够利用 BeanDefinitionRegistryPostProcessor再给容器添加额外的组件
+	4. ApplicationListener
+		① 监听容器中发布的时间，事件驱动模型开发
+		② public interface ApplicationListener<E extends ApplicationEvent> extends EventListener {}，ApplicationListener监听的是ApplicationEvent及其下面的子事件
+		③ ApplicationListener定义了一个方法onApplicationEvent(E event)，当容器中发布了ApplicationListener监听的事件，onApplicationEvent方法就会被触发。
+		④ 自定义监听事件的步骤：
+			A. 写一个监听器，监听某个事件，该事件必须是ApplicationEvent或者继承自ApplicationEvent
+			B. 把监听器放到容器中，
+			C. 只要容器中有相关的事件发布，该事件就会被监听到
+				a. ContextRefreshedEvent：容器刷新完成（所有Bean都完全创建）会发布该事件
+				b. ContextClosedEvent：关闭容器时会发布这个事件
+		⑤ 自定义事件的步骤：
+			A. 调用 ApplicationContext 的publishEvent方法
+			B. 该方法需要传入一个ApplicationEvent的对象，该对象是一个匿名内部类
+			C. 在匿名内部类中需要传入一个Object对象
+			D. 当ApplicationListener监听到自定义的的事件的发布时，会触发onApplicationEvent，并回调自定义的事件
+		⑥ 举例
+		@Component
+		public class ApplicationListenerImpl implements ApplicationListener<ApplicationEvent> {
+			public void onApplicationEvent(ApplicationEvent event) {
+				System.out.println("收到事件" + event);
+			}
+		}
+		applicationContext.publishEvent(new ApplicationEvent(new Date()) {});
+	5. @EventListener
+		① 在一个普通的业务逻辑组件中的任意方法也能监听事件
+			A. 在方法是上使用@EventListener注解
+			B. 该注解可以传入多个事件，并将事件绑定在业务逻辑方法中
+			C. 获取到监听的事件的方法是在逻辑方法中传入事件的对象，该对象有容器获取并传入
+			D. 举例：
+				@Service
+				public class EmpService {
+				@EventListener(classes = {ApplicationEvent.class})
+					public void listen(ApplicationEvent applicationEvent) {
+						System.out.println("EmpService ……" + applicationEvent);
+					}
+				}
+			E. 该注解的原理是使用EventListenerMethodProcessor后置处理器来解析方法上的EventListener注解
+		② SmartInitializingSingleton
+			A. SmartInitializingSingleton是EventListenerMethodProcessor实现的接口
+			B. SmartInitializingSingleton定义了afterSingletonsInstantiated()方法，该方法是在当前所有单实例被创建完成之后被执行的，该方法类似于ContextRefreshedEvent事件。
+五、Servlet 3.0			
+	1. 简介：跟之前使用web.xml配置动态web不同的地方在于，以前注册Servlet、Filter和Listener时，需要在web.xml文件中对三大组件进行注册，包括SpringMVC的DispatchServlet。而在Servlet3.0标准以后，
+	给我们提供了一些利用注解方式来完成组件的注册与添加，包括提供了一些运行时的可插拔的插件能力。
+	2. 使用原生的注解版动态web的开发
+		① 使用Maven创建一个动态web工程mavenWeb
+		② 在pom.xml文件中添加工程依赖的运行时环境
+			<dependency>
+				<groupId>javax.servlet</groupId>
+				<artifactId>servlet-api</artifactId>
+				<version>2.5</version>
+				<scope>provided</scope>
+			</dependency>
+			
+			<dependency>
+				<groupId>javax.servlet.jsp</groupId>
+				<artifactId>jsp-api</artifactId>
+				<version>2.1.3-b06</version>
+				<scope>provided</scope>
+			</dependency>
+		③ 创建一个JSP进行资源访问，<a href="${pageContext.request.contextPath }/hello">hello</a>
+		④ 创建一个Servlet，继承HTTPServlet，并重写doGET方法
+		⑤ 在Servlet中使用@WebServlet("/hello")注解，绑定访问的路径
+		⑥ 同样，当注册Filter和Listener时，同样可以使用@WebFilter和@WebListener进行注册
+	3. Shared Libraries（共享库）/runtimes pluggability（运行时插件能力）
+		① Servlet 容器启动会扫描当前应用里面每一个Jar包的ServletContainerInitializer的实现
+		② 提供ServletContainerInitializer的实现类，必须绑定在META-INF/services/javax.servlet.ServletContainerInitializer文件中
+		③ 文件的内容就是ServletContainerInitializer实现类的全类名
+		④ 总结：容器在启动应用的时候，会扫描当前应用每一个Jar包里面的META-INF/services/javax.servlet.ServletContainerInitializer指定的实现类，然后启动并允许实现类的方法
+		⑤ @HandlesTypes：容器启动时，会将@HandlesTypes指定的类型下面的子类（实现类、子接口）传递过来
+		⑥ 举例：
+			A. 定义一个类实现ServletContainerInitializer接口，该接口提供了一个方法onStartup(Set<Class<?>> set, ServletContext servletContext)
+				a. ServletContext：代表当前web应用的ServletContext，一个web应用对应一个ServletContext。对应四大域对象之一的Application的对象
+				b. Set<Class<?>>：会获取到@HandlesTypes中传递过来的所有感兴趣类型的子类或者实现类
+				c. 举例：
+					@HandlesTypes(value = {HelloService.class})
+					public class ServletContainerInitializerImpl implements
+							ServletContainerInitializer {
+						@Override
+						public void onStartup(Set<Class<?>> set, ServletContext servletContext)
+								throws ServletException {
+							System.out.println("感兴趣的类型……");
+							for (Class<?> clazz : set) {
+								System.out.println(clazz.getName());
+							}
+						}
+					}
+			B. 在当前类路径下创建META-INF/services/javax.servlet.ServletContainerInitializer文件，并在文件中输入ServletContainerInitializer接口实现类的全类名
+				com.li.maven.servlet.ServletContainerInitializerImpl
+	4. 使用ServletContext注册Web的三大组件（Servlet、Filter和Listener）
+		① 自定义的组件可以通过@WebServlet、@WebFilter和@WebListener注册到ServletContext容器中，但是第三方提供的组件如果要注册到容器中，可以借助ServletContainerInitializer
+		② 使用编码的方式，在项目启动的时候给ServletContext添加组件，但必须是在容器启动的时候才能够添加
+		③ 有两个地方可以使用ServletContext给容器注册组件
+			A. 实现ServletContainerInitializer接口并在onStartup方法中注册
+			B. 自定义监听器并实现ServletContextListener接口在contextInitialized中进行注册，该实现类需要结合使用@WebListener注解
+		④ 举例：
+			ServletRegistration.Dynamic empServlet = servletContext.addServlet("empServlet", EmpServlet.class);
+			empServlet.addMapping("/emp");
+			
+			servletContext.addListener(new Emplistener());
+			
+			FilterRegistration.Dynamic empFilter = servletContext.addFilter("empFilter", new EmpFilter());
+			empFilter.addMappingForUrlPatterns(EnumSet.of(DispatcherType.REQUEST), true, "/*");
+	5. Servlet3.0 与 SpringMVC整合分析
+		① Servlet3.0 与 SpringMVC整合步骤
+			A. 在pom.xml文件中导入一个插件，是用于使Maven版web工程在找不到web.xml文件后成功编译
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-war-plugin</artifactId>
+					<version>2.1.1</version>
+					<configuration>
+						<failOnMissingWebXml>false</failOnMissingWebXml>
+					</configuration>
+				</plugin>
+			B. 在pom.xml中导入SpringMVC的相关依赖
+				<dependency>
+					<groupId>org.springframework</groupId>
+					<artifactId>spring-web</artifactId>
+					<version>${spring-version}</version>
+				</dependency>
+				
+				<dependency>
+					<groupId>org.springframework</groupId>
+					<artifactId>spring-webmvc</artifactId>
+					<version>${spring-version}</version>
+				</dependency>
+			C. 注册SpringMVC的DispatchServlet	
+				a. web 容器启动的时候，会扫描每个jar包下的META-INF/services/javax.servlet.ServletContainerInitializer，并加载这个文件指定的类，SpringMVC提供了一个类
+				SpringServletContainerInitializer，Spring的应用一启动就会加载感兴趣的SpringServletContainerInitializer接口下的所有组件，并且为SpringServletContainerInitializer组件
+				创建对象（不是接口、抽象类）
+					(1) AbstractContextLoaderInitializer：createRootApplicationContext()创建根容器
+					(2) AbstractDispatcherServletInitializer：
+						(A) 创建一个web 的IOC容器：createServletApplicationContext();
+						(B) 创建一个DispatchServlet：createDispatcherServlet()
+						(C) 并把创建的DispatchServlet通过Java代码的方式注册到Servlet容器中，但是把添加映射的方法留给子类：getServletMappings()
+					(3) AbstractAnnotationConfigDispatcherServletInitializer：注解方式配置的DispatcherServlet的初始化器
+						(A) createRootApplicationContext()创建根容器
+						(B) getRootConfigClasses()：传入一个配置类，该配置类是留着子类实现
+						(C) 创建web de IOC 容器：createServletApplicationContext()
+				b. 总结：以注解方式启动SpringMVC，只要继承AbstractAnnotationConfigDispatcherServletInitializer并实现抽象方法指定DispatcherServlet的配置信息。
+				c. 定义继承AbstractAnnotationConfigDispatcherServletInitializer抽象类的子类，web容器启动的时候创建对象，调用方法来初始化容器以及前端控制器
+				该抽象类定义了以下方法：
+					(1) getRootConfigClasses：获取根容器的配置类，（Spring的配置文件）创建父容器
+					(2) getServletConfigClasses：获取web容器的配置类（SpringMVC的配置文件）创建子容器
+					(3) getServletMappings：获取DispatcherServlet的映射信息。该方法返回一个需要拦截资源的数组，一般拦截“/”，即拦截所有请求（包括静态资源），
+					但是不包括*.jsp，如果是/*，则会将拦截包括JSP页面，JSP页面时Tomcat的JSP引擎解析的。
+				d. 创建父容器AppConfig和子容器RootConfig，父容器定义扫描的包不包括Controller注解，而子容器只扫描Controller注解
+				e. 定义一个Controller和Service类
+				f. 代码
+					public class MyWebAppInitializer extends AbstractAnnotationConfigDispatcherServletInitializer {
+						@Override
+						protected Class<?>[] getRootConfigClasses() {
+							return new Class<?>[] { RootConfig.class };
+						}
+						@Override
+						protected Class<?>[] getServletConfigClasses() {
+							return new Class<?>[] { AppConfig.class };
+						}
+						@Override
+						protected String[] getServletMappings() {
+							// 拦截所有请求（包括静态资源），但是不包括*.jsp，如果是/*，则会将拦截包括JSP页面，JSP页面时Tomcat的JSP引擎解析的
+							return new String[] { "/" };
+						}
+					}
+					
+					@ComponentScan(value = "com.li.maven", includeFilters = {
+							@Filter(type = FilterType.ASSIGNABLE_TYPE, classes = { CustomerController.class })
+					}, useDefaultFilters = false)
+					public class AppConfig {}
+					
+					@ComponentScan(value = "com.li.maven", excludeFilters = {
+							@Filter(type = FilterType.ANNOTATION, classes = { Controller.class })
+					})
+					public class RootConfig {}
+		② 定制与接管SpringMVC
+			A. 在SpringMVC的配置类上使用@EnableWebMvc注解，开启SpringMVC定制配置功能，该配置相当于使用<mvc:annotation-driven/>
+			B. 配置组件：（视图解析器、视图映射、静态资源映射、拦截器 ……）
+				a. 在配置类中实现WebMvcConfigurer接口，该接口定义了定制SpringMVC的方法，但是该接口中很多方法是使用SpringMVC场景不需要的
+				b. WebMvcConfigurer接口有个实现类WebMvcConfigurerAdapter，该实现类实现了WebMvcConfigurer接口的所有方法，但是具体实现交由子类
+					public class AppConfig extends WebMvcConfigurerAdapter {}
+				c. 定制视图解析器
+					(1) 重写configureViewResolvers方法，该方法会提供一个参数ViewResolverRegistry
+					(2) ViewResolverRegistry对象定义了两个重载的方法：
+						(A) jsp()：默认所有页面都是在/WEB-INF/*.jsp
+						(B) jsp(prefix, suffix)：可以自定义前缀和后缀
+					(3) 举例：
+						public void configureViewResolvers(ViewResolverRegistry registry) {
+							registry.jsp("/WEB-INF/views/", ".jsp");
+						}
+				d. 静态资源访问
+					(1) 如何没有开启默认的静态资源处理器，当访问静态资源时，该请求会被拦截，由于没有对请求进行映射，因此会出现
+					No mapping found for HTTP request with URI [/WebProject/js/jquery-1.12.0.min.js] in DispatcherServlet with name 'dispatcher'
+					(2) 重写configureDefaultServletHandling方法，该方法提供了DefaultServletHandlerConfigurer参数，该参数的enable()相当于
+					<mvc:default-servlet-handler/>配置
+					(3) 举例：
+						public void configureDefaultServletHandling(DefaultServletHandlerConfigurer configurer) {
+							configurer.enable();
+						}
+				e. 配置拦截器
+					(1) 重写addInterceptors方法，该方法提供了InterceptorRegistry对象
+					(2) InterceptorRegistry对象可以通过addInterceptor方法添加拦截器，并通过addPathPatterns方法添加拦截的请求
+					(3) 举例：
+						public void addInterceptors(InterceptorRegistry registry) {
+							registry.addInterceptor(new MyInterceptor()).addPathPatterns("/**");
+						}
+	6. 异步请求
+		① 简介：
+			A. 在Servlet3.0之前，Servlet采用Thread-Per-Request的方式处理请求。即每一次Http请求都由某一个线程从头到尾负责处理。
+			B. 如果一个请求需要进行IO操作，比如访问数据库、调用第三方接口等，那么其所对应的线程将同步地等待IO操作完成，而IO操作时非常慢的，所以此时的线程并不能
+			及时地释放回线程池以供后续使用，在并发量越来越多的情况下，这将带来严重的性能问题。即便是像Spring、Struts这样的高层框架也脱离不了这样的桎梏，因为他们
+			都是建立在Servlet之上的，为了解决这样的问题，Servlet3.0引入了异步请求处理，然后在Servlet3.1又引入了非阻塞IO来进一步增强异步请求处理的性能。
+		② Servlet3.0异步请求的步骤
+			A. 支持异步处理，在@WebServlet使用属性asyncSupported = true
+			B. 开启异步模式，调用request的startAsync()，该方法会返回AsyncContext对象。
+			C. 调用AsyncContext对象的start(Runnable run)，该方法需要传入一个Runnable内部类，在内部类中进行业务逻辑的异步处理
+			D. 调用逻辑方法
+			E. 获取异步的上下文，调用request的getAsyncContext()方法。
+			F. 获取响应
+			G. 当异步处理完成之后，调用AsyncContext的complete()方法，说明异步处理已经完成
+			H. 举例：
+				@WebServlet(value = "/async", asyncSupported = true)
+				public class AsyncServlet extends HttpServlet {
+
+					@Override
+					protected void doGet(final HttpServletRequest req, HttpServletResponse resp)
+							throws ServletException, IOException {
+						System.out.println("主线程开始  …… " + Thread.currentThread() + "time: " + System.currentTimeMillis());
+						final AsyncContext startAsync = req.startAsync();
+						startAsync.start(new Runnable() {
+							
+							@Override
+							public void run() {
+								try {
+									System.out.println("副线程程开始  …… " + Thread.currentThread() + "time: " + System.currentTimeMillis());
+									sleep();
+									AsyncContext asyncContext = req.getAsyncContext();
+									asyncContext.getResponse().getWriter().write("hello async!");
+									startAsync.complete();
+									System.out.println("副线程程结束  …… " + Thread.currentThread() + "time: " + System.currentTimeMillis());
+								} catch (Exception e) {
+									e.printStackTrace();
+								}
+							}
+						});
+						System.out.println("主线程结束  …… " + Thread.currentThread() + "time: " + System.currentTimeMillis());
+					}
+					
+					public void sleep() throws InterruptedException {
+						System.out.println(Thread.currentThread() + " processing ……");
+						Thread.sleep(3 * 1000);
+					}
+				}
+			I. 结果
+				主线程开始  …… Thread[http-nio-8081-exec-1,5,main]time: 1589775004445
+				主线程结束  …… Thread[http-nio-8081-exec-1,5,main]time: 1589775004456
+				副线程程开始  …… Thread[http-nio-8081-exec-2,5,main]time: 1589775004456
+				Thread[http-nio-8081-exec-2,5,main] processing ……
+				副线程程结束  …… Thread[http-nio-8081-exec-2,5,main]time: 1589775007459
+		③ SpringMVC 异步请求
+			A. 返回Callable
+				a. 控制器返回Callable
+				b. Spring异步处理：将Callable提交到TaskExecutor，使用一个隔离的线程进行执行
+				c. DispatcherServlet 和所有的Filter退出web容器，但是response保持打开状态
+				d. Callable返回的结果，SpringMVC将请求重新派发给容器，恢复之前的处理
+				e. 根据Callable返回的结果，SpringMVC继续进行视图渲染流程等（接受请求->视图渲染）
+				f. 举例
+					@ResponseBody
+					@RequestMapping("/asyncCallable")
+					public Callable<String> asyncCallable() {
+						System.out.println("主线程开始  …… " + Thread.currentThread() + "time: " + System.currentTimeMillis());
+						Callable<String> callable = new Callable<String>(){
+
+							@Override
+							public String call() throws Exception {
+								System.out.println("副线程程开始  …… " + Thread.currentThread() + "time: " + System.currentTimeMillis());
+								sleep();
+								System.out.println("副线程程结束  …… " + Thread.currentThread() + "time: " + System.currentTimeMillis());
+								return "asyncCallable";
+							}
+							
+						};
+						System.out.println("主线程结束  …… " + Thread.currentThread() + "time: " + System.currentTimeMillis());
+						return callable;
+					}
+				g. 结果分析
+					preHandle ……
+					主线程开始  …… Thread[http-nio-8081-exec-1,5,main]time: 1589780149978
+					主线程结束  …… Thread[http-nio-8081-exec-1,5,main]time: 1589780149980
+					DispatcherServlet及所有Filter退出线程，等待Callable执行
+					
+					副线程程开始  …… Thread[MvcAsync1,5,main]time: 1589780149993
+					Thread[MvcAsync1,5,main] processing ……
+					副线程程结束  …… Thread[MvcAsync1,5,main]time: 1589780152994
+					Callable执行完成，SpringMVC将请求重新发给容器
+					
+					preHandle ……
+					postHandle ……（没有再次执行目标方法，Callable的返回值就是目标方法的返回值）
+					afterCompletion ……
+				h. 异步拦截器：
+					(1) 原生API的AsyncListener
+					(2) SpringMVC：实现AsyncHandlerInterceptor接口
+			B. 返回DeferredResult
+								   应用1														  应用2
+							  --------------												   ------------
+							  |   Tomcat   |				 --------------					   |    	  |
+				请求开始	  |			   | 1. 产生消息	 |			  | 2. 监听消费消息	   |		  |
+				------------->|	  线程1    |---------------->|    		  |------------------->|		  |
+							  |			   |				 |			  |					   |		  |
+							  |			   |				 |			  |					   |		  |
+							  |			   |				 | 消息中间件 |					   |   处理   |
+							  |			   |				 |			  |					   |		  |
+				请求结束	  |  		   | 4. 监听获取结果 |			  |3. 处理结果         |		  |
+				<-------------|	  线程2	   |<----------------| 			  |<-------------------|		  |
+							  |			   |				 |			  |					   |		  |
+							  |			   |				 --------------					   |          |
+							  --------------												   ------------
+				a. SpringMVC支持消息中间件的的场景，利用DeferredResult，当客户端发送一个请求时，服务端不能及时得到响应可以先创建一个DeferredResult对象，把DeferredResult对象返回给客户端，则
+				客户端发送的请求就会在等待处理中，把DeferredResult对象保存在一个队列中，当其他线程获取到当前DeferredResult对象，并调用DeferredResult对象的setResult方法，那么客户端发送的请求
+				就会得到响应
+				b. 举例：
+					@ResponseBody
+					@RequestMapping("/createOrder")
+					public DeferredResult<Object> createOrder() {
+						DeferredResult<Object> deferredResult = new DeferredResult<Object>((long) 3 * 1000, "create fail ...");
+						DeferredResultQueue.saveDeferredResult(deferredResult);
+						return deferredResult;
+					}
+					
+					@ResponseBody
+					@RequestMapping("/create")
+					public String create() {
+						DeferredResult<Object> deferredResult = DeferredResultQueue.getDeferredResult();
+						String uuid = UUID.randomUUID().toString();
+						deferredResult.setResult(uuid);
+						return "success" + uuid;
+					}
+					
+					public class DeferredResultQueue {
+						private static Queue<DeferredResult<Object>> queue = new ConcurrentLinkedQueue<>();
+						public static void saveDeferredResult(DeferredResult<Object> deferredResult) {
+							queue.add(deferredResult);
+						}
+						public static DeferredResult<Object> getDeferredResult() {
+							return queue.poll();
+						}
+					}

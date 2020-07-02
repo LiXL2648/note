@@ -1,0 +1,758 @@
+一、导言
+	生产环境下开发不再是一个项目一个工程，而是每一个模块创建一个工程，而多个模块整合在一起就需要使用
+	到maven这样的构建构建
+二、为什么需要使用maven
+	1. Maven是干什么用的？
+		这是每个在刚开始接触Maven时遇到最大的问题，之所以提出这个问题，是因为即使不使用Maven，仍然可以进行 B/S 结构项目的开发。
+		从表述层、业务逻辑层到持久层再到数据库都有一套成熟的解决方案--不使用Maven一样可以开发项目
+	2. 为什么要使用Maven，他能帮助我们解决什么问题？
+		① 添加第三方jar包
+			A. 在今天的 JavaEE 开发领域，有大量的第三方框架和工具提供我们使用。要使用这些jar包最简单的方法就是复制粘贴到WEB-INF/lib/目录下，
+			但是这些导致每次创建工程就需要将jar包重复复制到/WEB-INF/lib/目录下，从而造成工作区中存在大量重复的文件，让我们的过程显得很臃肿。
+			B. 而使用Maven后每个jar包本身只在本地仓库中保存一份，需要jar包的过程只需要以坐标的方式简单的引用一下就可以了，不仅极大的节约了存储的
+			空间，让项目更轻巧，更避免了重复文件太多而造成的混乱
+		② jar包之间的依赖关系
+			A. jar包往往不是孤立存在的，很多jar包都需要在其他jar包的支持下才能够正常工作，我们称之为jar包之间的依赖。最典型的例子是：commons-fileupload-1.3.jar依赖于
+			commons-io-2.0.1.jar，如果没有IO包，fileupload包就不能正常工作
+			B. 而问题是，我们并不知道所使用的所有jar包的依赖关系，当我们拿到一个新的从未使用过的jar包，我们并不了解一个新的jar包需要哪些jar包的支持，导致导入的jar包不够，
+			而现有的程序不能正常工作。再进一步，当项目中需要用到上百个jar包时，我们无法人为的、人工的逐一地确认他们依赖的其他jar包。
+		③ 获取第三方jar包
+			A. JavaEE开发中需要使用到的jar包种类繁多，几乎每个jar包在其本身的官网上获取方式都不尽相同。为了查找一个jar包找遍互联网，身心疲惫，没有经历过的人或许体会不到这种折磨。
+			不仅如此，费尽心思找的jar包有时候并没有我们需要的那个类，又或者有同名的类没有我们要找的方法，以不规范的方式获取的jar包也往往是不规范的。
+			B. 使用Maven我们可以享受到一个完全统一规范的jar包管理体系，我们只需要在项目中以坐标的方式依赖一个jar包，maven就会自动从中央仓库进行下载，同时下载这个jar包所所依赖的
+			其他jar包--规范、完整、准确！一次性解决所有的问题
+			C. 顺便一提，统一的规范几乎是程序员的最高信仰。如果没有一个统一的规范，就意味着每个具体的技术都各自为政，需要通过不同的特殊的方式加入到项目中，好不容易加入进来还会和其他
+			技术格格不入，最终受苦的是我们。而任何一个领域的统一规范都能够极大的降低程序员的工作难度，减少工作量。例如：USB接可以外接各种设备，如果每个设备都有自己独特的接口，那么不仅
+			制造商需要维护各个接口的设计方案，使用者也需要详细了解每个设备对应的接口，无疑是非常繁琐的。
+		④ 将项目拆分成多个工程模块
+			A. 随着JavaEE项目的规模越来越庞大，开发团队的规模也与日俱增。一个项目上千人的团队持续开发很多年对于JavaEE项目来说再正常不过。那么我们想象一下：几百人的人开发的项目是同一个web工程。
+			那么架构师、项目经理该如何划分项目的模块。如何分工呢？这么大的项目已经不可能通过package结构来划分模块，必须将项目拆分成多个工程协同开发。多个模块工程中有的是Java工程，有的是
+			web工程。
+			B. 那么工程拆分后又如何进行互相调用和访问呢？这就需要使用Maven的依赖管理机制，一般项目拆分情况为：
+					-----------------------------------------
+					| web模块                  表述层       |
+                    ----|------------------------------------
+						|
+					----↓------------------------------------
+					| 组件模块   控制层/业务逻辑层/持久化层 |
+                    ----|------------------------------------
+						↓
+                      公共模块
+                        |
+                        ↓
+                      环境模块
+			C. 上层模块依赖下层，所以下层模块中定义的API都可以为上层所调用和访问
+三、什么是Maven
+	1. Maven简介：
+		Maven 是 Apache 软件基金会组织维护的一款自动化构建工具，专注服务于 Java 平台的项目构建和依赖管理
+	2. 什么是构建
+		① 构建并不是创建，创建一个工程并不等于构建一个项目，要了解构建的含义我们应该由浅入深的从以下三个层面来看：
+			A. 纯java代码：Java是一门编译性语言，.java扩展名的源文件需要编译成.class扩展名的字节码文件才能后执行，所以编写任何java代码想要执行
+			的话就必须经过编译得到对应的.class文件。
+			B. Web工程：当我们需要经过浏览器访问Java程序时就必须将包含Java程序的Web工程编译的结果部署到服务器上的指定目录下，并启动服务器才行。
+			这个过程就叫做部署
+			C. 实际项目：在实际项目中整合第三方框架，Web工程中除了Java程序和JSP页面、图片等静态资源之外，还包括第三方框架的jar包以及各种各样的配置文件。
+			所有这些资源都必须按照正确的目录结构部署到服务器上，项目才可以运行
+		② 综上所述构建就是以我们编写的java代码、框架配置文件、国际化等其他资源文件、JSP页面和图片等静态资源作为“原材料”，去“生成”出一个可以运行的项目的过程
+	3. 构建过程的几个主要环节
+		① 清理：删除以前的编译结果，为重新编译做好准备
+		② 编译：将Java源程序编译为字节码文件
+		③ 测试：针对项目中的关键点进行测试，确保项目在迭代开发过程中关键点的正确性
+		④ 报告：在每一次测试后以标准的格式记录和展示测试的结果
+		⑤ 打包：将一个包含诸多文件的工程封装一个压缩文件用于安装和部署。Java工程对应jar包，Web工程对应war包。
+		⑥ 安装：在Maven环境下特指将打包的结果--jar包或者war包安装带本地仓库中。
+		⑦ 部署：将打包的结果部署到远程仓库或将war包部署到服务器上运行
+	4. 自动化构建
+		① 其实上述环节我们在Eclipse中都可以找到对应的操作，只是不太标准。那么既然IDE已经可以进行构建了，我们为什么还要使用Maven这样的构建构建？以下是一个小故事
+			A. 这是阳光明媚的一天。托马斯向往常一样来到公司，冲好一杯咖啡，进入自己的邮箱--很不幸，QA小组发来一封邮件，报告了他昨天提交的模块的测试结果--有Bug。“好吧，
+			反正也不是第一次”，托马斯摇摇头，进入IDE，运行自己的程序，编译、打包、部署到服务器上，然后按照邮件中的操作路径进行测试。“嗯，没错，这个地方确实有问题”，
+			托马斯说道。于是托马斯开始尝试修复这个BUG，当他差不多有眉目的时候已经到了午饭的时间。
+			B. 下午继续工作，BUG很快就被修复了，接着托马斯对模块重新编译、打包、部署、测试之后确认没有问题，回复了QA小组的邮件
+			C. 一天就这样过去了，明媚的阳光化作美丽的晚霞，托马斯觉得生活并不像晚霞那样美好
+		② 梳理一下托马斯这一天中的工作内容
+								 -------------------------------------
+			收到QA小组的邮件 --> |编译 --> 打包 --> 部署 --> 测试 -->|分析问题
+					↑			 |									 |	|
+					|			 |									 |	↓
+			  回复QA小组邮件 <-- |测试 <-- 部署 <-- 打包 <-- 编译 <--| 编码
+								 -------------------------------------
+		③ 将这些程序化的工作交给机器自动完成，就是自动化构建
+			
+			收到QA小组的邮件 --> 自动构建 --> 分析问题
+					↑			 				  |
+					|			                  ↓
+			  回复QA小组邮件 <-- 自动构建 <--   编码
+		④ 此时Maven的意义就体现出来了，它可以自动的从构建过程的起点一直执行到终点
+	5. 安装Maven核心程序
+		① 检查当前环境是否配置了JAVA_HOME的环境变量
+		② 解压Maven核心程序的压缩包
+			A. 解压apache-maven-3.6.0-bin.zip到D:\Program Files\OpenSource\maven
+			B. 注意：解压的路径必须是一个非中文无空格的路径
+		③ 配置Maven相关的环境变量
+			A. MAVEN_HOME或者M2_HOME
+			B. 配置M2_HOME是因为刚开始Maven版本2.0，因此需要向下兼容2.0版本
+			C. 需要在path下配置Maven的bin目录
+		④ 运行mvn -v查看Maven版本验证是否安装成功
+			A. mvn -v
+				Apache Maven 3.6.0 (97c98ec64a1fdfee7767ce5ffb20918da4f719f3; 2018-10-25
+				Maven home: D:\Program Files\OpenSource\maven\apache-maven-3.6.0\bin\..
+				Java version: 1.7.0_80, vendor: Oracle Corporation, runtime: D:\Program
+				Default locale: zh_CN, platform encoding: GBK
+				OS name: "windows 8.1", version: "6.3", arch: "amd64", family: "windows"
+			B. 出现以上信息则代表安装Maven成功
+	6. Maven的核心概念
+		① 约定的目录结构
+		② POM
+		③ 坐标
+		④ 依赖
+		⑤ 仓库
+		⑥ 生命周期/插件/目标
+		⑦ 继承
+		⑧ 聚合
+四、第一个Maven工程
+	1. 创建约定的目录结构
+		HelloMaven（根目录）：工程名
+		|---src（src目录）：存放Java源程序
+		|---|---main（main目录）：存放Java的主程序
+		|---|---|---java（java目录）：存放Java源文件
+		|---|---|---resources（resources目录）：存放框架或者其他配置文件
+		|---|---test（test目录）：存放Java的测试程序
+		|---|---|---java（java目录）：存放Java源文件
+		|---|---|---resources（resources目录）：存放框架或者其他配置文件
+		|---pom.xml（pom.xml文件）：Maven工程的核心配置文件
+	2. 为什么要遵守约定的目录结构
+		① Maven要负责项目的自动化构建，以编译为例，Maven要想自动进行编译，则必须知道Java源文件保存的地方
+		② 如果自定义的东西想让框架或者工具知道，有以下两种方式
+			A. 以配置的方式明确告诉框架
+			B. 遵守框架内部已经存在的约定
+	3. 创建第一个Maven工程
+		① 创建根目录 HelloMaven
+		② 在根目录 HelloMaven 中创建 src 类路径目录和 pom.xml 坐标配置文件，并在pom.xml中加入以下配置
+			<?xml version="1.0" encoding="UTF-8"?>
+
+			<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+			xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+				<modelVersion>4.0.0</modelVersion>
+
+				<groupId>com.li.maven</groupId>
+				<artifactId>HelloMaven</artifactId>
+				<version>0.0.1-SNAPSHOT</version>
+
+				<dependencies>
+					<dependency>
+						<groupId>junit</groupId>
+						<artifactId>junit</artifactId>
+						<version>4.11</version>
+						<scope>test</scope>
+					</dependency>
+				</dependencies>
+				
+			</project>
+		③ 在 src 目录下创建两个目录分别是：main 和 test 目录
+		③ 在 main 和 test 目录中分别创建 java 和 resources 目录
+		④ 在 main 目录和 test 目录的 java 目录中分别创建 package 目录 com.li.maven
+		⑥ 在 main 目录的 package 中创建 Hello.java
+			package com.li.maven;
+			public class Hello {
+				public String sayHello(String name) {
+					return "Hello " + name + "!";
+				}
+			}
+		⑦ 在 test 目录的 package 中创建 HelloTest.java
+			package com.li.maven;
+			import org.junit.Test;
+			public class HelloTest {
+				@Test
+				public void testHello() {
+					Hello hello = new Hello();
+					String result = hello.sayHello("LiXL");
+					System.out.println(result);
+				}
+			}
+	4. 常用的 Maven 命令
+		① 注意：执行与构建过程相关的 Maven 命令，就必须进入 pom.xml 所在的目录。
+		② 构建过程相关的 Maven 命令：编译、测试、打包、……
+		③ 常用的命令
+			A. mvn clean：清理
+			B. mvn compile：编译主程序
+			C. mvn test-compile：编译测试程序
+			D. mvn test：执行测试
+			E. mvn package：执行打包
+			F. mav install: 安装
+			G. mvn site：生成站点
+	5. 关于联网问题：
+		① Maven 的核心程序仅仅定义了抽象的生命周期，但是具体的工作必须由特定的插件来完成，而插件本身并不包含在
+		Maven 的核心程序中
+		② 当执行 Maven 命令需要用到某些插件时，Maven 核心程序会首先到本地仓库中查找
+		③ 默认的本地仓库的位置：系统中当前用户的家目录\m2\repository（C:\Users\Administrator\m2\repository）
+		④ Maven核心程序如果在本地仓库中找不到需要的插件，那么它就会自动连接到外网，到中央仓库中下载
+		⑤ 如果此时无法连接到外网，则自动化构建将会失败
+		⑥ 修改默认的本地仓库的位置，可以让Maven 的核心程序到事先准备好的目录下查找需要的插件
+			A. 进入Maven核心程序的配置文件settings.xml：
+				D:\Program Files\OpenSource\maven\apache-maven-3.6.0\conf\settings.xml
+			B. 在settings节点中配置修改本地仓库默认的位置：
+				<localRepository>D:\Program Files\OpenSource\maven\apache-maven-3.6.0\.m2\repository</localRepository>
+五、POM
+	1. POM含义：
+		① Project Object Modal（项目对象模型）
+		② 与DOM：Document Object Modal（文档对象模型）类似
+	2. pom.xml：
+		① 对于 Maven 工程是核心配置文件，与构建过程相关的一切设置都在 pom.xml 文件中进行配置。
+		② 其重要程度相当于web.xml对于动态web工程
+六、坐标：
+	1. 数学中的坐标：
+		① 在平面上，使用X、Y两个向量可以唯一确定平面上的任意一个点
+		② 在空间中，使用X、Y、Z三个向量可以唯一确定空间中的任何一个点
+	2. Maven中的坐标：
+		① 使用下面三个向量在仓库中唯一确定一个 Maven 工程
+			A. groupid：公司或者组织域名倒序 + 项目名，<groupid>com.li.HelloMaven</groupid>
+			B. artifactid：模块名，<artifactid>HelloMaven</artifactid>
+			C. version：版本，<version>1.0.0</version>
+		② gav：指定的是 Maven 工程的坐标
+	3. Maven 工程坐标与仓库中路径的对应关系
+		①从以下坐标可以获取spring-core jar包的位置以及文件名
+		② 坐标
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-core</artifactId>
+			<version>4.3.22.RELEASE</version>
+		③ spring-core jar包的位置以及文件名
+			org/springframework/spring-core/4.3.22.RELEASE/spring-core-4.3.22.RELEASE.jar = 
+			org\springframework\spring-core\4.3.22.RELEASE\spring-core-4.3.22.RELEASE.jar
+七、仓库 
+	1. 仓库的分类
+		① 本地仓库：当前电脑上部署的仓库目录，为当前电脑上所有的Maven工程服务
+		② 远程仓库：
+			A. 私服：搭建在局域网环境中，为局域网范围的所有Maven服务。
+						  ---------				
+			用户 -------> |	      |	<---------- Maven Central
+				 <------- |       |
+						  |	Nexus |	<---------- Apache      
+						  |	私服  |
+						  |	      |
+			用户 ---------|	      |	<---------- 其他远程仓库
+						  ---------				
+							
+							
+			B. 中央仓库：架设在 Internet 上，为全世界所有的 Maven 工程服务
+			C. 中央仓库的镜像：架设在各大洲，为中央仓库分担流量，减轻中央仓库的压力，同时更快的响应用户请求
+	2. 仓库中保存的内容：Maven工程
+		① Maven 自身所需要的插件
+		② 第三方框架或者工具的 jar 包
+		③ 自己开发的 Maven 工程
+八、依赖1
+	1. 创建第二个Maven工程：SecondMaven
+		① 在工程空间中创建根目录 SecondMaven
+		② 在根目录 SecondMaven 中创建当前类路径 src 和 pom.xm 配置文件，如下
+			<?xml version="1.0" encoding="UTF-8"?>
+
+			<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+			xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+				<modelVersion>4.0.0</modelVersion>
+
+				<groupId>com.li.maven</groupId>
+				<artifactId>SecondMaven</artifactId>
+				<version>0.0.1-SNAPSHOT</version>
+
+				<dependencies>
+					<dependency>
+						<groupId>junit</groupId>
+						<artifactId>junit</artifactId>
+						<version>4.11</version>
+						<scope>test</scope>
+					</dependency>
+					
+					<dependency>
+						<groupId>com.li.maven</groupId>
+						<artifactId>HelloMaven</artifactId>
+						<version>0.0.1-SNAPSHOT</version>
+						<scope>compile</scope>
+						
+					</dependency>
+				</dependencies>
+				
+			</project>
+		③ 在 src 目录下创建存放主程序的 main 目录和存放测试程序的 test 目录 	
+		④ 在 main 目录和 test 目录中分别创建用于存放 .java文件的 java 目录和用于存放配置文件的 resources 目录
+		⑤ 在 main 目录和 test 目录中的 java 目录中分别创建 com.li.maven 的 package 目录结构
+		⑥ 在 main 目录的 java 目录中的 com.li.maven 中创建 HelloFriend.java 文件，内容如下
+			package com.li.maven;
+			import com.li.maven.Hello;
+			public class HelloFriend {
+				public String sayHelloToFriend(String name) {
+					Hello hello = new Hello();
+					String result = hello.sayHello(name) + " I am " + getName();
+					return result;
+				}
+				public String getName() {
+					return "LiXL";
+				}
+			}
+		⑦ 在 test 目录的 java 目录中的 com.li.maven 中创建 HelloFriendTest.java 文件，内容如下
+			package com.li.maven;
+			import org.junit.Test;
+			public class HelloFriendTest {
+				@Test
+				public void testHelloToFriend() {
+					HelloFriend helloFriend = new HelloFriend();
+					String result = helloFriend.sayHelloToFriend("LiLX");
+					System.out.println(result);
+				}
+			}
+		⑧ Maven工程创建完成之后，使用dos命令行进入当前工程的 pom.xml 所在的目录下
+		⑨ 执行 mvn compile 命令，出现以下的信息
+			 Failed to execute goal on project SecondMaven
+		⑩ 出现额异常为，找不到当前依赖：HelloMaven-0.0.1-SNAPSHOT.jar
+	2. Maven 解析依赖信息时会到本地仓库中查找被依赖的 jar 包
+		① 由于所依赖的 jar 包并不属于第三方，因此在本地中找不到所需要的依赖立即报错
+		② 对于自己开发的 Maven 工程，使用 mvn install 命令安装后就可以使 Maven 工程进入仓库
+		③ 进入 HelloMaven 工程的 pom.xml 所在的目录，执行 mvn install 命令，安装成功
+		④ 重新进入到 SecondMaven 工程的 pom.xml 所在的目录下，执行mvn compile 命令，编译成功
+	3. 依赖的范围：
+		① 注意到依赖信息中除了目标 jar 包的坐标还有一个 scope 设置，这是依赖的范围。依赖的范围有几个可选值。
+			A. compile
+			B. test
+			C. provided
+		② 从项目的结构角度理解 compile 和 test 的区别
+			
+			-------
+			| src |
+			-------
+			   |	  --------       ------------		--------------------
+			   |----> | main | ----> |   主程序 | <---- | compile 范围依赖 |
+			   |      --------       ------------	  |	--------------------
+			   |	  --------       ------------ <---|	--------------------
+			   |----> | test | ----> | 测试程序 | <---- |   test范围依赖   |
+					  --------       ------------		--------------------
+					  
+			A. 结合例子：对于 SecondMaven 来说，HelloMaven 就是服务于主程序的，JUnit是服务于测试程序的。
+			B. SecondMaven 主程序需要 HelloMaven 是非常明显的，测试程序由于要调用主程序所以也需要 HelloMaven，所以compile 范围依赖对主程序和
+			测试程序都应该有效
+			C. SecondMaven 的测试程序部分需要 JUnit 也非常明显，而主程序是不需要的，所以Test 范围依赖仅仅对于主程序有效
+		③ 从开发和运行这两个不同阶段理解 compile 和 provided 的区别
+			A. 结合例子：对于spring-code 来说，从开发到部署再到运行，spring-code都是需要的，而Servlet-api 在开发中仅仅被需要，到部署阶段时，会自动忽略对Servlet-api
+			的依赖，当运行在Tomcat中时，由于Tomcat中已经定义了 Servlet-api 的信息，故不再需要依赖 Servlet-api，当Maven程序需要依赖 Servlet-api 时，会与Tomcat中已存在的
+			Servlet-api 起冲突。
+			B. 所以 compile 范围依赖 对开发、部署、运行都是需要的，而provided 范围依赖仅对 开发时是需要的
+								-----------------------
+								| Maven工程 [Web工程] |
+								-----------------------
+										  ↓
+									   --------
+									   | 开发 | <-----------------
+									   -------- 				 |
+										  ↓						 |
+									   --------					 |	--------------------
+								 	   | 部署 | <------------------ | compile 范围依赖 |		  		
+								       --------					 |	--------------------
+										  ↓						 |
+									   --------					 |
+									   | 运行 |	<-----------------
+									   --------
+										  ↓
+									  ----------
+									  | Tomcat |
+									  ----------
+	
+								-----------------------
+								| Maven工程 [Web工程] |
+								-----------------------
+										  ↓
+									   --------					    ---------------------
+									   | 开发 | <-----------------	| provided 范围依赖 |
+									   -------- 				 |	---------------------
+										  ↓						 |			 ↓
+									   --------					 |	---------------------
+								 	   | 部署 | <------------------ | 		忽略 	    |		  		
+								       --------					 |	---------------------
+										  ↓						 |			 |
+									   --------					 |		     |
+									   | 运行 |	<-----------------			 |
+									   --------								 |
+										  ↓									 ↓
+									  ----------					 --------------------
+									  | Tomcat | ------------------> |  由 Servlet 容器 |
+									  ----------					 --------------------
+九、生命周期
+	1. 什么是 Maven 的生命周期
+		① Maven 的生命周期定义了各个构建环节的执行顺序，有了这个清单，Maven 就可以自动化地执行构建命令了。
+		② Maven 有三套相互独立的生命周期，分别是：
+			A. Clean Lifecycle：在进行真正构建之前进行一些清理工作
+			B. Default Lifecycle：构建的核心部分，编译、测试、打包、安装、部署等等
+			C. Site Lifecycle：生成项目报告，站点，发布站点。
+		③ 他们是相互独立的，你可以仅仅调用clean 来清理工作目录，仅仅调用site 生成站点。当然可以直接运行mvn clean install site 
+		运行所有这三套生命周期
+		④ 每套生命周期都由一组阶段（Phase）组成，我们平时在命令行输入命令总会对应一个特殊的阶段，运行 mvn clean ，这个clean是
+		Clean Liftcycle的一个阶段，有Clean 生命周期，也有 clean阶段
+	2. Clean Liftcycle：Clean 生命周期一共包含了三个阶段
+		① pre-clean：执行一些需要在clean 之前完成的工作
+		② clean：移除所有上一次构建生成的文件
+		③ post-clean：执行一些需要在clean 之后立刻完成的工作
+	3. sSite Lifecycle：
+		① pre-site：执行一些需要在生成站点文档之前完成的工作
+		② site：生成项目的站点文档
+		③ post-site：执行一些需要在生成站点文档之后完成的工作，并且为部署做准备
+		④ site-deploy：将生成的站点文档部署到特点的服务器上。
+		⑤ 这里经常用到的是 site 阶段和 site-deploy，用以生成个发布Maven站点，这可是Maven 相当强大的功能，Maven比较喜欢文档及统计数据自动生成
+	4. Default Lifecycle：
+		① Default Liftcycle 是Maven 生命周期最重要的一个，绝大部分工作都发生在这个生命周期中。这里解释一些比较重要和常用的阶段
+		② validate -> generate-sources -> process-sources
+		③ generate-sources
+		④ process-resources：复制并处理资源文件，至目标目录，准备打包
+		⑤ compile：编译项目的源代码
+		⑥ process-classes
+		⑦ generate-test-sources
+		⑧ process-test-sources
+		⑨ generate-test-resources
+		⑩ progress-test-resources：复制并处理资源文件，至目标测试目录
+		①① test-compile：编译测试源代码
+		①② process-test-classes
+		①③ test：使用合适的单元测试框架运行测试，这些测试代码不会被打包或者部署
+		①④ prepare-package
+		①⑤ package：接受编译好的代码，打包成可以发布的格式，如JAR
+		①⑥ pre-interaction-test
+		①⑦ interaction-test
+		①⑧ post+interaction-test
+		①⑨ verify
+		②① install 将包安装值本地仓库，以让其他项目依赖
+		②② deploy：将最终的包复制到远程的仓库，以让其他开发人员与项目共享或者部署到服务器是上运行。
+	5. 生命周期与自动化构建
+		运行任何一个阶段的时候，它前面的所有阶段都会被运行。例如运行mvn install的时候，代码会被编译，测试，打包（即从validate 一直到install）中间的命令会自动执行。
+		这就是Maven为什么能够自动执行构建过程的各个环节的原因。此外，Maven的插件机制是完全依赖Maven的生命周期，因此理解生命周期至关重要。
+	6. 插件和目标
+		① 生命周期的各个阶段仅仅定义了要执行的任务是什么（也就是目标）
+		② 各个阶段和插件的目标是对应的
+		③ 相似的目标由特定的插件来完成
+		④ 列举一些生命周期阶段与其对应的插件目标和插件
+			生命周期阶段			插件目标			插件
+			compile					compile				maven-compile-plugin
+			test-compile			testCompile			maven-compile-plugin
+		⑤ 可以将目标看作调用插件功能的的命令
+十、在 Eclipse 中使用 Maven
+	1. 在安装 Eclipse 中安装 Maven 插件
+		① 要用Eclipse构建Maven项目，我们需要先安装meeclipse插件 
+		② 点击eclipse菜单栏Help->Eclipse Marketplace搜索到插件Maven Integration for Eclipse 并点击安装即可，如下图
+		③ 安装成功之后我们在Eclipse菜单栏中点击File->New->Other,在弹出的对话框中会看到Maven工程
+	2. Eclipse 中 Maven 插件的设置
+		① 在 Window -> preferences -> Maven 中 设置 Installations 和 Usersetting 两个选项
+		② installations：指定Maven核心程序的位置，不建议使用插件自带的Maven程序，而应该使用自己下载的Maven
+		② Usersettings：指定Maven的conf/settings.xml的位置，进而获取本地仓库的位置
+			A. 设置User settings：指定settings.xm的位置，D:\Program Files\OpenSource\maven\apache-maven-3.6.0\conf\settings.xm
+			B. 设置Local Repository：指定本地仓库的位置，D:\Program Files\OpenSource\maven\apache-maven-3.6.0\.m2\repository
+	3. 使用 Eclipse 创建 Maven 版的 Java 工程
+		① 在工作区使用 Ctrl+n 新建项目或者鼠标点击File 新建一个Maven Project 工程
+		② 在新建Maven工程时，需要勾选 create a simple project，然后点击 next
+		③ 输入groupid 和 articleid后选择 finish
+		④ 可以发现新建的maven使用的jdk版本为1.5，修改jdk的版本
+			A. 右键Maven 工程，选择build path -> configure build path
+			B. 选择libraries -> jre system library，remove
+			C. 选择 add library -> jre system library，选择自己需要的jdk版本，修改完成点击OK关闭即可
+			D. 接着，右键项目，选择 Properties -> java compiler，选择compiler compliance level，将版本更换为1.7，点击Apply修改完成后点击OK关闭即可
+		⑤ 使用上述方式每次新创建 maven 时都需要修改Maven的jdk版本，步骤繁琐
+		⑥ 可以通过修改Maven 核心程序的cof/settings.xml文件，设置Maven的默认jdk版本。
+			A. 进入到settings.xml文件中，找到 profiles节点下，添加以下配置
+				<profile>
+					<id>jdk-1.7</id>
+					<activation>
+						<activeByDefault>true</activeByDefault>
+						<jdk>1.7</jdk>
+					</activation>
+					<properties>
+						<maven.compiler.source>1.7</maven.compiler.source>
+						<maven.compiler.target>1.7</maven.compiler.target>
+						<maven.compiler.compilerVersion>1.7</maven.compiler.compilerVersion>
+					</properties>
+				</profile>
+			B. 再次新建Maven工程时，默认的jdk 版本将使用修改时定义的jdk版本。
+		⑦ 在 Eclipse 中使用Maven 命令
+			A. 在新建的Maven 工程下找到pom.xml文件，右键 -> Run As
+			B. 第一次执行Maven命令 时，会报-Dmaven.multiModuleProjectDirectory system property is not set.
+			C. 解决-Dmaven.multiModuleProjectDirectory system property is not set.的问题
+				a. 检查当前环境变量中是否配置了MAVEN_HOME，如果没有则需要配置
+				b. 在 Window -> Preferences -> Java -> Installde JREs，选择一个jdk版本点击Edit
+				c. 在Default VM arguments中输入-Dmaven.multiModuleProjectDirectory=$MAVEN_HOME，点击Finish即可
+			D. 执行 Maven compile命令
+				a. 在eclipse 中并没有 Maven compile 命令，但是可以通过点击Maven build...命令进行设置
+				b. 右键 -> Run As -> Maven build ...
+				c. 在 Goals 中输入 compile
+				d. 然后点击Run即可
+	4. 在 MyEclipse 中创建 Maven 版的 web 工程
+		① 第一次创建 Maven 版的 Web 工程
+			A. 在工作区使用 Ctrl+n 新建项目或者鼠标点击File 新建一个Maven Project 工程
+			B. 勾选勾选 create a simple project，然后点击 next
+			C. 输入groupid 和 articleid，然后在 package中选择war，点击 finish 确定
+			D. 新建的Maven版 web 工程比Maven 版的 java 工程在src/main中多了一个webapp目录，因此Myeclipse 将其视为 普通的Maven版 Java工程
+		② 设置Maven 版的 web工程
+			A. 右键Maven工程，选择Properties
+			B. 查找project facets 在右侧选择Dynamic web module，在右下方会出现 further configuration available...，并点击修改web module
+			C. 在context root 中输入 WebProject
+			D. 在Content directory中输入 /src/main/webapp
+			E. 确认下方Generate web.xml deployment descriptor 已被勾选
+			F. 点击OK 后关闭 web module，再点击apply 最后点击OK完成修改
+			G. Maven版的动态web工程就已经创建好了
+		③ 解决 Jsp 报错的问题
+			A. 报错原因：The superclass "javax.servlet.http.HttpServlet" was not found on the Java 
+			B. 传统做法是修改工程的运行环境，即添加Tomcat的运行环境
+			C. Maven解决运行环境的方法：在pom.xml文件中添加Servlet-api的依赖
+				<dependency>
+					<groupId>javax.servlet</groupId>
+					<artifactId>servlet-api</artifactId>
+					<version>2.5</version>
+					<scope>compile</scope>
+				</dependency>
+		④ 解决Maven工程运行在Tomcat在类路径中没有创建lib目录以及没有拷贝依赖的jar包的问题：
+			右击项目->properties->找到Deployment Assembly，右边便是编译打包的配置，看是不是缺少了lib库的依赖，我的就是，点击Add， 
+			选择Java Build Path Entries，点击next，选择Maven Dependencies，点击Finish，最后点击Apply和OK完成配置与关闭页面即可
+	5. 导入 Maven 工程
+		① 手动创建的的Maven工程不能通过Eclipse 的传统方式General -> Existing Project  into workspace，原因是没有工程的必要文件
+		② 导入 Maven 工程的步骤
+			A. 在工作区使用 Ctrl+n 新建项目或者鼠标点击File，选择Import -> Maven -> Existing Maven Project
+			B. 在root directory 中选择Maven 工程的工作空间
+			C. 等待 Eclipse 对工作空间的检测，该检测是根据工程中是否存在pom.xml 进行判断的
+			D. 选择要导入的Maven工程，点击finish确定即可。
+			E. 导入成功后，手动创建的Maven工程具备了工程的文件，因此与其他Eclipse工程是相同的。
+		③ 使用Eclipse创建的Maven工程可以用Eclipse的传统方式进行导入	
+十一、依赖2
+	1. 创建第三个Maven版 Java工程 MakeFriends
+		① 分别创建一个Java程序MakeFriends和测试程序MakeFriendsTest
+			package com.li.maven;
+			public class MakeFrends {
+
+				public String makeFrends(String name) {
+					HelloFriend friend = new HelloFriend();
+					String sayHelloToFriend = friend.sayHelloToFriend(name);
+					System.out.println(sayHelloToFriend);
+					String result = "Hey, " + friend.getName() + "!";
+					return result;
+				} 
+			}
+			package com.li.maven;
+			import org.junit.Test;
+			public class MakeFrendsTest {
+
+				@Test
+				public void testMakeFrends() {
+					MakeFrends makeFrends = new MakeFrends();
+					String result = makeFrends.makeFrends("LiLX");
+					System.out.println(result);
+				}
+			}
+		② 在pom.xml中导入
+			<dependency>
+				<groupId>junit</groupId>
+				<artifactId>junit</artifactId>
+				<version>4.11</version>
+				<scope>test</scope>
+			</dependency>
+
+			<dependency>
+				<groupId>com.li.maven</groupId>
+				<artifactId>HelloFriend</artifactId>
+				<version>0.0.1-SNAPSHOT</version>
+				<type>jar</type>
+				<scope>compile</scope>
+			</dependency>
+		③ 由于MakeFriends中依赖的HelloFriend所在的Maven工程HelloFriend还没有安装到本地仓库，因此程序找不到相关的依赖
+		④ 在HelloFriend 工程下找到pom.xml并使用Maven命令安装工程到本地仓库
+		⑤ 安装成功后，由于本地仓库中已经存在HelloFriend工程，MakeFriends能找到依赖的HelloFriend因此错误消失
+		⑥ 在运行时环境中 Maven Dependencies中发现依赖的自定义Maven工程与第三方框架的过程图标不同，这是因为eclipse在工程中找到所依赖的工程。
+		⑦ 在MakeFriends中对pom.xml使用Maven命令，Maven compile，发现编译成功。
+	2. 依赖的传递性
+		① 目前三个Maven 工程的依赖关系是HelloMaven -> HelloFriend -> MakeFriends 
+		② 在 HelloMaven 中添加 Spring-core 依赖，结果在三个Maven中的运行环境Maven dependancies都添加了对Spring-core的依赖
+		打开MakeFriends 的pom.xml 的dependency Hierarchy中可以查看层级关系
+				Junit:4.11[test]
+					hamcrest-core:1.3[test]
+			  ---------------------------------------
+			  |	HelloFriend:0.0.1-SNAPSHOT[compile] |  <--------------- 直接依赖
+			  ---------------------------------------
+				  -------------------------------------------
+				  |	HelloMaven:0.0.1-SNAPSHOT[compile]      |
+				  |		spring-core:4.3.22.RELEASE[compile] | <-------- 间接依赖
+				  |			commons-logging:1.2[compile]    |
+				  -------------------------------------------
+		③ 依赖的传递性的好处：可以传递的依赖不必在每个模块工程中都重复声明，在最底层的工程中依赖一次即可
+		④ 注意：非compile范围的依赖不能传递。所以在各个工程模块中，如果有需要就得重复声明依赖
+	3. 依赖的排除
+		① 需要设置依赖排出的场合
+			  -----------------------------------------------
+			  |	HelloFriend:0.0.1-SNAPSHOT[compile] 		| <---------确实需要的使用的依赖
+			  |		HelloMaven:0.0.1-SNAPSHOT[compile]      |
+			  |			spring-core:4.3.22.RELEASE[compile] |
+			  -----------------------------------------------
+					  --------------------------------------- 
+					  |	commons-logging:1.2[compile]    	| <-------- 不稳定的jar包，不希望加入当前的工程中
+					  ---------------------------------------
+		② 依赖的排除的步骤
+			A. 打开需要排除某个jar的 Maven工程的pom.xml文件
+			B. 找到间接依赖被引进来的依赖，加入以下配置
+				<exclusions>
+					<exclusion>
+						<groupId>commons-logging</groupId>
+						<artifactId>commons-logging</artifactId>
+					</exclusion>
+				</exclusions>
+			C. 查询需要排除的依赖坐标，在dependency Hierarchy中找到需要排除的依赖，双击即可查询
+			D. 当排除了某个依赖之后，该依赖不再向下传递
+		③ 依赖的原则
+			A. 作用：解决模块之间的jar包冲突
+			B. 原则1：路径最短者优先原则
+			
+				MakeFriends ------> HelloFriend -------> HelloMaven
+					↓					 ↓				   ↓
+				log4j.1.2.14		log4j.1.2.17 	  log4j.1.2.17		
+				
+			C：原则2：路径相同时先生忙完者优先
+			
+				makeFriends -----> HelloFriend --------> log4j.1.2.14	
+					|
+					-------------> HelloMaven ---------> log4j.1.2.17	
+				先声明指的是dependency标签的声明顺序，即makeFriends中依赖HelloFriend和HelloMaven的先后顺序
+	4. 统一管理依赖的版本号
+		① 当项目中使用多个依赖的版本号是相同时，需要将所有版本号相同的依赖统一升级，每个依赖都手动修改版本的方式并不可靠
+		② 统一管理依赖的版本号的步骤
+			A. 在properties标签中使用自定义标签统一版本号
+				<properties>
+					<spring-version>4.3.22.RELEASE</spring-version>
+				</properties>
+			B. 在需要统一版本的位置，使用${自定义标签名}引用声明的版本号
+			C. properties标签配合自定义标签并不只能用于统一管理依赖的版本号，凡是需要统一声明后引用的场合都可以使用。
+	5. 继承
+		① 现状：
+			A. HelloMaven使用的JUnit版本为4.0
+			B. HelloFriend使用的JUnit版本为4.0
+			C. MakeFriends使用的JUnit版本为4.9
+			D. 由于test 范围的依赖不能传递，所以必然会分散在各个模块工程中，很容易造成版本不一致
+		② 需求：统一管理各个模块工程中对JUnit依赖的版本
+		③ 解决思路：将JUnit依赖统一提取到“父工程”中，在子工程中声明JUnit依赖时不指定版本，以父工程中统一设定，同时也便于修改
+		④ 操作步骤
+			A. 创建一个maven工程作为父工程。注意打包的方式采用POM
+				<groupId>com.li.maven</groupId>
+				<artifactId>HelloParent</artifactId>
+				<version>0.0.1-SNAPSHOT</version>
+				<packaging>pom</packaging>
+			B. 在子工程中声明对父工程的引用，注：在引用父工程时，最好加上<relativePath>，该标签的含义是：以当前pom.xml为基准指明父工程pom.xml文件的相对路径
+				<parent>
+					<groupId>com.li.maven</groupId>
+					<artifactId>HelloParent</artifactId>
+					<version>0.0.1-SNAPSHOT</version>
+					<relativePath>../HelloParent/pom.xml</relativePath>
+				</parent>
+			C. 将子工程的坐标中与父工程坐标中重复的内容删除
+			D. 在父工程中统一管理JUnit的依赖
+				<dependencyManagement>
+					<dependencies>
+						<dependency>
+							<groupId>junit</groupId>
+							<artifactId>junit</artifactId>
+							<version>4.11</version>
+							<scope>test</scope>
+						</dependency>
+					</dependencies>
+				</dependencyManagement>
+			E. 在子工程中删除JUnit的版本号部分
+		⑤配置继承后，执行安装命令时，需要先安装父工程
+	6. 聚合
+		① 作用：一键安装所有的Maven工程
+		② 配置方式：在一个“总的聚合工程”（一般是父工程）中配置各个参与聚合的模块，在每个模块中指明其相对路径，模块的顺序与构建成功与否无关
+			<modules>
+				<module>../HelloMaven</module>
+				<module>../HelloFriend</module>
+				<module>../MakeFrends</module>
+			</modules>
+		③ 使用方式：在聚合工程的pom.xml文件上执行Maven 命令：Maven Install
+	7. 工程的自动部署
+		① 动态Web工程部署的方式是将工程打包成war包然后部署到Tomcat上
+		② Maven打包成war的方式是对pom.xml使用Maven命令，选择maven build...，在Goals中输入package 命令，点击run，刷新当前工程后会产生一个
+		target包，该包下有产生好的war包，将该war包复制到Tomcat中，运行Tomcat，当Tomcat运行后，war包会自动解压
+		③ 使用Maven 命令的 deploy进行自动部署，操作步骤
+			A. 在pom.xml文件中加入以下配置
+				<!-- 配置当前工程构建过程中的特殊设置 -->
+				<build>
+					<finalName>mavenWeb</finalName>
+					
+					<!-- 配置构建过程中需要使用的插件 -->
+					<plugins>
+						<plugin>
+							<!-- cargo是一个专门从事“启动Servlet容器”的组织 -->
+							<groupId>org.codehaus.cargo</groupId>
+							<artifactId>cargo-maven2-plugin</artifactId>
+							<version>1.4.12</version>
+							
+							<!-- 针对插件进行配置 -->
+							<configuration>
+								<!-- 配置当前系统中容器的位置 -->
+								<container>
+									<containerId>tomcat8x</containerId>
+									<home>D:\Program Files\OpenSource\Tomcat\myeclipse\apache-tomcat-8.5.38</home>
+								</container>
+								<!-- 确认容器的位置 -->
+								<configuration>
+									<type>existing</type>
+									<home>D:\Program Files\OpenSource\Tomcat\myeclipse\apache-tomcat-8.5.38</home>
+									<!-- 如果Tomcat端口默认值为8080，则不必设置该属性 -->
+									<!-- <properties>
+										<cargo.servlet.port>8080</cargo.servlet.port>
+									</properties> -->
+								</configuration>
+							</configuration>
+							
+							<!-- 配置插件在什么情况下执行 -->
+							<executions>
+								<execution>
+									<id>cargo-run</id>
+									
+									<!-- 生命周期的阶段 -->
+									<phase>install</phase>
+									<!-- 插件的目标 -->
+									<goals>
+										<goal>run</goal>
+									</goals>
+								</execution>
+							</executions>
+						</plugin>
+					</plugins>
+				</build>
+			B. 对pom.xml 使用Maven命令，选择Maven build...，在Goals中输入 deploy命令，点击run，Maven工程会自动部署到目标Tomcat上，
+			但是该方式的弊端是，当启动Tomcat服务后，服务无法停止，需要手动关闭，否则会造成端口一直被占有。
+			C. 在DOS 命令行中使用Maven命令 mvn deploy 对Maven进行自动部署
+			
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+

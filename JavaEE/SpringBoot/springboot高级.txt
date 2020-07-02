@@ -1,0 +1,1304 @@
+九、Spring Boot与缓存
+	1. JSR107：Java Caching 定义了5个核心接口，分别是CachingProvider、CacheManager、Cache、Entry和Expiry
+		① CachingProvider：定义了创建、配置、获取、管理和控制多个CacheManager，一个应用可以在运行期访问多个CachingProvider
+		② CacheManager：定义了创建、配置、获取、管理和控制多个唯一命名的Cache，哲学Cache存放于CacheManager的上下文中。一个CacheManager仅被一个CachingProvider所拥有的。
+		③ Cache：是一个类似于Map的数据结构并临时存储以Key为索引的值，一个Cache仅被一个CacheManager所拥有
+		④ Entry：是一个存储在Cache中的key-value对。
+		⑤ Expiry：每一个存储在Cache中的条目有一个定义的有效期，一旦超过这个有效期，条目为过期的状态。一旦过期，条目将不可访问、更新和删除。缓存有效期可以通过ExpiryPolicy设置。
+														---------------
+														| Application |
+														---------------
+															   |
+													-----------|------------
+													↓		    		   ↓
+										   -------------------	  -------------------
+										   | CachingProvider |	  | CachingProvider |
+										   -------------------    -------------------
+													|
+									----------------|---------------
+									↓							   ↓
+							 ----------------				----------------
+							 | CacheManager |				| CacheManager |
+							 ----------------				----------------
+									|
+					----------------|-----------------
+					↓				↓				 ↓
+				---------		---------		 ---------
+				| Cache |		| Cache |		 | Cache |
+				---------		---------	     ---------
+					↓ 
+			 ---------------	   ----------
+			 | Entry<K, V> | ----> | Expiry |
+			 ---------------       ----------
+					↓
+			 ---------------	   ----------
+			 | Entry<K, V> | ----> | Expiry |
+			 --------------- 	   ----------
+	2. Spring缓存抽象
+		① 核心概念：
+			A. Spring从3.1开始定义了org.springframework.cache.Cache和org.springframework.cache.CacheManager接口来统一不同的缓存技术；并支持使用JCache（JSR-107）
+			注解简化我们开发；
+			B. Cache接口为缓存的组件规范定义，包含缓存的各种操作集合；
+			C. Cache接口下Spring提供了各种xxxCache的实现；如RedisCache，EhCacheCache , ConcurrentMapCache等；
+			D. 每次调用需要缓存功能的方法时，Spring会检查检查指定参数的指定的目标方法是否已经被调用过；如果有就直接从缓存中获取方法调用后的结果，如果没有就调用方
+			法并缓存结果后返回给用户。下次调用直接从缓存中获取。
+			E. 使用Spring缓存抽象时我们需要关注以下两点；
+				a. 确定方法需要被缓存以及他们的缓存策略
+				b. 从缓存中读取之前缓存存储的数据
+		② 几个重要概念&缓存注解
+			A. Cache：缓存接口，定义缓存操作。实现有：RedisCache、EhCacheCache、ConcurrentMapCache等
+			B. CacheManager：缓存管理器，管理各种缓存（Cache）组件
+			C. @Cacheable：主要针对方法配置，能够根据方法的请求参数对其结果进行缓存
+			D. @CacheEvict：清空缓存
+			E. @CachePut：保证方法被调用，又希望结果被缓存。
+			F. @EnableCaching：开启基于注解的缓存
+			G. Caching：Cacheable[]、CachePut[]和CacheEvict[]的组合注解
+			H. @CacheConfig：可抽取公共cacheNames、keyGenerator和cacheManager等
+			I. keyGenerator：缓存数据时key生成策略
+			J. serialize：缓存数据时value序列化策略
+		③ @Cacheable/@CachePut/@CacheEvict 主要的参数
+			A. value：缓存的名称，在 spring 配置文件中定义，必须指定至少一个，例如：@Cacheable(value=”mycache”) 或者 @Cacheable(value={”cache1”,”cache2”})
+			B. key：缓存的 key，可以为空，如果指定要按照 SpEL 表达式编写，如果不指定，则缺省按照方法的所有参数进行组合，例如：@Cacheable(value=”testcache”,key=”#userName”)
+				a. 使用SpELl表达式生成Key：key = "#root.targetClass.name+'.'+#root.methodName+'('+#id+')'"
+				b. 使用keyGenerator生成key策略
+					@Bean("myKeyGenerator")
+					public KeyGenerator keyGenerator() {
+						return new KeyGenerator() {
+							@Override
+							public Object generate(Object o, Method method, Object... objects) {
+								return o.getClass().getName() + "." + method.getName() + "." + Arrays.asList(objects).toString();
+							}
+						};
+					}
+					keyGenerator = "myKeyGenerator"
+			C. condition：缓存的条件，可以为空，使用 SpEL 编写，返回 true 或者 false，只有为 true 才进行缓存/清除缓存，在调用方法之前之后都能判断，
+			例如：@Cacheable(value=”testcache”,condition=”#userName.length()>2”)
+			D. allEntries(@CacheEvict )：是否清空所有缓存内容，缺省为 false，如果指定为 true，则方法调用后将立即清空所有缓存，例如：@CachEvict(value=”testcache”,allEntries=true)
+			E. beforeInvocation(@CacheEvict)：是否在方法执行前就清空，缺省为 false，如果指定为 true，则在方法还没有执行的时候就清空缓存，缺省情况下，如果方法执行抛出异常，则不会清空缓存
+			例如：@CachEvict(value=”testcache”，beforeInvocation=true)
+			F. unless(@CachePut、@Cacheable)：用于否决缓存的，不像condition，该表达式只在方法执行之后判断，此时可以拿到返回值result进行判断。条件为true不会缓存，fasle才缓存
+			例如：@Cacheable(value=”testcache”,unless=”#result == null”)
+			G. sync（@Cacheable）：是否使用异步缓存模式，默认不开启，即方法执行完，以同步的方式将方法返回的结果保存在缓存中，开启异步模式后，unless就不支持使用。
+		④ Cache SpEL 
+			A. methodName：当前被调用的方法名，例如：#root.methodName
+			B. method：当前被调用的方法，例如：#root.method.name
+			C. target：当前被调用的目标对象，例如：#root.target
+			D. targetClass：当前被调用的目标对象类，例如：#root.targetClass
+			E. args：当前被调用的方法的参数列表，例如：#root.args[0]
+			F. caches：当前方法调用使用的缓存列表（如@Cacheable(value={"cache1", "cache2"})），则有两个cache，例如：#root.caches[0].name
+			G. argument name：方法参数的名字. 可以直接 #参数名 ，也可以使用 #p0或#a0 的形式，0代表参数的索引；例如：#iban 、 #a0 、  #p0
+			H. result：方法执行后的返回值（仅当方法执行之后的判断有效，如‘unless’，’cache put’的表达式 ’cache evict’的表达式beforeInvocation=false），例如：#result
+	3. 缓存使用
+		① 引入spring-boot-starter-cache模块
+			<dependency>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-starter-cache</artifactId>
+			</dependency>
+		② 搭建基本环境
+			A. 创建数据表employees和departments
+			B. 创建JavaBean封装数据
+			C. 整合MyBatis操作数据库
+				a. 配置数据源
+				b. 使用注解版的MyBatis
+					(1) 使用@MapperScan扫描所有的Mapper
+					(2) 创建EmployeeMapper，并定义CRUD操作数据库
+		③ @EnableCaching开启缓存，并使用@Cacheable(value = "employee")给方法标注使用缓存
+		④ 缓存的自动配置原理
+			A. 自动配置类：CacheAutoConfiguration
+			B. 缓存的配置类：
+				a. org.springframework.boot.autoconfigure.cache.GenericCacheConfiguration
+				b. org.springframework.boot.autoconfigure.cache.JCacheCacheConfiguration
+				c. org.springframework.boot.autoconfigure.cache.EhCacheCacheConfiguration
+				d. org.springframework.boot.autoconfigure.cache.HazelcastCacheConfiguration
+				e. org.springframework.boot.autoconfigure.cache.InfinispanCacheConfiguration
+				f. org.springframework.boot.autoconfigure.cache.CouchbaseCacheConfiguration
+				g. org.springframework.boot.autoconfigure.cache.RedisCacheConfiguration
+				h. org.springframework.boot.autoconfigure.cache.CaffeineCacheConfiguration
+				i. org.springframework.boot.autoconfigure.cache.GuavaCacheConfiguration
+				j. org.springframework.boot.autoconfigure.cache.SimpleCacheConfiguration
+				k. org.springframework.boot.autoconfigure.cache.NoOpCacheConfiguration
+			C. 默认生效的类：SimpleCacheConfiguration
+				a. 给容器添加了一个缓存管理器ConcurrentMapCacheManager
+				b. createConcurrentMapCache，获取或者创建ConcurrentMapCache组件，在ConcurrentMap中存取数据
+			D. 缓存的运行流程
+				a. 方法运行之前，先去查询Cache(缓存组件)，按照@Cacheable指定的CacheName获取（CacheManager获取相应的缓存）
+				b. 第一次获取缓存如果没有Cache组件会自动创建
+				c. 在Cache中查找缓存的内容，使用一个Key，默认是方法的参数，是按照某种策略生成的，默认是使用KeyGenerator的实现类SimpleKeyGenerator生成的
+				SimpleKeyGenerator生成key的默认策略，
+					(1) 如果没有参数，key为new SimpleKey()
+					(2) 如果有一个参数，key为参数的值
+					(3) 如果有多个参数：key为new SimpleKey(params)
+				d. 如果没有查到缓存就调用目标方法
+				e. 将目标方法返回结果保存到缓存中。
+			E. 总结：@Cacheable标注的方法执行之前先检查缓存中是否存在数据，默认是按照参数作为key进行查询，如果没有则运行方法将结果保存在缓存中，再次调用方法查找数据，
+			直接返回缓存中的数据。
+			F. 核心步骤：
+				a. 使用CacheManager（ConcurrentMapCacheManager）按照CacheName获取Cache（ConcurrentMapCache）组件
+				b. key是使用KeyGenerator生成的，默认是SimpleKeyGenerator
+	4. 整合redis实现缓存
+		① 引入spring-boot-starter-data-redis
+		② application.yml配置redis连接地址
+			Spring:
+			  redis:
+				host: 192.168.107.6
+		③ 使用redisTemplate、stringRedisTemplate操作redis
+			A. 操作字符串：redisTemplate.opsForValue()
+			B. 操作hash：redisTemplate.opsForHash()
+			C. 操作list：redisTemplate.opsForList()
+			D. 操作set：redisTemplate.opsForSet()
+			E. 操作有序set：redisTemplate.opsForZSet()
+		④ 使用redisTemplate操作redis保存对象时
+			A. 对象需要实现序列化接口，使用JDK序列化机制
+			B. 将对象转化为JSON数据保存
+			C. 参考SpringBoot的RedisAutoConfiguration自动配置类中注册RedisTemplate的方式，自定义RedisTemplate，RedisTemplate默认使用的序列化器是JDK的JdkSerializationRedisSerializer
+			而如果经常在Redis中操作一个对象时，可以对该对接进行序列化定制，即修改其默认的序列化器。
+			@Configuration
+			public class MyRedisConfig {
+				@Bean
+				public RedisTemplate<Object, Employee> empRedisTemplate(RedisConnectionFactory redisConnectionFactory) throws UnknownHostException {
+					RedisTemplate<Object, Employee> template = new RedisTemplate();
+					template.setConnectionFactory(redisConnectionFactory);
+					Jackson2JsonRedisSerializer<Employee> serializer = new Jackson2JsonRedisSerializer<>(Employee.class);
+					template.setDefaultSerializer(serializer);
+					return template;
+				}
+			}
+		⑤ 自定义CacheManager：
+			A. 原理：
+				a. 引入redis的starter后，RedisCacheConfiguration自动配置生效，容器保存了RedisCacheManager
+				b. RedisCacheManager创建了RedisCache作为缓存组件，RedisCache通过操作redis对数据进行缓存。
+				c. 默认保存的数据k/v都是Object，利用序列化进行保存数据，修改默认的序列化机制
+					(1) 创建RedisCacheManager时使用	RedisTemplate<Object, Object>
+					(2) 而RedisTemplate默认使用的是JDK序列化机制
+			B. 如何自定义CacheManager
+				a. 自定义RedisCacheManager覆盖容器中已有的CacheManager
+				b. 将自定义的RedisTemplate传入RedisCacheManager中
+				c. 使用redisCacheManager.setUsePrefix(true)设置key的前缀，默认是使用cache的CacheName作为前缀
+				d. 举例：
+				@Bean
+				public RedisCacheManager empRedisCacheManager(RedisTemplate<Object, Employee> empRedisTemplate) {
+					RedisCacheManager redisCacheManager = new RedisCacheManager(empRedisTemplate);
+					redisCacheManager.setUsePrefix(true);
+					return redisCacheManager;
+				}
+			C. 注意：
+				a. 自定义的CacheManager使用RedisTemplate<Object, Employee>操作的是指定的对象，即操作Employee对象的缓存
+				b. 而当操作其他对象时，比如Department，数据能成功存储在redis缓存中，获取缓存时就无法反序列化为Department对象。
+				c. 在操作不同的对象时，推荐使用不同的CacheManager对特定的对象进行序列化和反序列化。
+				d. 在使用@Cacheable时，需要指定好CacheManager。或者早@CacheConfig中统一指定CacheManager。
+				e. 多个CacheManager的情况下。需要使用@Primary指定一个默认使用的CacheManager。默认将RedisCacheConfiguration中提供的
+				RedisCacheManager作为默认的缓存管理器，如果不知道的情况下，则会使用默认的缓存管理器。
+			D. 使用编码的方式进行缓存管理
+				a. 将CacheManager自动注入，由于缓存管理器存在多个，可以使用@Qualifier注解指定需要注入的BeanName。
+				b. 通过RedisCacheManager的getCache方法获取Cache，需要指定CacheName。
+				c. 通过Cache的get方法可以获取缓存，put方法可以存储数据。
+十、Spring Boot与消息（RabbitMQ）
+	1. 概述：
+		① 大多数应用中，可通过消息服务中间件来提升系统异步通信。扩展解耦能力
+		② 消息服务中两个重要概念：消息代理（message broker）和目的地（destination），当消息发送者发送消息以后，将由消息代理管理，消息代理保证
+		消息传递到指定目的地。
+		③ 消息队列主要有两种形式的目的地
+			A. 队列（Queue）：点对点消息通信（point-to-point）
+			B. 主题（topic）：发布（publish）/订阅（subscribe）消息通信。
+						
+					-------- ----> ----------------------		----------------	   ----------------
+					| 用户 |	   | 注册消息写入数据库 | ----> | 发送注册邮件 | ----> | 发送注册短信 |
+					-------- <---  ----------------------		----------------	   ----------------
+					  150ms					50ms					   50ms					 50ms
+					
+															    ----------------
+															|-> | 发送注册邮件 | 50ms
+					-------- ----> ----------------------	|	----------------	   
+		异步处理	| 用户 |	   | 注册消息写入数据库 | --|
+					-------- <---  ----------------------	| 	----------------
+					  100ms					50ms			|->	| 发送注册短信 | 50ms
+																----------------
+																					   ----------------
+																				   |-> | 发送注册邮件 | 50ms
+					-------- ----> ----------------------		----------------   |   ----------------
+					| 用户 |	   | 注册消息写入数据库 | ----> | 写入消息队列 | --| 
+					-------- <---  ----------------------		----------------   |   ----------------
+					  50ms					50ms					   50ms		   |-> | 发送注册短信 | 50ms
+																					   ----------------
+										
+										应用解耦																流量削峰
+					-------------------------------------------------		---------------------------------------------------------------------------------
+					|												|		|																				|
+					|	------------	   			------------	|		|	------------	 写入	 ------------	  根据规则	   ----------------		|
+					|	| 订单系统 | -------------> | 库存系统 |	|		|	| 用户请求 | ----------> | 消息队列 | <--------------- | 秒杀业务处理 |		|
+					|	------------  调用库存接口	------------	|		|	------------   消息队列	 ------------	读取秒杀请求   ----------------		|
+					|												|		|																				|
+					-------------------------------------------------		---------------------------------------------------------------------------------
+					-------------------------------------------------
+					|					------------				|
+					|					| 消息队列 |				|
+					|					------------				|
+					|						 |						|
+					|				---------|---------				|
+					|				↑				  ↑		 		|
+					|		   ------------		 ------------		|
+					|		   | 订单系统 |		 | 库存系统 |		|
+					|		   ------------		 ------------		|
+					-------------------------------------------------
+		④ 点对点式：
+			A. 消息发送者发送消息，消息代理将其放入到一个队列中，消息接受者从队列中获取消息内容，消息读取之后被移除队列
+			B. 消息只有唯一发送者和接受者，但并不是说只能有一个接收者。
+		⑤ 发布订阅式：发送者（发布者）发送消息到主题，多个接收者（订阅者）监听（订阅这个主题），那么就会在消息达到同时接受到消息
+		⑥ JMS（Java Message Service）Java消息服务：基于JVM消息代理的规范。ActiveMQ、HornetMQ是JMS实现
+			A. 定义：JAVA API
+			B. 跨语言：否
+			C. 跨平台：否
+			D. Model：提供两种消息模型：
+				a. Peer-2-Peer
+				b. Pub/Sub
+			E.  支持消息类型：
+				a. TextMessage
+				b. MapMessage
+				c. BytesMessage
+				d. StreamMessage
+				e. ObjectMessage
+				f. Message （只有消息头和属性）
+			F. JMS 定义了JAVA API层面的标准；在java体系中，多个client均可以通过JMS进行交互，不需要应用修改代码，但是其对跨平台的支持较差；
+		⑦ AMQP（Advance Message Queuing Protocol）高级消息队列协议，也是一个消息代理的规范，兼容JMS，RabbitMQ是AMQP的实现。
+			A. 定义：网络线级协议
+			B. 跨语言：是
+			C. 跨平台：是
+			D. Model：提供两种消息模型：
+				a. direct exchange
+				b. fanout exchange
+				c. topic change
+				d. headers exchange
+				e. system exchange
+				f. 本质来讲，后四种和JMS的pub/sub模型没有太大差别，仅是在路由机制上做了更详细的划分；
+			E.  支持消息类型：
+				a. byte[]
+				b. 当实际应用时，有复杂的消息，可以将消息序列化后发送
+			F. AMQP定义了wire-level层的协议标准；天然具有跨平台、跨语言特性。
+		⑧ Spring支持
+			A. spring-jms提供了对JMS的支持
+			B. spring-rabbit提供了对AMQP的支持
+			C. 需要ConnectionFactory的实现来连接消息代理
+			D. 提供JmsTemplate、RabbitTemplate来发送消息
+			E. @JmsListener（JMS）、@RabbitListener（AMQP）注解在方法上监听消息代理发布的消息
+			F. @EnableJms、@EnableRabbit开启支持
+		⑨ Spring Boot自动配置
+			A. JmsAutoConfiguration
+			B. RabbitAutoConfiguration
+	2. RabbitMQ简介
+		① RabbitMQ简介：RabbitMQ是一个有erlang开发的AMQP（Advanced Message Queue Protocol）的开源实现
+		② 核心概念：
+			A. Message（消息）：消息是不具名的，它由消息头和消息体组成。消息体是不透明的，而消息头则是由一系列的可选属性组成，这些属性包括
+			routing-key（路由键）、priority（相对于其他消息的优先权）、delivery-mode（指出该消息可能需要持久性存储）等。
+			B. Publisher（消息的生产者）：也是一个向交换器发布消息的客户端应用程序。
+			C. Exchange（交换器）：用来接收生产者发送的消息并将这些消息路由给服务器中的队列。Exchange有4种类型：direct(默认，支持点对点)，fanout, topic, 
+			和headers（支持发布/订阅），不同类型的Exchange转发消息的策略有所区别
+			D. Queue（消息队列）：用来保存消息直到发送给消费者。它是消息的容器，也是消息的终点。一个消息可投入一个或多个队列。消息一直在队列里面，等待消
+			费者连接到这个队列将其取走。
+			E. Binding（绑定）：用于消息队列和交换器之间的关联。一个绑定就是基于路由键将交换器和消息队列连接起来的路由规则，所以可以将交换器理解成一个由
+			绑定构成的路由表。Exchange 和Queue的绑定可以是多对多的关系。
+			F. Connection（网络连接）：比如一个TCP连接。
+			G. Channel（信道）：多路复用连接中的一条独立的双向数据流通道。信道是建立在真实的TCP连接内的虚拟连接，AMQP 命令都是通过信道发出去的，不管是发布
+			消息、订阅队列还是接收消息，这些动作都是通过信道完成。因为对于操作系统来说建立和销毁 TCP 都是非常昂贵的开销，所以引入了信道的概念，以复用一条 TCP 连接。
+			H. Consumer（消息的消费者）：表示一个从消息队列中取得消息的客户端应用程序。
+			I. Virtual Host（虚拟主机）：表示一批交换器、消息队列和相关对象。虚拟主机是共享相同的身份认证和加密环境的独立服务器域。每个 vhost 本质上就是一个 mini 版
+			的 RabbitMQ 服务器，拥有自己的队列、交换器、绑定和权限机制。vhost 是 AMQP 概念的基础，必须在连接时指定，RabbitMQ 默认的 vhost 是 / 。
+			J. Broker：表示消息队列服务器实体
+	3. RabbitMQ运行机制：
+		① AMQP 中的消息路由：AMQP 中消息的路由过程和 Java 开发者熟悉的 JMS 存在一些差别，AMQP 中增加了 Exchange 和 Binding 的角色。生产者把消息发布到 Exchange 上，
+		消息最终到达队列并被消费者接收，而 Binding 决定交换器的消息应该发送到那个队列。
+							--------------------------------------------------	  ---------------------
+							|						Broker					 |    |	    Connection	  |
+							|	------------------------------------------	 |	  |    -----------    |
+							|	|				Virtual Host			 |	 |	  |    | Channel |    |
+			-------------	|	| 	------------			---------	 |	 |	  |    -----------	  |	   ------------
+			| Publisher | --|---|---| Exchange | ---------- | Queue	|    |	 |----|----| Channel |----|----| Consumer |
+			-------------	|	|	------------  Binding	---------	 |	 |	  |    -----------    |	   ------------
+							|	|										 |	 |	  |    | Channel |	  |
+							|	------------------------------------------	 |	  |    -----------	  |
+							|												 |	  |					  |
+							--------------------------------------------------	  ---------------------
+		② Exchange 类型	：Exchange分发消息时根据类型的不同分发策略有区别，目前共四种类型：direct、fanout、topic、headers 。headers 匹配 AMQP 消息的 header 而不是路由键， 
+		headers 交换器和 direct 交换器完全一致，但性能差很多，目前几乎用不到了，所以直接看另外三种类型：
+			A. Direct Exchange：消息中的路由键（routing key）如果和 Binding 中的 binding key 一致， 交换器就将消息发到对应的队列中。路由键与队列名完全匹配，如果一个队列
+			绑定到交换机要求路由键为“dog”，则只转发 routing key 标记为“dog”的消息，不会转发“dog.puppy”，也不会转发“dog.guard”等等。它是完全匹配、单播的模式。
+												---------------------
+												| routing key = KEY |
+												---------------------
+														 |
+							-----------------------------|--------------------	  	
+							|		Broker				 |					 |
+							|	-------------------------|----------------	 |
+							|	|	Exchange 			 |---------	 	 |	 |
+							|	----------------------------------|-------	 |
+							|	|	Binding						  |		 |	 |							
+							|	----------------------------------↓-------	 |
+							|	| 	QueueS		-------	-------	-------	 |	 |
+							|	|				| ... | | ... |	| KEY |  |	 |
+							|	|				------- -------	-------	 |	 |
+							|	------------------------------------------	 |
+							--------------------------------------------------	
+			B. Fanout Exchange：每个发到 fanout 类型交换器的消息都会分到所有绑定的队列上去。fanout 交换器不处理路由键，只是简单的将队列绑定到交换器上，每个发送到交换器的消息
+			都会被转发到与该交换器绑定的所有队列上。很像子网广播，每台子网内的主机都获得了一份复制的消息。fanout 类型转发消息是最快的。
+													  -----------
+													  | Message |
+													  -----------
+														   |
+							-------------------------------|------------------	  	
+							|		Broker				   |				 |
+							|	---------------------------|--------------	 |
+							|	|	Exchange 	   --------|--------	 |	 |
+							|	-------------------|-------|-------|------	 |
+							|	|	Binding		   |	   |	   |	 |	 |							
+							|	-------------------↓-------↓-------↓------	 |
+							|	| 	QueueS		-------	-------	-------	 |	 |
+							|	|				| ... | | ... |	| ... |  |	 |
+							|	|				------- -------	-------	 |	 |
+							|	-------------------|-------|-------|------	 |
+							-----------------------|-------|-------|----------	
+												   |	   |	   |
+												   |-------|-------|
+														   ↓
+			C. Topic Exchange：topic 交换器通过模式匹配分配消息的路由键属性，将路由键和某个模式进行匹配，此时队列需要绑定到一个模式上。它将路由键和绑定键的字符串切分成单词，
+			这些单词之间用点隔开。它同样也会识别两个通配符：符号“#”和符号“*”。#匹配0个或多个单词，*匹配一个单词。
+									--------------------------	-----------------------------
+							Message | routing key = usa.news | 	| routing key = usa.weather |
+									--------------------------	-----------------------------
+											    |			 				  |
+							--------------------|-----------------------------|----------------------	  	
+							|		Broker		|	  ------------------------| 				    |
+							|	----------------|-----|-----------------------|------------------   |
+							|	|	Exchange 	|----------------------|	  |--------|	 	|	|
+							|	----------------------|----------------|---------------|---------   |
+							|	|	Binding			  |			       |		 	   |		|	|		
+							|	----------------------↓----------------↓---------------↓---------   |
+							|	| 	QueueS		---------------	--------------- ---------------	|	|
+							|	|				| binding key | | binding key | | binding key |	|	|
+							|	|				| = usa.#	  |	| = #.news	  |	| = #.weather |	|	|
+							|	|				--------------- ---------------	---------------	|	|
+							|	-----------------------------------------------------------------   |
+							-------------------------------------------------------------------------	
+	4. RabbitMQ整合
+		① 安装rabbitmq
+			A. 使用Docker镜像下载rabbitmq的镜像，选择tar版本带management的
+			docker pull rabbitmq:3.8-management
+			B. 启动rabbitmq容器：
+			docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 cc86ffa2f398
+			C. 使用浏览器访问rabbitmq的客户端
+			http://192.168.107.6:15672/
+			D. 使用默认的用户密码登录：
+			username：guest，password：guest
+		② rabbitmq客户端的使用
+			A. 菜单栏介绍
+				a. Overview：概览信息
+				b. Connections：监控所有连接
+				c. Channels：信道
+				d. Exchanges：交换器
+				e. Queues：消息队列
+				f. Admin：管理控制台，能够添加用户和虚拟主机
+			B.  创建交换器（Add a new exchange）
+				a. exchange.direct：在Name中输入exchange.direct，选择Type为direct，选择Durability为Durable（持久化），其他默认，点击Add exchange完成添加
+				b. exchange.fanout：在Name中输入exchange.fanout，选择Type为fanout，选择Durability为Durable（持久化），其他默认，点击Add exchange完成添加
+				c. exchange.topic：在Name中输入exchange.topic，选择Type为topic，选择Durability为Durable（持久化），其他默认，点击Add exchange完成添加
+			C. 添加消息队列（点击Add a new queue）
+				a. Li
+				b. Li.XL
+				C. Li.LX
+				D. Hello.XL
+			D. 交换器和队列绑定规则							   ------------
+														|----> | Li		  | <---------------
+														|	   ------------				   |
+						  -------------------------		|	   ------------		   		--------
+						  |	 -------------------  |		|----> | Li.XL	  | <-----------| Li.# | <----|
+						  |	 | exchange.direct |  |		|	   ------------		|  | 	--------	  |		-----------------
+			message ----> |	 -------------------  | ----|						|  |				  |---- |exchange.topic | <---- Message
+						  |  | exchange.fanout |  |		|	   ------------		|  |	--------	  |		-----------------
+						  |	 -------------------  |		|----> | Li.LX    | <----  -----| *.XL | <----|
+						  -------------------------		|	   ------------        		--------
+														|	   ------------				    |
+														|----> | Hello.XL | <----------------
+															   ------------
+			E. 发送消息
+			F. 接受并应答消息：在Ack Mode中选择Ack message requeue false
+		③ 整合测试rabbitmq
+			A. 引入 spring-boot-starter-amqp
+			<dependency>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-starter-amqp</artifactId>
+			</dependency>
+			B. rabbitmq的自动配置原理：
+				a. 自动配置类：RabbitAutoConfiguration
+				b. ConnectionFactory：创建连接工厂
+				c. RabbitProperties：封装了rabbitmq的配置
+				d. RabbitTemplate：自动注入，给rabbitmq发送和接受消息
+				e. AmqpAdmin：自动注入，系统管理功能组件
+			C. 在application.yml 配置 rabbitmq
+				a. rabbitmq自动配置了主机名，默认为localhost，端口号和vhost属性
+				b. 配置示例：
+				    spring:
+					  rabbitmq:
+					    host: 192.168.107.6
+					    username: guest
+					    password: guest
+			D. RabbitTemplate的API
+				a. send(String exchange, String routingKey, Message message)：发送消息，需要指定交换器、路由键和Message（消息对象，可以定义消息头和消息体）
+				b. convertAndSend(String exchange, String routingKey, Object object)：转化并发送，需要指定交换器、路由键和发送数据对象（默认被当成消息头，
+				并自动序列化，发送给rabbitmq）
+				c. receiveAndConvert(String queueName)：接受并装换消息。需要指定队列名。
+			E. 发送与接受消息
+				a. 使用点对点发送和接受消息
+					public void testRabbitTemplateSend() {
+						Map<String, Object> map = new HashMap<>();
+						map.put("message", "SpringBoot RabbitMQ");
+						map.put("time", new Date());
+						map.put("data", Arrays.asList("LiXL", 2648));
+						map.put("employee", employeeMapper.getEmpById(20001));
+						rabbitTemplate.convertAndSend("exchange.direct", "Li", map);
+					}
+					public void testRabbitTemplateAccept() {
+						Object object = rabbitTemplate.receiveAndConvert("Li");
+						System.out.println(object.getClass());
+						System.out.println(object);
+					}
+				b. 使用广播发送方式原理一致。
+			F. 将数据序列化为JSON发送
+				a. 默认发送的数据的序列化机制是使用JDK进行序列化
+				b. 自定义序列化机制
+					(1) 使用MessageConverter的抽象子实现的实现类Jackson2JsonMessageConverter进行序列化
+					(2) RabbitAutoConfiguration自动配置类中注册RabbitTemplate会设置自定义的消息转化器
+					rabbitTemplate.setMessageConverter(messageConverter);
+					(3) 自定义序列化机制之后，消息头默认使用的是数据类的信息，消息体格式变为application/json，并且能够反序列化
+					(4) 举例：
+						@Bean
+						public MessageConverter jsonMessageConverter() {
+						   return new Jackson2JsonMessageConverter();
+						}
+			G. @RabbitListener
+				a. 监听消息队列
+				b. 使用@RabbitListener注解，需要指定queues属性，表示监听的队列，一旦有消息存在指定的队列中，则消息则会被监听到，使用该注解，不仅能接受到消息体，
+				还能接受消息头，使用Message对象接收，通过该对象，可以获取消息头信息的MessageProperties，也可以获取消息体的body
+				c. 在主配置类中，使用@EnableRabbit注解，开启基于注解的监听消息模式
+				d. 举例：
+					@EnableCaching
+					@EnableRabbit
+					@SpringBootApplication
+					@MapperScan(value = "com.li.springboot.dao")
+					public class SpringbootExpertApplication {
+
+						public static void main(String[] args) {
+							SpringApplication.run(SpringbootExpertApplication.class, args);
+						}
+					}
+					
+					@RabbitListener(queues = "Li")
+					public void receive(Map<String, Object> map, Message message) {
+						System.out.println("收到消息");
+						System.out.println(map.getClass().getName());
+						System.out.println(map);
+
+						System.out.println(message.getMessageProperties());
+					}
+			H. AmqpAdmin组件
+				a. 创建和删除Queues、Exchange和Binging
+				b. AmqpAdmin相关API
+					(1) declareExchange(Exchange var1)：创建转换器，需要传入Exchange对象，Exchange是一个接口，该抽象实现的子类有DirectExchange、FanoutExchange、TopicExchange
+					所有子类需要传一个name，作为交换器的名字，也可以传入durable表示是否持久化。
+					(2) declareQueue(Queue var1)：创建消息队列，需要传入一个Queue，如果Queue为Null，则会默认创建一个随机的消息队列。创建Queue时需要指定Queue的名字以及是否需要
+					持久化。
+					(3) declareBinding(Binding var1)：创建绑定消息队列与转换器，需要传入一个Binding对象，创建Binding时需要指定destination（目的地）、DestinationType（目的地类型）、
+					exchange（交换器）、routingKey（路由键）和arguments（绑定参数）。
+					(4) 删除等操作 ……
+				c. 举例：
+					admin.declareExchange(new DirectExchange("admin.direct"));
+					admin.declareQueue(new Queue("Yu.CX", true));
+					admin.declareBinding(new Binding("Yu.CX", Binding.DestinationType.QUEUE, "admin.direct", "Yu.CX", null));
+十一、Spring Boot与检索（ElasticSearch）
+	1. 简介：
+		① 我们的应用经常需要添加检索功能，开源的 ElasticSearch 是目前全文搜索引擎的首选。他可以快速的存储、搜索和分析海量数据。Spring Boot通过整合Spring Data ElasticSearch为我们
+		提供了非常便捷的检索功能支持；
+		② Elasticsearch是一个分布式搜索服务，提供Restful API，底层基于Lucene，采用多shard（分片）的方式保证数据安全，并且提供自动resharding的功能，github等大型的站点也是采用了
+		ElasticSearch作为其搜索服务。
+	2. 概念
+		① 以员工文档的形式存储为例：一个文档代表一个员工数据。存储数据到 ElasticSearch 的行为叫做 索引 ，但在索引一个文档之前，需要确定将文档存储在哪里。
+		② 一个 ElasticSearch 集群可以 包含多个 索引 ，相应的每个索引可以包含多个 类型 。 这些不同的类型存储着多个 文档 ，每个文档又有 多个 属性 。
+		③ 类似关系
+			A. 索引-数据库
+			B. 类型-表
+			C. 文档-表中的记录
+			D. 属性-列
+															ES集群
+															  |
+							----------------------------------|----------------------------------
+							|								  |									|
+			----------------↓---------------------------------↓---------------------------------↓--------------------
+			|			----------						-------------					   ------------				|
+			|			| Google |			索引		| microsoft |					   | megacorp |				|
+			|			----------						-------------					   ------------				|
+			----------------|-------------------------------------------------------------------|--------------------
+			----------------|-------------------------------------------------------------------|--------------------	
+			|		↓-------|-------↓													↓-------|-------↓			|
+			| ------------	   -----------										  ------------		-----------		|	
+			| | Employee |	   | product |	类型								  | employee |		| product |		|
+			| ------------	   -----------										  ------------		-----------		|
+			--------|------------------------------------------------------------------------------------------------
+				----|----------------------------------------
+				|	|	   ------			文档			|
+				|	|   ---|----|------------------------	|
+				|	|-> | {| id |:1,name:”LiXL”,age:18} |	|
+				|	|   ---|----|------------------------	|
+				|	|	---|----|------------------------	|
+				|	|-> | {| id |:1,name:”LiLX”,age:18} |	|
+				|	|	---|----|------------------------	|
+				|		   ------							|
+				|			属性							|
+				----------------------------------------------
+	3. 整合ElasticSearch测试
+		① 下载ElasticSearch镜像
+			A. 配置阿里镜像加速器
+				a. 登录阿里云官方网站
+				b. 在控制台中点击容器镜像服务
+				c. 点击镜像加速器，选择CentOS版
+				d. 将加速器地址复制到/etc/docker/daemon.json文件中
+				e. 重启docker镜像和docker守护进程
+					sudo systemctl daemon-reload
+					sudo systemctl restart docker
+			B. 下载docker镜像：docker pull elasticsearch
+			C. 启动elasticsearch容器，默认启动所占内存为2G，需要通过命令参数临时修改启动内存大小
+			docker run -e ES_JAVA_OPTS="-Xms256m -Xmx256m" -d -p 9200:9200 -p 9300:9300 --name elasticsearch 5acf0e8da90b
+			D. 在浏览器访问http://192.168.107.6:9200/，出现elasticsearch的信息则说明安装并启动成功
+		② ElasticSearch基本使用
+			A. 使用Postman工具对ElasticSearch进行基本操作
+			B. 向ElasticSearch发送数据
+				a. 选择PUT的请求方式，以restful的方式，在Body中选择raw，并选择JSON（application/json）的方式
+				b. 举例：
+					{
+						"empName"	:	"Li", 
+						"email"		:	"Li@qq.com", 
+						"gender"	:	1, 
+						"birthday"	:	831139200000, 
+						"depId"		:	10001
+					}
+			C. 检索文档
+				a. 使用get请求方式
+				b. 检索一条文档：http://192.168.107.6:9200/myemployees/employees/1
+				c. 检索所有文档：http://192.168.107.6:9200/myemployees/employees/_search
+				d. 精确检索文档：http://192.168.107.6:9200/myemployees/employees/_search?q=empName:YuCX
+				e. 复杂检索文档：选择post请求方式，发送请求体（json表达式），精确匹配
+					{
+						"query": {
+							"match": {
+								"empName": "YuCX"
+							}
+						}
+					}
+				f. 更复杂的查询
+					{
+						"query": {
+							"bool":{
+								"must": {
+									"match":{
+										"empName": "YuCX"
+									}
+								}, 
+								"filter":{
+									"range": {
+										"depId": {"gt": 10001}
+									}
+								}
+							}
+						}
+					}
+				g. 全文检索：如果empName属性包含指定的属性值，即属性值会被分次，则就会被检索
+					{
+						"query" : {
+							"match" : {
+								"empName" : "Li"
+							}
+						}
+					}
+				h. 短语搜索：只有完成匹配（属性值当做完整的单词）才会被检索
+					{
+						"query" : {
+							"match_phrase" : {
+								"empName" : "Li"
+							}
+						}
+					}
+				i. 高亮检索，即匹配的部分会使用HTML标签封装。	
+					{
+						"query" : {
+							"match_phrase" : {
+								"empName" : "Li"
+							}
+						}, 
+						"highlight": {
+							"fields" : {
+								"empName" : {}
+							}
+						}
+					}
+			D. 删除文档使用delete请求方式
+			E. 判断文档是否存在使用Head请求方式，检索状态码为200则证明该数据存在，反之则响应404。
+			F. 修改文档，则再次发送put请求即可。
+		③ SpringBoot整合Elasticsearch 
+			A. Elasticsearch自动配置原理
+				a. SpringBoot默认使用SpringData Elasticsearch模块进行操作
+				b. SpringBoot默认支持两种技术来和ES交互
+					(1) Jest（默认不生效，需要导入jest的工具包io.searchbox.client.JestClient）
+					(2) SpringData Elasticsearch
+				c. SpringBoot提供了Elasticsearch的配置类为ElasticsearchAutoConfiguration
+					(1) Client组件：需要配置clusterNodes和clusterName等节点信息
+					(2) ElasticsearchTemplate组件：操作ES
+					(3) ElasticsearchRepository：可以通过其子接口来操作ES
+			B. SpringBoot整合Jest操作ES
+				a. 导入jest依赖，依赖的版本对应安装ES的版本
+					<dependency>
+						<groupId>io.searchbox</groupId>
+						<artifactId>jest</artifactId>
+						<version>5.3.4</version>
+					</dependency>
+				b. 在application.yml中进行相关配置
+					spring:
+					  elasticsearch:
+					    jest:
+					      uris:
+						    - http://192.168.107.6:9200
+				c. 自动注入JestClient，进行ES操作。
+					(1) 索引一个文档（保存一条数据）
+						(A) 在实体类中需要使用@JestId指定作为ES中id的属性
+						(B) 调用Index.Builder的build方法创建一个索引，创建Index.Builder对象时，需要将实体类作为对象传入，并调用Index.Builder对象的index方法指明索引和type方法指明类型
+						(C) 调用jestClient的execute方法执行得到的索引。
+						(D) 举例：
+							@Autowired
+							private JestClient jestClient;
+							public void testJestClient(){
+								Employee employee = employeeMapper.getEmpById(20004);
+								employee.setEmpId(6);
+								Index index = new Index.Builder(employee).index("myemployees").type("employees").build();
+								try {
+									jestClient.execute(index);
+								} catch (IOException e) {
+									e.printStackTrace();
+								}
+							}
+					(2) 全文检索（获取数据）
+						(A) 调用Search.Builder的build方法创建一个检索体，创建Index.Builder对象时，需要传入检索体的json，并调用Index.Builder对象的addIndex方法指明索引和addType方法指明类型
+						(B) 调用jestClient的execute方法会返回一个SearchResult对象，可以通过SearchResult对象获取检索的结果等。
+						(C) 举例：
+							public void testJestClientSearch(){
+								String json = "{\"query\" : {\"match_phrase\" : {\"empName\" : \"Li\"}}}";
+								Search search = new Search.Builder(json).addIndex("myemployees").addType("employees").build();
+								try {
+									SearchResult searchResult = jestClient.execute(search);
+									System.out.println(searchResult.getJsonString());
+								} catch (IOException e) {
+									e.printStackTrace();
+								}
+							}
+			C. SpringBoot整合SpringDataElasticsearch操作ES
+				a. 引入spring-boot-starter-data-elasticsearch
+					<dependency>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-starter-data-elasticsearch</artifactId>
+					</dependency>
+				b. 在application.yml中进行相关配置
+					spring
+					  data:
+						elasticsearch:
+						  cluster-name: elasticsearch
+						  cluster-nodes: 192.168.107.6:9300
+				c. 解决启动SpringBoot应用时报错
+					(1) 问题可以是ES版本与SpringBoot依赖的ES版本不一致
+					(2) spring data elasticsearch模块与elasticsearch版本适配
+						spring data elasticsearch	elasticsearch
+						3.0.0.RC2					5.5.0
+						3.0.0.M4					5.4.0
+						2.0.4.RELEASE				2.4.0
+						2.0.0.RELEASE				2.2.0
+						1.4.0.M1					1.7.3
+						1.3.0.RELEASE				1.5.2
+						1.2.0.RELEASE				1.4.4
+						1.1.0.RELEASE				1.3.2
+						1.0.0.RELEASE				1.1.1
+					(3) 可以采用升级SpringBoot版本或者安装对应elasticsearch版本的方式适配版本
+				d. 使用ElasticsearchRepository操作ES
+					(1) 编写一个ElasticsearchRepository的子接口，需要指定两个泛型：实体类和实体类主键的类型
+					(2) 在实体类中指定文档保存的索引和类型
+					(3) ElasticsearchRepository的相关API
+						(A) <S extends T> S index(S var1)：索引一个文档
+						....
+					(4) 支持自定义查询方法
+					(5) 举例：
+						@Document(indexName = "myemployees", type = "employees")
+						public class Employee implements Serializable
+						
+						public interface EmployeeRepository extends ElasticsearchRepository<Employee, Integer>{
+							List<Employee> findByEmpNameLike(String name);
+						}
+						
+						public void testEmployeeRepository(){
+					        // Employee employee = employeeMapper.getEmpById(20001);
+					        // employeeRepository.index(employee);
+							List<Employee> emps = employeeRepository.findByEmpNameLike("Li");
+							for (Employee emp : emps) {
+								System.out.println(emp);
+							}
+						}
+				e. 使用ElasticsearchTemplate操作ES
+十二、Spring Boot与任务
+	1. 异步任务
+		① 在Java应用中，绝大多数情况下都是通过同步的方式来实现交互处理的；但是在处理与第三方系统交互的时候，容易造成响应迟缓的情况，之前大部分都是使用多线程来完成此类任务，其实，
+		在Spring 3.x之后，就已经内置了@Async来完美解决这个问题。
+		② 两个注解
+			A. @EnableAsync：在主配置类中使用@EnableAsync开启异步注解支持
+			B. @Aysnc：在需要异步调度的逻辑方法上使用@Aysnc进行异步交互
+		③ 举例：
+			@GetMapping("/helloAsync")
+			public String helloAsync() {
+				asyncService.helloAsync();
+				return "Hello Async!";
+			}
+			
+			@Async
+			public void helloAsync() {
+				try {
+					Thread.sleep(3000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				System.out.println("处理数据中");
+			}
+			
+			@EnableAsync
+			public class SpringbootExpertApplication {
+
+				public static void main(String[] args) {
+					SpringApplication.run(SpringbootExpertApplication.class, args);
+				}
+			}
+	2. 定时任务
+		① 项目开发中经常需要执行一些定时任务，比如需要在每天凌晨时候，分析一次前一天的日志信息。Spring为我们提供了异步执行任务调度的方式，提供TaskExecutor 、TaskScheduler 接口。
+		② 两个注解：
+			A. @EnableScheduling：在全局配置类中使用@EnableScheduling开启定时任务的注解支持
+			B. @Scheduled：在定时调度逻辑方法上使用@Scheduled进行定时调度。
+		③ cron表达式：
+			A. cron表达式有六位数字，每位数字用空格隔开，分别表示的秒，分，时，日，月份，星期
+			B. 字段、允许值与允许的特殊字符
+				字段		允许值					允许的特殊字符
+				秒			0-59					, - * /
+				分			0-59					, - * /
+				时			0-23					, - * /
+				日			1-31					, - * ? / L W C
+				月			1-12					, - * /
+				星期		0-7或SUN-SAT 0,7是SUN	, - * ? / L C #
+			C. 特殊字符代表的含义
+				特殊字符	代表含义						解释							举例
+				,			枚举							所要例举的精确时间点			1,2,3,4 * * * * 1-7
+				-			区间							所要列举的时间范围				1-4 * * * * 1-7
+				*			任意							任意时间点						0 * * * * 1-7
+				/			步长							每隔多长时间执行一次			0/4 * * * * 1-7
+				?			日/星期冲突匹配					指定日，星期为？，反之日为？	0/4 * * 1 * ?
+				L			最后
+				W			工作日
+				C			和calendar联系后计算过的值
+				#			星期，4#2，第2个星期四
+			D.  表达式举例：
+				a. 0 0/5 14,18 * * ?：每天的14点整合18点整，每隔5分钟执行一次
+				b. 0 15 10 ? * 1-6：每个月的周一至周六10:15:00执行一次
+				c. 0 0 2 ? * 6L：每个月的最后一个周六02:00:00执行一次
+				d. 0 0 2 LW * ?：每个月的最后一个工作日02:00:00执行一次
+				e. 0 0 2-4 ? * 2#1：每个月的第二个星期一的凌晨2点至4点执行一次
+	3. 邮件任务
+		A. 邮件发送需要引入spring-boot-starter-mail
+			<dependency>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-starter-mail</artifactId>
+			</dependency>
+		B. Spring Boot 自动配置MailSenderAutoConfiguration
+		C. 在application.yml配置文件中定义MailProperties内容
+			a. 需要配置用户名密码，QQ邮箱为了安全性起见，密码使用的不是邮箱密码，而是在邮箱设置中设置安全登录
+			b. 选择设置->账户，开启POP3/SMTP服务和IMAP/SMTP服务，并生成授权码
+			c. 查看邮件服务器主机，点击POP3/SMTP服务 (如何使用 Foxmail 等软件收发邮件？)，即可查看发送服务器
+			d. 由于连接QQ邮箱需要安全连接，因此需要额外配置和开启SSL
+			e. application.yml:
+				spring:
+				  mail:
+					username: 1634491328@qq.com
+					password: ***
+					host: smtp.qq.com
+					properties:
+					  mail:
+						smtp:
+						  ssl:
+							enable: true
+		D. 自动装配JavaMailSenderImpl进行邮件发送
+			a. send(SimpleMailMessage var1)：发送简单的邮件，需要传入一个SimpleMailMessage对象，课题通过SimpleMailMessage对象指定主题、内容和接收方。
+				举例：
+				public void testJavaMailSenderImpl() {
+					SimpleMailMessage message = new SimpleMailMessage();
+					message.setSubject("放假通知");
+					message.setText("端午放假");
+					message.setTo("1138886027@qq.com");
+					message.setFrom("1634491328@qq.com");
+					mailSender.send(message);
+				}
+			b. send(MimeMessage var1)：发送复制的邮件，可以发送HTML代码和添加附件，MimeMessage对象的获取需要通过JavaMailSenderImpl对象的createMimeMessage()方法
+			MimeMessage对象，创建MimeMessageHelper对象，并将得到的MimeMessage对象传入，并指定是否需要编码，通过MimeMessageHelper的对象指定主题、内容、接收方以及发送的附件
+				举例：
+				public void testJavaMailSenderImpl01() throws MessagingException {
+					MimeMessage mimeMessage = mailSender.createMimeMessage();
+					MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true);
+
+					helper.setSubject("放假通知");
+					helper.setText("<b style=\"color:red\">端午放假</b>",true);
+					helper.setTo("1138886027@qq.com");
+					helper.setFrom("1634491328@qq.com");
+
+					helper.addAttachment("1.docx", new File("C:\\Users\\Administrator\\Desktop\\1.docx"));
+					mailSender.send(mimeMessage);
+				}
+十三、Spring Boot与安全（Spring Security）
+	1. 安全
+		① Spring Security是针对Spring项目的安全框架，也是Spring Boot底层安全模块默认的技术选型。他可以实现强大的web安全控制。对于安全控制，我们仅需引入spring-boot-starter-security模块，
+		进行少量的配置，即可实现强大的安全管理。
+		② 几个类：
+			A. WebSecurityConfigurerAdapter：自定义Security策略
+			B. AuthenticationManagerBuilder：自定义认证策略
+			C. @EnableWebSecurity：开启WebSecurity模式
+		③ 应用程序的两个主要区域是“认证”和“授权”（或者访问控制）。这两个主要区域是Spring Security 的两个目标。
+		④ “认证”（Authentication），是建立一个他声明的主体的过程（一个“主体”一般是指用户，设备或一些可以在你的应用程序中执行动作的其他系统）。
+		⑤ “授权”（Authorization）指确定一个主体是否允许在你的应用程序执行一个动作的过程。为了抵达需要授权的店，主体的身份已经有认证过程建立。
+		⑥ 这个概念是通用的而不只在Spring Security中。
+	2. Web&安全
+		① 搭建SpringSecurity基本环境
+			A. 引入SpringSecurity实验的页面和路径映射规则（controller）
+			B. 引入SpringSecurity模块与thymeleaf模块
+				<dependency>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-starter-thymeleaf</artifactId>
+				</dependency>
+				<dependency>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-starter-security</artifactId>
+				</dependency>
+			C. 需要更换thymeleaf模块的版本号
+				<properties>
+					<java.version>1.8</java.version>
+					<thymeleaf.version>3.0.9.RELEASE</thymeleaf.version>
+					<thymeleaf-layout-dialect.version>2.2.2</thymeleaf-layout-dialect.version>
+				</properties>
+		② 登录、认证和授权
+			A. 编写SpringSecurity的配置文件，
+				a. 必须继承WebSecurityConfigurerAdapter，并使用@EnableWebSecurity标注，@EnableWebSecurity中已经使用了@Configuration注解标注，因此不需要再使用@Configuration注解标注配置类
+					@EnableWebSecurity
+					public class MySecurityConfig extends WebSecurityConfigurerAdapter {
+				b. 控制请求访问权限
+					(1) 定制请求的授权规则，首页可以正常访问，而其他页面被拒绝访问
+					(2) 开启自动配置的登录功能。
+						(A) 如果没有权限，则会自动发送/login来到SpringSecurity的登录页面
+						(B) 重定向到/login?error表示登录失败
+						(C) 默认的/login，以get的方式发送请求，则是来到登录页，而post则是进行登录认证，默认请求参数是username和password
+						(D) 定制登录页
+							(a) 调用http的loginPage方法指定登录页的地址
+							(b) 一旦定制loginPage，那么loginPage的post请求就是进行登录认证
+							(c) 可以通过loginProcessingUrl方法重新指定登录的url
+							(d) 可以通过usernameParameter方法重新指定用户名参数，passwordParameter指定密码参数
+					(3) 开启自动配置的注销功能
+						(A) 自动访问/logout请求清空session，表示用户注销
+						(B) 用户注销之后默认发送/login?logout来到登录页，修改默认规则，使注销成功后来到首页。
+					(4) 开启自动配置的记住我功能
+						(A) 登录成功后，将cookie发送给浏览器保存
+						(B) 以后登录时带上cookie，只要通过检查就可以免登陆
+						(C) 点击注销，cookie会被删除
+						(D) 定制记住我功能
+							(a) 默认的记住我的checkboxs的name属性是rememberme
+							(b) 使用rememberMeParameter方法重新指定记住我的属性
+					(5) 举例：
+						protected void configure(HttpSecurity http) throws Exception {
+						http.authorizeRequests().antMatchers("/").permitAll()
+								.antMatchers("/level1/**").hasRole("user1")
+								.antMatchers("/level2/**").hasRole("user2")
+								.antMatchers("/level3/**").hasRole("user3");
+
+						http.formLogin().usernameParameter("user").passwordParameter("pwd")
+								.loginPage("/userlogin")/*.loginProcessingUrl("/login")*/;
+						http.logout().logoutSuccessUrl("/");
+						http.rememberMe().rememberMeParameter("remember");
+					}
+				c. 定义认证规则
+					(1) 使用内存方式登录，即把用户名密码保存在内容中，用户通过登录后会赋予用户相应的权限
+					(2) 对于没有权限的内容，禁止用户访问。
+					(3) 举例：
+						protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+							auth.inMemoryAuthentication().withUser("LiXL").password("960504").roles("user1", "user2")
+									.and().withUser("LiLX").password("960730").roles("user1", "user3")
+									.and().withUser("YuCX").password("950829").roles("user2", "user3");
+						}
+			C. 整合SpringSecurity和Thymeleaf
+				a. 引入thymeleaf-extras-springsecurity4模块
+					<dependency>
+						<groupId>org.thymeleaf.extras</groupId>
+						<artifactId>thymeleaf-extras-springsecurity4</artifactId>
+					</dependency>
+				b. 修改thymeleaf-extras-springsecurity4模块的版本号
+					<thymeleaf-extras-springsecurity4.version>3.0.2.RELEASE</thymeleaf-extras-springsecurity4.version>
+				c. 在Thymeleaf的模板引擎页面中引入SpringSecurity的名称空间
+					xmlns:sec="http://www.thymeleaf.org/thymeleaf-extras-springsecurity4"
+				d. thymeleaf springsecurity语法规则：
+					(1) sec:authorize：授权
+						(A) isAuthenticated()：判断是否认证
+							sec:authorize="isAuthenticated()"
+						(B) hasRole(role)：判断是否有指定的角色
+							sec:authorize="hasRole('user1')"
+					(2) sec:authentication：认证
+						(A) name：获取登录的用户名
+							sec:authentication="name"
+						(B) principal.authorities：获取角色
+							sec:authentication="principal.authorities"
+十四、Spring Boot与分布式
+	1. 分布式应用		
+		① 在分布式系统中，国内常用zookeeper+dubbo组合，而Spring Boot推荐使用全栈的Spring，Spring Boot+Spring Cloud。
+		② 分布式系统：
+			A. 单一应用架构：当网站流量很小时，只需一个应用，将所有功能都部署在一起，以减少部署节点和成本。此时，用于简化增删改查工作量的数据访问框架(ORM)是关键。
+			B. 垂直应用架构：当访问量逐渐增大，单一应用增加机器带来的加速度越来越小，将应用拆成互不相干的几个应用，以提升效率。此时，用于加速前端页面开发的Web框架(MVC)是关键。
+			C.分布式服务架构：当垂直应用越来越多，应用之间交互不可避免，将核心业务抽取出来，作为独立的服务，逐渐形成稳定的服务中心，使前端应用能更快速的响应多变的市场需求。
+			此时，用于提高业务复用及整合的分布式服务框架(RPC)是关键。
+			D. 流动计算架构：当服务越来越多，容量的评估，小服务资源的浪费等问题逐渐显现，此时需增加一个调度中心基于访问压力实时管理集群容量，提高集群利用率。此时，
+			用于提高机器利用率的资源调度和治理中心(SOA)是关键。
+		③ Zookeeper和Dubbo
+			A. ZooKeeper：ZooKeeper 是一个分布式的，开放源码的分布式应用程序协调服务。它是一个为分布式应用提供一致性服务的软件，提供的功能包括：配置维护、域名服务、分布式同步、组服务等。
+			B. Dubbo：Dubbo是Alibaba开源的分布式服务框架，它最大的特点是按照分层的方式来架构，使用这种方式可以使各个层之间解耦合（或者最大限度地松耦合）。从服务模型的角度来看，Dubbo采用
+			的是一种非常简单的模型，要么是提供方提供服务，要么是消费方消费服务，所以基于这一点可以抽象出服务提供方（Provider）和服务消费方（Consumer）两个角色。
+			C. Dubbo Architecture：Dubbo架构流程：Dubbo服务容器（Container）在启动的时候负责加载和运行服务提供者（Provider），服务提供者启动时，会将自己能提供的服务信息注册到注册中心（Registry），
+			服务消费者启动时，会从注册中心订阅所需要的服务，注册中会将服务的地址列表全部返回给服务消费者（Consumer），服务如果发生变更，注册中心也可以基于长连接的方式将变更推送给服务消费者，服务消费者
+			手持实时更新的服务提供者的名单，服务消费者从服务提供者提供的地址列表中基于负载均衡机制找到相应的提供者的位置并调用它的服务，如果调用失败，会从地址列表中反复查找，直到调用成功。Dubbo还提供了
+			监控机制，服务消费者调用服务次数、时间和服务提供者提供服务次数。时间等信息进行监控
+				
+			2.subscript：服务消费者启动 ------------
+			订	 ---------------------->| Registry | 1. registry：将服务信息注册到注册中心（Zookeeper）
+			阅	 | ---------------------| 注册中心 |<--------------------------
+			服	 | |3. notify:			------------						  |
+			务	 | |长连接的方式											  |
+				 | |实时推送服务变更										  |
+				 | ↓													--------------
+			--------------												| Provider   |
+			| Consumer   | 4.invoke：调用服务，多次调用，直到成功		| 服务提供者 |<----------
+			| 服务消费者 |--------------------------------------------->|------------| 			| 0.start：Dubbo 容器启动和加载服务提供者
+			--------------												| Container  |-----------
+				 |														| 服务容器   | 
+				 |														--------------
+				 |		   			 5.count：定时监控						  |
+				 |						------------						  |
+				 ---------------------->| Monitor  |<--------------------------
+										| 监控中心 |
+										------------
+	2. SpringBoot整合Dubbo和Zookeeper
+		① 安装Zookeeper
+			A. 下载zookeeper镜像：docker pull zookeeper
+			B. 启动zookeeper容器：docker run --name zookeeper --restart always -d -p 2181:2181 411f5595aa97
+		② 编写服务提供者：providerTicket
+			A. 定义一个TicketService接口和该接口的实现TicketServiceImpl
+			B. 在application.yml中配置Dubbo
+				dubbo:
+				  application:
+					name: providerTicket
+				  registry:
+					address: zookeeper://192.168.107.6:2181
+				  scan:
+					base-packages: com.li.springboot.service
+			C. 将服务注册到注册中心
+				a. 使用com.alibaba.dubbo.config.annotation.Servic注解标注，表示将服务注册到注册中心
+				b. 使用@Component将服务注册到容器中
+				c. 代码：
+					@Service
+					@Component
+					public class TicketServiceImpl implements TicketService {
+						@Override
+						public String getTicket() {
+							return "《复仇者联盟》";
+						}
+					}
+			D. 需要将服务启动
+		③ 编写服务消费者：consumerTicket
+			A. 定义一个ConsumerService
+			B. 在application.yml中配置Dubbo
+				dubbo:
+				  application:
+					name: consumerTicket
+				  registry:
+					address: zookeeper://192.168.107.6:2181
+			C. 从注册中心获取服务
+				a. 要想引入提供者提供的服务，需要在消费者模块中创建与服务者模块中服务相同的目录结构与定义相同的接口。
+				b. 在服务消费者模块的ConsumerService中，使用Spring的@Service将其加入到IOC容器中
+				c. 使用@Reference注解远程引用服务提供者的服务
+				d. 代码：	
+					@Service
+					public class ConsumerService {
+
+						@Reference
+						private TicketService ticketService;
+
+						public void buy() {
+							System.out.println("购买" + ticketService.getTicket() + "成功");
+						}
+					}
+		④ 引进Dubbo和Zookeeper相关的依赖
+				<dependency>
+					<groupId>com.alibaba.boot</groupId>
+					<artifactId>dubbo-spring-boot-starter</artifactId>
+					<version>0.1.0</version>
+				</dependency>
+				<dependency>
+					<groupId>com.github.sgroschupf</groupId>
+					<artifactId>zkclient</artifactId>
+					<version>0.1</version>
+				</dependency>
+	3. Spring Boot和Spring Cloud	
+		① Spring Cloud是一个分布式的整体解决方案。Spring Cloud 为开发者提供了在分布式系统（配置管理，服务发现，熔断，路由，微代理，控制总线，一次性token，全局琐，leader选举，
+		分布式session，集群状态）中快速构建的工具，使用Spring Cloud的开发者可以快速的启动服务或构建应用、同时能够快速和云平台资源进行对接。
+		② SpringCloud分布式开发五大常用组件
+			A. 服务发现——Netflix Eureka
+			B. 客服端负载均衡——Netflix Ribbon
+			C. 断路器——Netflix Hystrix
+			D. 服务网关——Netflix Zuul
+			E. 分布式配置——Spring Cloud Config
+		③ 编写一个注册中心：eurekaServer
+			A. 引入eureka-server依赖
+					<dependency>
+						<groupId>org.springframework.cloud</groupId>
+						<artifactId>spring-cloud-starter-eureka-server</artifactId>
+					</dependency>
+			B. 在application.yml中配置注册中心
+				server:
+				  port: 8761
+				eureka:
+				  instance:
+					# eureka实例的主机名
+					hostname: eurekaServer
+				  client:
+					# 不将自己注册到eureka上
+					register-with-eureka: false
+					# 不从eureka中获取服务注册信息
+					fetch-registry: false
+					service-url:
+					  # z注册服务中心的地址
+					  defaultZone: http://localhost:8761/eureka/
+			C. 在主配置类上使用@EnableEurekaServer开启Eureka注册中心功能
+			D. 启动注册中心应用
+			E. 代码：
+				@EnableEurekaServer
+				@SpringBootApplication
+				public class EurekaServerApplication {
+
+					public static void main(String[] args) {
+						SpringApplication.run(EurekaServerApplication.class, args);
+					}
+				}
+		④ 编写一个服务提供者：providerTicket
+			A. 引入Eureka Discovery依赖
+				<dependency>
+					<groupId>org.springframework.cloud</groupId>
+					<artifactId>spring-cloud-starter-eureka</artifactId>
+				</dependency>
+			B. 在application.yml中配置服务注册信息
+				server:
+				  port: 8001
+				spring:
+				  # 服务提供者应用名
+				  application:
+					name: providerTicket
+				eureka:
+				  instance:
+					# 注册服务时使用服务IP进行注册
+					prefer-ip-address: true
+				  client:
+					service-url:
+					  # z注册服务中心的地址
+					  defaultZone: http://localhost:8761/eureka/
+			C. 定义一个服务提供者，并将服务信息以HTTP请求暴露出来，即编写一个service和controller
+			D. 启动服务提供者应用，可启用多个相同的服务提供者
+			E. 代码：
+				@RestController
+				public class PhoneController {
+
+					@Autowired
+					private PhoneService phoneService;
+
+					@GetMapping("/phone")
+					public String getPhone() {
+						return phoneService.getPhone();
+					}
+				}
+			
+				@Service
+				public class PhoneService {
+
+					public String getPhone() {
+						System.out.println("8001");
+						return "一台 iPhone11 Pro";
+					}
+				}
+		⑤ 编写一个服务消费者：consumerTicket
+			A. 引入Eureka Discovery依赖
+				<dependency>
+					<groupId>org.springframework.cloud</groupId>
+					<artifactId>spring-cloud-starter-eureka</artifactId>
+				</dependency>
+			B. 在application.yml中配置服务消费者信息
+				server:
+				  port: 8082
+				spring:
+				  application:
+					name: consumerTicket
+				eureka:
+				  instance:
+					# 注册服务时使用服务IP进行注册
+					prefer-ip-address: true
+				  client:
+					service-url:
+					  # z注册服务中心的地址
+					  defaultZone: http://localhost:8761/eureka/
+			C. 在全局配置文件中使用@EnableDiscoveryClient开启发现服务功能，并注册一个RestTemplate用于发送Http请求发现服务，使用@LoadBalanced注解可以
+			在发送HTTP请求时使用负载均衡机制。
+			D. 通过RestTemplate的getForObject获取服务，需要指定服务的地址与返回值类型，服务的地址只需要指定服务提供者的应用名即可
+			E. 启动服务消费者应用
+			E. 代码：
+				@EnableDiscoveryClient
+				@SpringBootApplication
+				public class ConsumerTicketApplication {
+
+					public static void main(String[] args) {
+						SpringApplication.run(ConsumerTicketApplication.class, args);
+					}
+
+					@Bean
+					@LoadBalanced
+					public RestTemplate restTemplate() {
+						return new RestTemplate();
+					}
+				}
+			
+				@RestController
+				public class ConsumerController {
+
+					@Autowired
+					private RestTemplate restTemplate;
+
+					@GetMapping("/buyPhone")
+					public String buyPhone(String name) {
+						String s = restTemplate.getForObject("http://PROVIDERTICKET/phone", String.class);
+						return name + "购买" + s;
+					}
+				}
+十五、Spring Boot与开发热部署
+	1. 热部署：在开发中我们修改一个Java文件后想看到效果不得不重启应用，这导致大量时间花费，我们希望不重启应用的情况下，程序可以自动部署（热部署）。
+	2. 有以下四种情况，如何能实现热部署。
+		① 模板引擎
+			A. 在Spring Boot中开发情况下禁用模板引擎的cache
+			B. 页面模板改变ctrl+F9可以重新编译当前页面并生效
+		② Spring Loaded
+			A. Spring官方提供的热部署程序，实现修改类文件的热部署
+			B. 下载Spring Loaded（项目地址https://github.com/spring-projects/spring-loaded）
+			C. 添加运行时参数；
+			-javaagent:C:/springloaded-1.2.5.RELEASE.jar –noverify
+		③ JRebel
+			A. 收费的一个热部署软件
+			B. 安装插件使用即可
+		④ Spring Boot Devtools（推荐）
+			A. 引入依赖
+				<dependency>  
+				   <groupId>org.springframework.boot</groupId>  
+				   <artifactId>spring-boot-devtools</artifactId>   
+				</dependency> 
+			B. 启动热部署
+				a. IDEA使用ctrl+F9
+				b. 或做一些小调整
+					(1) Intellij IEDA和Eclipse不同，Eclipse设置了自动编译之后，修改类它会自动编译，而IDEA在非RUN或DEBUG情况下才会自动编译（前提是你已经设置了Auto-Compile）。
+					(2) 设置自动编译（settings-compiler-make project automatically）
+					(3) ctrl+shift+alt+/（maintenance）
+					(4) 勾选compiler.automake.allow.when.app.running
+十六、Spring Boot与监控管理
+	1. 监控管理
+		① 通过引入spring-boot-starter-actuator，可以使用Spring Boot为我们提供的准生产环境下的应用监控和管理功能。我们可以通过HTTP，JMX，SSH协议来进行操作，自动得到审计、健康及指标信息等
+		② 步骤：
+			A. 引入spring-boot-starter-actuator
+				<dependency>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-starter-actuator</artifactId>
+				</dependency>
+			B. 通过http方式访问监控端点，默认这些监控端点是受保护的，需要在application.yml配置文件中指定management.security.enabled=false，关闭监控端点保护机制
+			
+			C. 可进行shutdown（POST 提交，此端点默认关闭）
+		③ 监控和管理端点：
+			A. autoconfig：所有自动配置信息，生效或者不生效的自动配置
+			B. auditevents：审计事件
+			C. beans：所有Bean的信息
+			D. configprops：所有配置属性
+			E. dump：线程状态信息，线程名字、id、状态与堆栈信息
+			F. env：当前环境信息，环境设置、环境变量和配置信息
+			G. health：应用健康状况
+			H. info：获取当前应用配置的所有info信息
+			I. metrics：应用的各项指标，内存大小，内存剩余用量，处理器的数量，线程信息等。
+			J. mappings：应用@RequestMapping映射路径
+			L. shutdown：关闭当前应用（默认关闭，需要发送POST请求），打开shutdown端点endpoints.shutdown.enabled=true
+			M. trace：追踪信息（最新的http请求）
+			N. heapdump：下载当前内容快照
+			O. loggers：日志信息
+			P. configprops：配置属性信息报告
+	2. 定制端点信息
+		① 定制端点一般通过endpoints+端点名+属性名来设置，
+			# 修改端点的ID和访问路径
+			endpoints:
+			  beans:
+				id: myBeans
+				path: /beans
+		② 开启远程应用关闭功能
+			# 开启远程应用关闭功能
+			endpoints:
+			  shutdown:
+				enabled: true
+			# 关闭端点
+			endpoints:
+			  beans:
+				enabled: false
+		③ 开启所需端点
+			# 关闭所有端点，再开启需要的端点
+			endpoints:
+			  enabled: false
+			  beans:
+				id: myBeans
+				path: /beans
+				enabled: true
+		④ 定制端点访问根路径，可以结合SpringSecurity所有以Message开头的请求进行安全权限控制
+			management:
+			  context-path: /message
+		⑤ 修改访问端点的端口号，则需要通过指定的端口和根路径进行访问，即 http://localhost:8181/message
+			management:
+			  context-path: /message
+			  port: 8181
+		⑥ 关闭http端点，则不能访问任何端点
+			management.port=-1
+	3. 自定义HealthIndicator
+		① SpringBoot引入spring-boot-starter-actuator，会生成一些特定的HealthIndicator对引入一些组件进行健康监测，只有正确配置的情况下，被SpringBoot监测的结果才是UP，
+		而如果错误配置时，则监测的结果就是DOWN
+		② 如何自定义HealthIndicator（健康状态指示器）
+			A. 编写一个指示器，需要实现HealthIndicator接口，并且命名需要为XXXHealthIndicator
+			B. 把自定义的HealthIndicator加入到容器
+			C. 自定义检查方法，如果是健康则返回Health.up().build()，如果是down的话，则返回Health.down().withDetail("msg", "服务异常").build()，可以指定异常信息
+			D. 代码：
+				@Configuration
+				public class MyHealthConfig{
+
+					@Bean
+					public HealthIndicator myAppHealthIndicator() {
+						return new HealthIndicator() {
+
+							@Override
+							public Health health() {
+								 return Health.up().build();
+								// return Health.down().withDetail("msg", "服务异常").build();
+							}
+						};
+					}
+				}
+
+

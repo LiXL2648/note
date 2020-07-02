@@ -1,0 +1,1241 @@
+
+	1. Eureka基础知识
+		① 什么是服务治理
+			A. Spring Cloud 封装了Netflix公司开发的Eureka模块来实现服务治理
+			B. 在传统的RPC远程调用框架中，管理每个服务与服务之间依赖关系比较复杂，所以需要使用服务治理，管理服务与服务之间依赖关系，可以实现
+			服务调用、负载均衡、容错等，实现服务发现与注册
+		② 什么是服务注册
+			A. Eureka采用了CS的设计架构，Eureka Server作为服务注册功能的服务器，它是服务注册中心，而系统中的其他服务，使用Eureka的客户端连接到
+			Eureka Server并维持心跳连接，这样系统维护人员就可以通过Eureka Server来监控系统中各个微服务是否正常运行。
+			B. 在服务注册与发现中没有一个注册中心。当服务器启动时，会把当前自己服务器信息，比如：服务通讯地址等以别的方式注册到注册中心上，另一方
+			（消费者服务提供者），以该别名的方式去注册中心上读取到实际的服务通讯地址，然后再实现本地的RPC远程调用框架核心设计思想：在于注册中心，
+			因为使用注册中心管理每个服务与服务之间的一个依赖关系（服务治理概念），在任何RPC远程框架中，都会有一个注册中心存放服务地址相关信息（接口信息）
+											以下是Dubbo与Eureka系统架构图之间的对比
+							
+				2.subscript：服务消费者启动 ------------
+				订	 ---------------------->| Registry | 1. registry：将服务信息注册到注册中心（Zookeeper）
+				阅	 | ---------------------| 注册中心 |<--------------------------
+				服	 | |3. notify:			------------						  |
+				务	 | |长连接的方式											  |
+					 | |实时推送服务变更										  |
+					 | ↓													--------------
+				--------------												| Provider   |
+				| Consumer   | 4.invoke：调用服务，多次调用，直到成功		| 服务提供者 |<----------
+				| 服务消费者 |--------------------------------------------->|------------| 			| 0.start：Dubbo 容器启动和加载服务提供者
+				--------------												| Container  |-----------
+					 |														| 服务容器   | 
+					 |														--------------
+					 |		   			 5.count：定时监控						  |
+					 |						------------						  |
+					 ---------------------->| Monitor  |<--------------------------
+											| 监控中心 |
+											------------
+										  --------|		
+										  |---------|
+										  ||----------
+						Get Registry	  -|| Server |      Registry/Renew/Cancel
+				 |---------------------->  -| Eureka | <--------------------------------
+				 |							----------								   |
+				 |																	   |
+				 |																	   |
+				 |																	   |
+				 |																	   |
+			-------------														  ------------
+			|  Service  |						Remote Call						  |	Service  |-
+			|  Consumer |-------------------------------------------------------->| Provider ||-
+			-------------														  ------------||
+																				   |-----------|
+																				     |----------
+		③ Eureka两大组件
+			A. Eureka Server：提供服务注册，各个微服务节点通过配置启动后，会在Eureka Server中服务注册表中将会存储所有可用服务节点的信息，服务节点的信息
+			可在界面中直观看到
+			B. Eureka Client：通过注册中心访问，是一个Java客户端，用于简化Eureka Server的交互，客户端同时也具备一个内置的、使用轮询（round-robin）负载
+			算法的负载均衡器。在应用启动后，将会向Eureka Server发送心跳（默认周期为30秒）。如果Eureka Server在多个心跳周期内没有接收到某个节点的心跳，
+			Eureka Server将会从服务注册表中把这个服务节点移除（默认是90秒）
+	2. 单机Eureka构建步骤
+		① IDEA生成Eureka Server端服务注册中心
+			A. 建Module：cloud-eureka-server7001
+			B. 改POM
+				<dependencies>
+					<dependency>
+						<groupId>org.springframework.cloud</groupId>
+						<artifactId>spring-cloud-starter-netflix-eureka-server</artifactId>
+					</dependency>
+					<dependency>
+						<artifactId>cloud-api-commons</artifactId>
+						<groupId>com.li.springcloud</groupId>
+						<version>${project.version}</version>
+					</dependency>
+					<dependency>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-starter-web</artifactId>
+					</dependency>
+					<dependency>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-starter-actuator</artifactId>
+					</dependency>
+					<dependency>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-devtools</artifactId>
+						<scope>runtime</scope>
+						<optional>true</optional>
+					</dependency>
+					<dependency>
+						<groupId>org.projectlombok</groupId>
+						<artifactId>lombok</artifactId>
+						<optional>true</optional>
+					</dependency>
+					<dependency>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-starter-test</artifactId>
+						<scope>test</scope>
+					</dependency>
+				</dependencies>
+			C. 写YML
+				server:
+				  port: 7001
+
+				eureka:
+				  instance:
+					hostname: localhost # eureka 服务端的实例名称
+				  client:
+					register-with-eureka: false # false表示不向注册中心注册自己
+					fetch-registry: false # false表示注册中心，维护服务实例，不需要检索服务
+					service-url: #设置与eureka server 交互的地址查询服务和注册服务都需要依赖一个地址
+					  defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
+			D. 主启动
+				@SpringBootApplication
+				@EnableEurekaServer
+				public class EurekaMain7001 {
+
+					public static void main(String[] args) {
+						SpringApplication.run(EurekaMain7001.class, args);
+					}
+				}
+			E. 测试：在浏览器中访问http://localhost:7001/，出现Spring Eureka页面，则证明成功创建注册中心
+		② Eureka Client端cloud-provider-payment8001注册进Eureka Server称为服务提供者provider
+			A. 改POM
+				<dependency>
+					<groupId>org.springframework.cloud</groupId>
+					<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+				</dependency>
+			B. 写YML
+				eureka:
+				  client:
+					register-with-eureka: true
+					fetch-registry: true
+					service-url:
+					  defaultZone: http://localhost:7001/eureka/
+			C. 主启动：在主启动类上添加@EnableEurekaClient注解，表示是服务注册者
+			D. 测试：启动应用，在Spring Eureka页面上出现CLOUD-PAYMENT-SERVICE则证明服务注册成功
+		③ Eureka Client端cloud-consumer-order80注册进Eureka Server成为服务消费者consumer。
+			A. 改POM
+				<dependency>
+					<groupId>org.springframework.cloud</groupId>
+					<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+				</dependency>
+			B. 写YML
+				spring:
+				  application:
+					name: cloud-order-service
+
+				eureka:
+				  client:
+					register-with-eureka: true
+					fetch-registry: true
+					service-url:
+					  defaultZone: http://localhost:7001/eureka/
+			C. 主启动：在主启动类上添加@EnableEurekaClient注解，表示是服务注册者
+			D. 测试：启动应用，在Spring Eureka页面上出现CLOUD-ORDER-SERVICE服务名则证明服务注册成功
+	3. 集群Eureka构建步骤
+		① Eureka集群原理说明
+			A. Eureka Server：
+				a. 服务注册：将服务信息注册进注册中心
+				b. 服务发现：从注册中心上获取服务信息
+				c. 实质，存key服务名，取value调用地址
+			B. 整个注册流程：
+				a. 先启动Eureka注册中心
+				b. 启动服务提供者payment支付服务
+				c. 支付服务启动后会把自身信息（比如服务地址以别名方式注册进Eureka）
+				d. 消费者order服务在需要调用接口时，使用服务别名去注册中心获取实际的RPC远程调用地址
+				e. 消费者获得调用地址后，底层实际上是利用HttpClient技术实现远程调用
+				f. 消费者获得服务地址后会缓存在本地jvm内存中，默认每间隔30秒更新一次服务调用地址
+			C. 微服务RPC远程服务调用核心：高可用，搭建Eureka注册中心集群，实现负载均衡+故障容错
+		② Eureka Server集群环境构建步骤
+			A. 参考cloud-eureka-server7001，新建cloud-eureka-server7002
+			B. 改POM，与cloud-eureka-server7001的pom.xml依赖一致
+			C. 修改映射配置
+				a. 找到C:\Windows\System32\drivers\etc路径下的hosts文件
+				b. 修改映射配置添加进hosts文件
+					127.0.0.1	eureka7001.com
+					127.0.0.1	eureka7002.com
+			D. 写YML
+				a. 7001
+					server:
+					  port: 7001
+
+					eureka:
+					  instance:
+						hostname: eureka7001.com # eureka 服务端的实例名称
+					  client:
+						register-with-eureka: false # false表示不向注册中心注册自己
+						fetch-registry: false # false表示注册中心，维护服务实例，不需要检索服务
+						service-url: #设置与eureka server 交互的地址查询服务和注册服务都需要依赖一个地址
+						  defaultZone: http://eureka7002.com:7002/eureka/
+				b. 7002
+					server:
+					  port: 7002
+
+					eureka:
+					  instance:
+						hostname: eureka7002.com # eureka 服务端的实例名称
+					  client:
+						register-with-eureka: false # false表示不向注册中心注册自己
+						fetch-registry: false # false表示注册中心，维护服务实例，不需要检索服务
+						service-url: #设置与eureka server 交互的地址查询服务和注册服务都需要依赖一个地址
+						  defaultZone: http://eureka7001.com:7001/eureka/
+			E. 主启动
+				@SpringBootApplication
+				@EnableEurekaServer
+				public class EurekaMain7002 {
+
+					public static void main(String[] args) {
+						SpringApplication.run(EurekaMain7002.class, args);
+					}
+				}
+			F. 测试
+				a. 访问http://localhost:7001/与http://eureka7001.com:7001/一致，并且在DS Replicas中指向eureka7002.com
+				b. 访问http://localhost:7002/与http://eureka7002.com:7002/一致，并且在DS Replicas中指向eureka7001.com信息
+				c. 证明 Eureka集群搭建完成
+		③ 将支付服务8001微服务发布到Eureka集群上
+			a. 写YUM，将eureka.service-url.defaultZone属性修改为eureka.service-url.defaultZone=http://eureka7001.com:7001/eureka/,http://eureka7002.com:7002/eureka/
+			b. 测试：支付服务8001微服务成功发布到Eureka集群上
+		④ 将订单服务80微服务发布到Eureka集群上
+			a. 写YUM，将eureka.service-url.defaultZone属性修改为eureka.service-url.defaultZone=http://eureka7001.com:7001/eureka/,http://eureka7002.com:7002/eureka/
+			b. 测试：订单服务80微服务成功发布到Eureka集群上
+		⑤ 支付服务提供者8001集群环境搭建
+			a. 参考cloud-provider-payment8001创建cloud-provider-payment8002
+			b. 改POM，将cloud-provider-payment8001的pom.xml依赖复制到cloud-provider-payment8002的pom.xml中
+			c. 写YML，将cloud-provider-payment8001的application.yml内容复制到cloud-provider-payment8002中，需要将端口改为8002
+			d. 主启动，创建主启动类，并使用@EnableEurekaClient标注
+			e. 业务类，将cloud-provider-payment8001的所有业务类都拷贝进cloud-provider-payment8002
+			f. 修改8001/8002的Controller
+				(1) 在8001/8002的Controller中添加端口信息
+					@Value("${server.port}")
+					private String serverPort;
+				(2) 在Eureka注册中心中发现支付服务提供者集群完成搭建，在浏览器访问8001和8002也成功获取数据，但是通过订单服务访问支付服务时，发现并没有实现负载均衡的效果
+				原因是在订单服务调用支付服务时，通过HTTPClient绑定的地址是固定的，需要使用支付微服务别名替换具体的路径名
+				private static final String PAYMENT_URL = "http://CLOUD-PAYMENT-SERVICE"
+		⑥ 负载均衡
+			(1) 此时重新通过订单服务调用支付服务，会报500的错误，不知道主体名称的异常。原因是使用微服务别名替换具体的路径后，但是微服务别名下可能有多个微服务，程序
+				无法决定访问该别名下哪个微服务名
+			(2) 使用@LoadBalanced注解赋予RestTemplate负载均衡的能力
+				@Bean
+				@LoadBalanced
+				public RestTemplate restTemplate() {
+					return new RestTemplate();
+				}
+		⑦ 测试：完成默认的轮询负载均衡机制
+	4. actuator微服务信息完善
+		① 主机名称：服务名称修改
+			a. 当前问题：去除Eureka注册中心中的主机名
+			b. 修改YML
+				(1) 服务名称修改和IP信息提示完善需要基于spring-boot-starter-web和spring-boot-starter-actuator依赖
+				(2) 在cloud-provider-payment8001、cloud-provider-payment8002和cloud-consumer-order80的YML中分别增加属性：
+				eureka.instance.instance-id=payment8001/eureka.instance.instance-id=payment8002/eureka.instance.instance-id=order80
+		② 访问信息有IP信息提示
+			a. 当前问题，当鼠标移动至服务名称下时，底下需要显示服务的ip和端口信息
+			b. 在cloud-provider-payment8001、cloud-provider-payment8002和cloud-consumer-order80的YML中分别增加属性：
+				eureka.instanceprefer-ip-address=true
+	5. 服务发现Discovery
+		① 对于注册进Eureka里面的微服务，可以通过服务发现来获取该服务的信息
+		② 修改cloud-provider-payment8001的Controller
+			A. 自动装备DiscoveryClient
+			B. 使用DiscoveryClient的getServices()获取所有服务清单列表
+			C. 使用DiscoveryClient的getInstances(String var1)可以根据微服务具体的名称进一步获取微服务的相关信息，需要传入微服务名称，返回服务名称下所有
+			微服务实例，并且可以通过微服务实例获取微服务信息。
+				@Autowired
+				private DiscoveryClient discoveryClient;
+
+				@GetMapping("/discovery")
+				public DiscoveryClient discovery() {
+
+					// 获取服务清单列表
+					List<String> services = discoveryClient.getServices();
+					for (String service: services) {
+						log.info("-------->" + service);
+					}
+
+					// 可以根据微服务具体的名称进一步获取微服务的相关信息
+					List<ServiceInstance> instances = discoveryClient.getInstances("CLOUD-PAYMENT-SERVICE");
+					for (ServiceInstance instance:instances) {
+						log.info(instance.getServiceId() + "\t" + instance.getHost() + "\t" + instance.getPort());
+					}
+					return discoveryClient;
+				}
+		③ 8001主启动，需要在主启动类上使用@EnableDiscoveryClient注解标注
+		④ 测试：
+			A. 使用浏览器访问http://localhost:8001/discovery
+			B. 测试结果
+				a. discoveryClient实例信息
+					{"discoveryClients":[
+							{"services":["cloud-payment-service","cloud-order-service"],"order":0},
+							{"services":[],"order":0}
+						],
+					"services":["cloud-payment-service","cloud-order-service"],
+					"order":0}
+				b. 服务清单列表
+					cloud-payment-service
+					cloud-order-service
+				c. 微服务相关信息
+					CLOUD-PAYMENT-SERVICE	169.254.30.235	8002
+					CLOUD-PAYMENT-SERVICE	169.254.30.235	8001
+	6. Eureka自我保护机制
+		① 故障现象：
+			A. 概论：保护模式主要用于一组客户端和Eureka Server之间存在网络分区场景下的保护。一旦进入保护模式。Eureka Server将会尝试保护其服务注册表中的信息，
+			不再删除服务注册表中的数据，也就是不会销毁任何微服务。
+			B. 某时刻注销有=某一个微服务不可用了，Eureka不会立刻清理，依旧会对该微服务的信息进行保存，属于CAP里面的AP分支
+		② 导致原因：
+			A. 为什么为产生Eureka自我保护机制：为了防止EurekaClient可以正常运行，但是EurekaServer网络不通的情况下，EurekaServer不会立刻将EurekaClient服务剔除
+			B. 什么是自我保护模式？
+			默认情况下，如果EurekaServer在一定时间内没有接收到某个微服务实例的心跳，EurekaServer将会注销实例（默认是90秒），但是当网络分区故障发生（延时、卡顿、
+			拥挤）时，微服务与EurekaServer之间无法正常通信，以上行为可能变得非常危险，因为微服务本身其实是健康的，此时不应该注销这个微服务，Eureka通过“自我保护
+			模式”来解决这个问题，当EurekaServer节点在短时间内丢失过多客户端时（可能发生了网络分区故障），那么这个节点就会进入自我保护模式
+			C. 在自我保护模式中，Eureka Server会保护服务注册表中的信息，不再注销任何服务实例，它的设立理念就是宁可保留错误的服务注册信息，也不会盲目注销任何可能
+			健康的服务实例
+			D. 综上，自我保护模式是一种应对网络异常的安全保护措施。它的架构哲学是宁可同时保留所有微服务（健康的微服务和不健康的微服务都会保留），也不盲目注销任何
+			健康的微服务。使用自我保护模式，可以让Eureka集群更加的健壮、稳定。
+		③ 如何禁止自我保护
+			A. 注册中心EurekaServer端7001
+				a. 出厂默认设置，自我保护机制是开启的，eureka.server.enable-self-preservation=true
+				b. 使用eureka.server.enable-self-preservation=false，可禁用自我保护模式
+				c. 使用eureka.server.eviction-interval-timer-in-ms=2000，设置接收最长心跳的时间间隔
+				d. 效果：“THE SELF PRESERVATION MODE IS TURNED OFF. THIS MAY NOT PROTECT INSTANCE EXPIRY IN CASE OF NETWORK/OTHER PROBLEMS.”安全模式关闭
+			B. 生产者客户端EurekaClient端8001
+				a. 设置Eureka客户端向服务端发送心跳的时间间隔（默认是30秒）：eureka.instance.lease-renewal-interval-in-seconds=1
+				b. 设置服务器在收到最后一次心跳后等待时间上限，单位为秒，默认是90，超时将提出服务，eureka.instance.lease-expiration-duration-in-seconds=2
+				c. 启动服务后，服务成功入驻EurekaServer，关闭服务时，立即被剔除。
+六、Zookeeper服务注册与发现
+	1. SpringCloud整合Zookeeper代替Eureka
+	2. 注册中心Zookeeper
+		① zookeeper是一个分布式协调工具，可以实现注册中心功能
+		② 启动服务器：
+			A. 安装Zookeeper
+				a. 下载zookeeper镜像：docker pull zookeeper
+				b. 启动zookeeper容器：docker run --name zookeeper --restart always -d -p 2181:2181 411f5595aa97
+			B.  使用客户端连接Zookeeper：docker run -it --rm --link zookeeper:2181 zookeeper zkCli.sh -server zookeeper
+			C. 查看zookeeper的服务：ls /
+			D. 查看服务的流水号：ls /services/cloud-provider-payment
+			E. 查看服务的具体信息：get /services/cloud-provider-payment/96f67c46-20e1-461b-a6b1-f09a9f84e691
+		③ zookeeper服务器取代Eureka服务器，zk作为服务注册中心
+		④ zookeeper注册中心中的服务节点是临时节点
+	3. 服务提供者
+		① 新建cloud-provider-payment8004
+		② 改POM：引入spring-cloud-starter-zookeeper-discovery依赖，其他依赖与其他模块的依赖一致，但是不需要引入Eureka的依赖
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-starter-zookeeper-discovery</artifactId>
+			</dependency>
+		③ 写YML
+			server:
+			  port: 8004
+
+			spring:
+			  application:
+				name: cloud-provider-payment
+			  cloud:
+				zookeeper:
+				  connect-string: 192.168.107.6:2181
+		④ 主启动类，使用@EnableDiscoveryClient注解用于向使用consul与zookeeper作为注册中心时注册服务
+			@SpringBootApplication
+			@EnableDiscoveryClient
+			public class PaymentMain8004 {
+
+				public static void main(String[] args) {
+					SpringApplication.run(PaymentMain8004.class, args);
+				}
+			}
+		⑤ Controller
+		⑥ 启动8004注册进Zookeeper
+			A. 可能出现的异常是zookeeper的版本问题，原因是引入spring-cloud-starter-zookeeper-discovery组件后，该组件依赖了org.apache.zookeeper:zookeeper:3.5.3-beta，
+			该依赖与实际安装的Zookeeper版本不一致，导致程序不能正常启动。
+			B. 解决方法：解决安装zookeeper的版本与导入依赖的jar包冲突问题，即排除组件的org.apache.zookeeper:zookeeper:3.5.3-beta依赖，重新导入与安装zookeeper版本一致
+			的依赖
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-starter-zookeeper-discovery</artifactId>
+				<exclusions>
+					<exclusion>
+						<groupId>org.apache.zookeeper</groupId>
+						<artifactId>zookeeper</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.zookeeper</groupId>
+				<artifactId>zookeeper</artifactId>
+				<version>3.6.1</version>
+			</dependency>
+	4. 服务消费者
+		① 新建cloud-consumerzk-order80
+		② 改POM，与cloud-provider-payment8004的POM一致
+		③ 写YML，与cloud-provider-payment8004的YML一致，需要修改服务名cloud-provider-order
+		④ 主启动
+		⑤ 业务类
+			@Configuration
+			public class ApplicationContextConfig {
+
+				@Bean
+				@LoadBalanced
+				public RestTemplate restTemplate() {
+					return  new RestTemplate();
+				}
+			}
+			@RestController
+			public class OrderController {
+
+				@Autowired
+				private RestTemplate restTemplate;
+
+				private static final String PAYMENT_URL = "http://cloud-provider-payment";
+
+				@GetMapping("/order/serverPort")
+				public String getServerPort() {
+					String result = restTemplate.getForObject(PAYMENT_URL + "/serverPort", String.class);
+					return  result;
+				}
+			}
+		⑥ 验证测试
+七、Consul服务注册与发现
+	1. Consul简介
+		① Consul
+			A. 官网：https://www.consul.io/intro/
+			B. 介绍：
+				a. Consul是一套开源的分布式服务发现和配置管理系统，由HashiCorp公司用Go语言开发的。
+				b. 提供了微服务系统中的服务治理、配置中心、控制总线等功能。这些功能中的每一个都可以根据需要单独使用，也可以一起使用以构建全方位的服务网络，
+				总之Consul提供了一种完整的服务网络解决方案。
+				c. 它具有很多优点，包括：基于reft协议，比较简洁；支持健康检查，同时也支持HTTP和DNS协议支持跨数据中心的WAN集群提供图形界面，跨平台，支持Linux
+				Mas和Windows
+			C. 作用：
+				a. 服务发现：提供HTTP和DNS两种方式
+				b. 健康监测：支持多种方式，HTTP、TCP、Docker、Shell监本定制化
+				c. KV存储：  Key和Value的储存方式
+				d. 多数据中心：Consul支持多数据中心
+				e. 可视化Web界面
+				f. 中文文档：https://www.springcloud.cc/spring-cloud-consul.html
+			D. 下载地址：https://www.consul.io/downloads
+	2. 安装并运行Consul
+		① 在Linux系统中使用Docker镜像启动Consul
+			A. 安装Consul镜像：docker pull consul
+			B. 启动Consul镜像：
+				a. docker启动Consul时报WARNING：IPv4 forwarding is disabled. Networking will not work. 报错解决办法
+					(1) 编辑： /etc/sysctl.conf文件
+					(2) 添加代码：net.ipv4.ip_forward=1
+					(3) 重启network和docker服务：
+						systemctl restart network
+						systemctl restart docker
+					(4) 查看是否修改成功（返回1，证明成功）：sysctl net.ipv4.ip_forward -> net.ipv4.ip_forward = 1
+				b. 启动Consul容器：docker run -d -h cnode1 --name consul  --restart=always -p 8500:8500 consul
+		③ 在Windows系统安装Consul
+			A. 官网安装说明：https://learn.hashicorp.com/consul/getting-started/install.html
+			B. 下载完成之后只有一个consul.exe文件，磁盘路径下双击运行，查看版本信息
+			C. 使用开发模式启动：
+				a. 进入consul.exe所在目录，输入命令：consul agent-dev
+				b. 通过以下地址可以Consul的首页：http://192.168.107.6:8500/
+	3. 服务提供者
+		① 新建cloud-provider-payment8007
+		② 引入依赖consul
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-starter-consul-discovery</artifactId>
+			</dependency>
+		③ 在YML中配置Consul
+			server:
+			  port: 8007
+
+			spring:
+			  application:
+				name: consul-provider-payment
+			  cloud:
+				consul:
+				  host: 192.168.107.6
+				  port: 8500
+				  discovery:
+					service-name: ${spring.application.name}
+					hostname: localhost
+					heartbeat:
+					  enabled: true
+	4. 服务消费者
+	5. 三个注册中心的异同点
+		--------------------------------------------------------------------------
+		| 组件名    | 语言 | CAP | 服务健康检查 | 对外暴露接口 | SpringCloud集成 |
+		|-----------|------|-----|--------------|--------------|-----------------|
+		| Eureka    | Java | AP  | 可配支持     | HTTP         | 已集成		     |
+		| Consul    | Go   | CP  | 支持         | HTTP/DNS     | 已集成		     |
+		| Zookeeper | Java | CP  | 支持         | 客户端	   | 已集成		     |
+		--------------------------------------------------------------------------
+		① CAP：
+			A. C: Consistency（强一致性）
+			B. A: Availability（高可用性）
+			C. P：PartitionTolerance（分区容错性）
+			D. CAP理论关注粒度是数据，而不是整体系统设计的策略
+		② 经典的CAP：最多只能同时较好地满足两个
+			A. CAP理论核心是：一个分布式系统不可能同时很好满足一致性，可用性和分区容错性这个三个需求，因此，根据CAP原理将NoSQL数据库分成了满足CA原则、满足CP原则和
+			满足AP原则：
+				a. CA（MySQL）：单点集群，满足一致性和高可用性，通常在可扩展性上不太强
+				b. CP（Zookeeper/Consul）：满足一致性和分区容错性的系统，通常性能不是很高
+				c. AP（Eureka）：满足可用性和分区容错性的系统，通常可能对一致性要求低一些
+八、Ribbon负载均衡服务调用
+	1. 概述
+		① 简介：Spring Cloud Ribbon是基于Netflix Ribbon 实现的一套客户端：负载均衡工具。简单来说，Ribbon是Netflix发布的开源项目，主要功能是提供客户端的软件负载均衡算法
+		和服务调用。Ribbon客户端组件一系列完善的配置项连接超时、重试等。简单的说，就是在配置文件中列出Load Balance（简称LB）后面的机器，Ribbon会自动的基于某种规则（如：
+		简单轮询，随机连接等）去连接这些机器，我们很容易使用Ribbon实现自定义负载均衡算法。
+		② 官网资料：https://github.com/Netflix/ribbon/wiki/Getting-Started，目前Ribbon也进入维护模式，未来的替换方案是使用SpringCloud LoadBalanced替换
+		③ 作用：
+			A. LB负载均衡（Load Balance）是什么：简单来说就是惊用户的请求平摊的分配到多个服务上，从而达到系统的HA（高可用）。
+			B. 常见的负载均衡软件：Nginx、LVS、硬件F5等。
+			C. Ribbon本地负载均衡客户端和Nginx服务端负载均衡区别：
+				a. Nginx是服务器负载均衡，客户端所有请求都会交给Nginx，然后由Nginx实现转发请求，即负载均衡是由服务器实现的。
+				b. Ribbon本地负载均衡，在调用微服务接口时候，会在注册中心是上获取注册信息服务列表之后缓存到JVM本地，从而在本地实现RPC远程服务调用技术。
+			D. 集中式LB和进程内LB
+				a. 集中式LB：即在服务的消费方和提供方之间使用独立的LB设施（可以是硬件如：F5，也可以是软件，如Nginx），由该设置负责把访问请求通过某种策略转发至服务的提供方。
+				b. 进程内LB：将LB逻辑集成到消费方，消费方从服务注册中心获知有哪些地址可用，然后自己再从这些地址中选用出一个合适的服务器，Ribbon就属于进程内LB，它只是一个类库，
+				集成于消费方进程，消费方通过它来获取服务提供方的地址。
+			E. 一句话：负载均衡+RestTemplate调用
+	2. Ribbon负载均衡演示
+		① 架构说明：
+				-----------------					注册		--------------------
+				| Eureka Server | <---------------------------- | 服务提供者 实例1 |
+				-----------------			|					--------------------
+					  ↑	|查					|							 ↑
+					注|	|询					|		注册		--------------------
+					  |	|可					|------------------ | 服务提供者 实例2 |
+					册|	|用					|					--------------------
+					  |	↓服务列表			|							 ↑
+				---------------------		|		注册		--------------------
+				| 服务消费者 Ribbon |		|------------------ | 服务提供者 实例3 |
+				---------------------							--------------------
+						 |					负载均衡调用				 ↑
+						 -------------------------------------------------
+			A. Ribbon在工作时分成两步
+				a. 第一步先选择Eureka Server，它优先选择在同一个区域内负载较少的Server
+				b. 第二步再根据用户指定的策略，从Server取到服务注册列表中选择一个地址
+				其中Ribbon提供了多种策略：比如轮询、随机和根据响应时间加权
+			B. 总结：Ribbon其实就是一个软负载均衡的客户端组件，它可以和其他所需要的客户端结合使用，和Eureka结合只是其中一个实例。
+		② POM：
+			A. 之前写过样例时没有引入spring-cloud-starter-ribbon也可以使用Ribbon
+				 <dependency>
+					<groupId>org.springframework.cloud</groupId>
+					<artifactId>spring-cloud-starter-netflix-ribbon</artifactId>
+				</dependency>
+			B. spring-cloud-starter-netflix-eureka-client自带了spring-cloud-starter-netflix-ribbon的引用
+				<dependency>
+					<groupId>org.springframework.cloud</groupId>
+					<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+				</dependency>
+		③ 二说RestTemplate：
+			A. getForObject方法/getForEntity方法：
+				a. getForObject：返回对象为响应中数据转换化成的对象，基本上可以理解为JSON
+				b. 返回对象为ResponseEntity对象，包含响应中的一些重要信息，比如响应头、响应状态码和响应体等。
+			B. postForObject方法/postForEntity方法
+			C.  GET 请求
+			D. POST 请求
+	3. Ribbon核心组件IRule
+		① IRule：根据特定算法中从服务列表中选取一个要访问的服务
+			A. com.netflix.loadbalancer.RoundRobinRule：轮询
+			B. com.netflix.loadbalancer.RandomRule：随机
+			C. com.netflix.loadbalancer.RetryRule：重试，先按照RoundRobinRule的策略获取服务，如果获取服务失败则在指定时间内会进行重试，获取可用的服务
+			D. WeightedResponseTimeRule：对RoundRobinRule的扩展，响应速度越快的实例选择权重越大，越容易选择
+			E. BestAvailableRule：会先过滤掉由于多次访问故障而处于断路器跳闸状态的服务，然后选择一个并发最小的服务。
+			F. AvailabilityFilteringRule：先过滤掉故障实例，再选择并发较小的实例
+			G. ZoneAvoidanceRule：默认规则复合判断server所在区域的性能和server的可用性选择服务器
+		② 如何替换：
+			A. 修改cloud-consumer-order80
+			B. 注意配置细节：
+				a. 官方文档明确给出了警告：这个自定义配置类不能放在@Component所扫描的当前包以及子包下，否则自定义的配置类就会被所有的Ribbon客户端所，
+				共享，达不到特殊化定制的目的。
+				b. 在主配置类中使用@SpringBootApplication注解，该注解又使用了@ComponentScan注解标注，默认会扫描该主配置所在的包以及子包。
+			C. 新建myrule包，并在新建的package中新建MySelfRule规则类。
+				@Configuration
+				public class MySelfRule {
+
+					@Bean
+					public IRule myRule (){
+						return new RandomRule();
+					}
+				}
+			D. 在主启动类中使用@RibbonClient，该注解需要通过name属性指定服务提供者的服务名，和configuration属性指定自定义的负载均衡规则。
+				@SpringBootApplication
+				@EnableEurekaClient
+				@RibbonClient(name = "CLOUD-PAYMENT-SERVICE", configuration = MySelfRule.class)
+				public class OrderMain80 {
+
+					public static void main(String[] args) {
+						SpringApplication.run(OrderMain80.class, args);
+					}
+				}
+	4. Ribbon负载均衡算法
+		① 默认负载均衡轮询算法原理
+			A. 负载均衡轮询算法：rest接口第几次请求数 % 服务器集群总数 = 实际调用服务器位置下标，每次重新启动后rest接口计数从1开始。
+				1 % 2 = 1 -> index = 1 -> list.get(index)
+				2 % 2 = 0 -> index = 0 -> list.get(index)
+				....
+			B. 举例：
+				List<ServiceInstance> instances = discoveryClient.getInstances("CLOUD-PAYMENT-SERVICE");	
+				List[0] instances = 127.0.0.1:8001
+				List[1] instances = 127.0.0.1:8002
+				8001 + 8002组合成为集群，它们共计2台机器，集群总数为2，按照轮询算法原理
+				当总请求数为1时：1 % 2 = 1对应下标位置为1，则获得服务地址为127.0.0.1:8002
+				当总请求数为1时：2 % 2 = 0对应下标位置为0，则获得服务地址为127.0.0.1:8001
+				如此类推......
+		② 源码
+		③ 自定义负载均衡轮询算法，原理+JUC（CAS + 自旋锁）
+			A. 7001/7002集群启动
+			B. 8001/8002微服务改造，controller中测试端口号的变化
+				@GetMapping("/payment/lb")
+				public String getPaymentLB() {
+					return serverPort;
+				}
+			C. 80订单微服务改造
+				a. 在ApplicationContextConfig的Bean中将@LoadBalance注解去掉
+				b. 轮询算法接口：获取所有并返回特定的微服务实例
+					import org.springframework.cloud.client.ServiceInstance;
+
+					import java.util.List;
+
+					public interface LoadBalancer {
+						ServiceInstance instances(List<ServiceInstance> serviceInstances);
+					}
+				c. 轮询算法实现类：
+					import org.springframework.cloud.client.ServiceInstance;
+					import org.springframework.stereotype.Component;
+
+					import java.util.List;
+					import java.util.concurrent.atomic.AtomicInteger;
+
+					@Component
+					public class MyLB implements LoadBalancer {
+
+						private AtomicInteger atomicInteger = new AtomicInteger(0);
+
+						public final int getAndIncrement() {
+							int current;
+							int next;
+							do {
+								current = this.atomicInteger.get();
+								next = current >= 2147483647 ? 0 : current + 1;
+							} while (!this.atomicInteger.compareAndSet(current, next));
+							System.out.println("第" + next + "次访问");
+							return next;
+						}
+
+						@Override
+						public ServiceInstance instances(List<ServiceInstance> serviceInstances) {
+							int index = getAndIncrement() % serviceInstances.size();
+							return serviceInstances.get(index);
+						}
+					}
+				d. 测试方法
+					@Autowired
+					private LoadBalancer loadBalancer;
+
+					@Autowired
+					private DiscoveryClient discoveryClient;
+					
+					@GetMapping("consumer/payment/lb")
+					public String getPaymentLB() {
+						List<ServiceInstance> instances = discoveryClient.getInstances("CLOUD-PAYMENT-SERVICE");
+						if (instances == null || instances.size() <= 0) {
+							return null;
+						}
+						ServiceInstance serviceInstance = loadBalancer.instances(instances);
+						URI uri = serviceInstance.getUri();
+						return restTemplate.getForObject(uri + "/payment/lb", String.class);
+					}
+九、OpenFeign服务接口调用					
+	1. 概述
+		① 简介：
+			A. 官网解释：https://cloud.spring.io/spring-cloud-static/Hoxton.SR1/reference/htmlsingle/#spring-cloud-openfeign，Feign是一个声明式WebService客户端。
+			使用Feign能让编写Web Service客户端更加简单。它的使用方法是定义一个服务接口然后在上面添加注解。Feign也支持可拔插式的编码器和解码器。Spring Cloud对
+			Feign进行了封装，使其支持了Spring MVC标准注解和HTTPMessageConverters。Feign可以与Eureka和Ribbon组合以支持负载均衡
+			B. GitHub源码：https://github.com/spring-cloud/spring-cloud-openfeign
+		② 能干嘛：
+			A. Feign旨在使编写Java Http客户端变得更加容易
+			B. 前面在使用Ribbon+RestTemplate时，利用RestTemplate对Http请求的封装处理，形成了一套模板化的调用方法。但是在实际开发中，由于对服务依赖的调用可能不止一处，
+			往往一个接口会被多次调用，所以通常都会针对微服务自行封装一些客户端类来包装这些依赖服务的调用。所以，Feign在此基础是哪个做了进一步封装，由他来帮助我们定义
+			和实现依赖服务接口的定义。在Feign的实现下，我们只需要创建一个接口并使用注解的方式来配置它（以前是Dao接口上面标注Mapper注解，现在是一个微服务接口上面标注一
+			个Feign注解即可），即可完成对服务提供方的接口绑定，简化了使用Spring Cloud Ribbon时，自动封装服务调用客户端的开发量。
+			C. Feign集成了Ribbon：利用Ribbon维护了Payment的服务列表信息，并且通过轮询实现客户端的负载均衡。而与Ribbon不同的是，通过Feign只需要定义服务绑定接口且以声明式
+			的方法，优雅而且简单的实现了服务调用
+		③ Feign和OPenFeign两者的区别
+			A. Feign：Feign是Spring Cloud组件中的一个轻量级RESTful的Http服务客户端，Feign内置了Ribbon，用来做客户端负载均衡，去调用服务注册中心的服务。Feign的使用方式是：
+			使用Feign的直接定义接口，调用这个接口，就可以调用服务注册中心的服务
+				<dependency>
+					<groupId>org.springframework.cloud</groupId>
+					<artifactId>spring-cloud-starter-feign</artifactId>
+				</dependency>
+			B. OpenFeign：OpenFeign是Spring Cloud在Feign的基础上支持了SpringMVC的注解，如@RequestMapping等。OpenFeign的@FeignClient可以解析SpringMVC的的@RequestMapping注解
+			下的接口，并通过动态代理的方式产生实现类，实现类中做负载均衡并调用其他服务
+				<dependency>
+					<groupId>org.springframework.cloud</groupId> 
+					<artifactId>spring-cloud-starter-openfeign</artifactId>
+				</dependency>
+	2. OpenFeign使用步骤
+		① 接口+注解：服务调用接口+@FeignClient
+		② 新建cloud-consumerfeign-order80，Feign使用在消费方
+		③ 改POM
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-starter-openfeign</artifactId>
+			</dependency>
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+			</dependency>
+		④ 写YML
+			server:
+			  port: 80
+
+			eureka:
+			  client:
+				register-with-eureka: false
+				service-url:
+				  defaultZone: http://eureka7001.com:7001/eureka/,http://eureka7002.com:7002/eureka/
+		⑤ 主启动
+			@SpringBootApplication
+			@EnableFeignClients
+			public class OrderFeignMain80 {
+
+				public static void main(String[] args) {
+					SpringApplication.run(OrderFeignMain80.class, args);
+				}
+			}
+		⑥ 业务类：
+			A. 服务逻辑接口 + @FeignClient配置调用provider服务
+			B. 新建PaymentFeignService接口并新增注解@FeignClient
+				@Component
+				@FeignClient("CLOUD-PAYMENT-SERVICE")
+				public interface PaymentFeignService {
+
+					@GetMapping("/payment/{id}")
+					public CommonResult<Payment> getPaymentById(@PathVariable("id") Long id);
+				}
+			C. 控制层Controller
+				@RestController
+				public class OrderFeignController {
+
+					@Autowired
+					private PaymentFeignService paymentFeignService;
+
+					@GetMapping("/consumer/payment/{id}")
+					public CommonResult<Payment> getPaymentById(@PathVariable("id") Long id) {
+						return paymentFeignService.getPaymentById(id);
+					}
+				}
+		⑦ 测试：
+			A. 先启动2个Eureka集群7001/7002
+			B. 再启动2个微服务8001/8002
+			C. 启动OpenFeign
+			D. 浏览器访问：http://localhost/consumer/payment/1
+			E. 测试结果：Feign自带负载均衡配置项
+	3. OpenFeign超时控制
+		① 超时设置，故意设置超时演示出错情况 
+			A. 服务提供者8001编写暂停程序
+				@GetMapping("/payment/timeout")
+				public String feignTimeout() {
+					try {
+						Thread.sleep(3000);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+					return serverPort;
+				}
+			B. 服务消费者80在service层添加超时方法
+				@GetMapping("/payment/timeout")
+				public String feignTimeout();
+			C. 服务消费者80在controller调用超时方法
+				@GetMapping("/consumer/payment/timeout")
+				public String feignTimeout() {
+					return paymentFeignService.feignTimeout();
+				}
+			D. 测试：
+				a. 在浏览器地址栏输入http://localhost/consumer/payment/timeout
+				b. 错误页面：Read timed out executing GET http://CLOUD-PAYMENT-SERVICE/payment/timeout
+		② OpenFeign默认等待1秒钟，超时后直接报错
+		③ 默认Feign客户端只等待一秒钟，但是服务端处理需要超过1秒钟，导致Feign客户端不想等待，直接返回报错结果，为了避免这种情况，有时候需要设置
+		Feign客户端的超时控制，OpenFeign默认支持Ribbon
+		④ 修改YML，在YML文件中开启OpenFeign客户端超时控制
+			ribbon:
+			  # 指的是建立连接所用的时间，适用于网络状况正常的情况下，两端连接所用的时间
+			  ReadTimeout: 5000
+			  # 指的是建立连接后从服务器读取到可用资源所用的时间
+			  ConnectTimeout: 5000
+	4. OpenFeign日志打印功能
+		① Feign提供了日志打印功能，我们可以通过配置来调整日志级别，从而了解Feign中Http请求的细节，也就是说对FIG你接口的调用情况进行监控和输出。
+		② 日志级别：
+			A. NONE：默认的，不显示任何日志
+			B. BASIC：进记录请求方法、URL、响应状态码以及执行时间
+			C. HEADERS：除了BASIC中定义的信息之外，还有请求和响应的头信息
+			D. FULL：除了HEADERS中定义的信息之外，还有请求和响应的正文及元数据
+		③ 配置日志Bean
+			import feign.Logger;
+			import org.springframework.context.annotation.Bean;
+			import org.springframework.context.annotation.Configuration;
+
+			@Configuration
+			public class FeignConfig {
+
+				@Bean
+				Logger.Level feignLoggerLevel() {
+					return Logger.Level.FULL;
+				}
+			}
+		④ YML文件里需要开启日志的Feign客户端
+			logging:
+			  level:
+				# feign 日志以什么级别监控哪个接口
+				com.li.springcloud.service.PaymentFeignService: debug
+十、Hystrix断路器
+	1. 概述
+		① 分布式系统面临的问题：
+			A. 复杂分布式体系结构中的应用程序有数十个依赖关系，每个依赖关系在某些时候将不可避免地失败
+			B. 服务雪崩：多个微服务之间调用的时候，假设微服务A调用微服务B和微服务C，微服务B和微服务C又调用了其他微服务，这就是所谓的“扇出”。如果扇出的链路上某个微服务
+			的调用响应时间过长或者不可用，对微服务A的调用就会占用越来越多的系统资源，进而引起系统崩溃，所谓的“雪崩效应”。
+			C. 对于高流量的应用来说，单一的后端依赖可能会导致所有服务器上所有资源都在几秒钟内饱和。比失败更槽糕的是，这些应用程序还可能导致服务之间的延迟增加，备份队列，
+			线程和其他系统资源紧张，导致整个系统发生更多的级联故障。这些都表示需要对故障和延迟进行隔离和管理，以便单个依赖关系的失败，不能取消整个应用程序或者系统
+			D. 所以，通常当发现一个模考下的某个实例失败后，这时这个模块依然会接收流量，然后这个有问题的模块还调用了其他的模块，这样就会发生级联故障，或者叫做雪崩。
+		② 是什么：
+			A. Hystrix是一个用于处理分布式系统的延迟和容错的开源库，在分布式系统里，许多依赖不可避免的会调用失败，比如超时、异常等，Hystrix能够保证在一个依赖出问题的情
+			况下，不会导致整个服务失败，避免级联故障，以提高分布式系统的弹性
+			B. “断路器”本身是一种开关装置，当某个服务单元发生故障之后，通过断路器的故障监控（类似于熔断保险丝），向调用方返回一个符合预期的、可处理的备选响应（FallBack），
+			而不是长时间的等待或者抛出调用方无法处理的异常，这样就保证了服务调用方的线程不会被长时间、不必要地占用，从而避免了故障在分布式系统中的蔓延，乃至雪崩
+		③ 能干嘛：
+			A. 服务降级
+			B. 服务熔断
+			C. 接近实时的监控
+			D. 限流、隔离等
+		④ 官网资料：https://github.com/Netflix/Hystrix/wiki/How-To-Use
+		⑤ Hystrix停更进维
+	2. Hystrix重要概念
+		① 服务降级
+			A. 服务器繁忙，请稍后再试，不让客户端等待并立刻返回一个友好提示，fallback
+			B. 哪些情况会发生降级
+				a. 程序运行异常
+				b. 超时
+				c. 服务熔断触发服务降级
+				d. 线程池/信号量打满也会导致服务降级
+		② 服务熔断：
+			A. 类似于保险丝达到最大服务访问后，直接拒绝访问，拉闸限电，然后调用服务降级的方法并返回友好提示
+			B. 服务降级->进而熔断->恢复调用链路
+		③ 服务限流：秒杀高并发等操作，严禁一窝蜂的过来拥挤，大家排队，一秒N个，有序进行
+	3. Hystrix案例
+		① 构建
+			A. 新建cloud-provider-hystrix-payment8001
+			B. 改POM，引入spring-cloud-starter-netflix-hystrix依赖
+				<dependency>
+					<groupId>org.springframework.cloud</groupId>
+					<artifactId>spring-cloud-starter-netflix-hystrix</artifactId>
+				</dependency>
+				<dependency>
+					<groupId>org.springframework.cloud</groupId>
+					<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+				</dependency>
+			C. 写YML
+			D. 主启动
+			E. 业务类
+			F. 正常测试
+		② 高并发测试
+			A. 上述操作在非高并发的情形下，还能勉强满足
+			B. JMeter压力测试
+				a. 开启JMeter，启动20000个并发访问/payment/timeout
+				b. 再次访问/payment/ok和/payment/timeout
+				c. 演示结果：/payment/ok和/payment/timeout两个访问地址响应变得缓慢
+				d. 卡死原因：Tomcat默认的工作线程被打满，没有多余的线程来分解和处理
+			C. JMeter压测结论：上面还是服务提供者8001自己测试，假如此时外部消费者80也进行访问，则消费者只能干等，最终导致消费者80不满意，服务端8001直接被拖死。
+		③ 新建服务消费者80调用服务提供者8001
+			A. 新建：cloud-consumer-hystrix-order80
+			B. 改POM
+				<dependency>
+					<groupId>org.springframework.cloud</groupId>
+					<artifactId>spring-cloud-starter-netflix-hystrix</artifactId>
+				</dependency>
+				<dependency>
+					<groupId>org.springframework.cloud</groupId>
+					<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+				</dependency>
+				<dependency>
+					<groupId>org.springframework.cloud</groupId>
+					<artifactId>spring-cloud-starter-openfeign</artifactId>
+				</dependency>
+			C. 写YML
+			D. 业务类
+				a. PaymentHystrixService
+				b. OrderHystrixController
+			E. 正常测试：http://localhost/consumer/payment/ok
+			F. 高并发测试：
+				a. 启动20000个并发线程测试8001
+				b. 消费端80微服务访问微服务8001的/payment/ok
+				c. 测试结果：/payment/ok地址响应变得缓慢
+		④ 故障现象和导致原因
+			A. 8001同一层次的其他接口服务被困死，因为Tomcat线程里面的所有工作线程已经被占用完毕
+			B. 80此时调用8001，客户端访问响应缓慢
+		⑤ 上述结论：正因为有上述故障或者不佳表现才有降级/容错/限流等技术诞生
+		⑥ 解决的要求
+			A. 超时导致服务器变慢——超时不再等待
+			B. 出错（宕机或者程序运行出错）——出错兜底
+			C. 解决：
+				a. 服务（8001）超时，调用者（80）不能一直卡死等待，必须有服务降级
+				b. 服务（8001）DOWN机了，调用者（80）不能一直卡死等待，必须有服务降级
+				c. 服务（8001）OK，调用者（80）自己出故障或者有自我的要求（自己的等待时间小于服务提供者响应的时间）
+		⑦ 服务降级
+			A. 降级配置：@HystrixCommand
+			B. 8001先从自身找问题：设置自身调用超时设置，峰值内可以正运行，超过了需要有对应的方法处理，做服务降级fallback
+			C. 8001fallback
+				a. 业务类启用：
+					(1) @HystrixCommand报异常后如何处理：一旦调用服务方法失败并抛出了错误信息后，会自动调用@HystrixCommand标注好的fallbackMethod调用类中的指定方法
+					(2) 举例：
+						@HystrixCommand(fallbackMethod = "paymentInfo_timeout_handler", commandProperties = {
+								@HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "3000")
+						})
+						public String paymentInfo_timeout(){
+							// long millis = 5000;
+							long millis = 5000 / 0;
+							try {
+								Thread.sleep(millis);
+							} catch (InterruptedException e) {
+								e.printStackTrace();
+							}
+							return "线程池：" + Thread.currentThread().getName() + ", paymentInfo_timeout, 耗时（ms）：" + millis;
+						}
+
+						public String paymentInfo_timeout_handler() {
+							return "访问超时了 ...";
+						}
+					(3) 以上代码制造了两个异常，计算异常（long millis = 5000 / 0）和超时异常（long millis = 5000），都会引起服务降级，方案都是使用paymentInfo_timeout_handler
+				b. 主启动类激活：
+					@SpringBootApplication
+					@EnableEurekaClient
+					@EnableCircuitBreaker
+					public class PaymentHystrixMain8001 {
+
+						public static void main(String[] args) {
+							SpringApplication.run(PaymentHystrixMain8001.class, args);
+						}
+					}
+			D. 80fallback
+				a. 一般服务降级是在服务消费者端进行的，但是服务提供者端可以使用服务降级
+				b. 我们自己配置过的热部署方式对java代码改动明显，但对@HystrixCommand内属性的修改建议重启微服务
+				c. 修改YML，使Feign的Hystrix生效
+					feign:
+					  hystrix:
+						enabled: true
+				d. 主启动：添加@EnableCircuitBreaker注解，启动Hystrix服务降级
+				e. 业务类：
+					@GetMapping("/consumer/payment/timeout")
+					@HystrixCommand(fallbackMethod = "paymentInfo_timeout_handler", commandProperties = {
+							@HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "2000")
+					})
+					public String paymentInfo_timeout() {
+						return paymentHystrixService.paymentInfo_timeout();
+					}
+
+					public String paymentInfo_timeout_handler() {
+						return "线程池：" + Thread.currentThread().getName() + ", 访问超时了 ..., serverPort：" + serverPort;
+					}
+				f. 服务降级时指定的备用方法的与原方法需要需要统一参数列表，否则会出现com.netflix.hystrix.contrib.javanica.exception.FallbackDefinitionException: fallback method wasn't found异常
+			E. 目前问题：
+				a. 每个业务方法对应一个服务降级方法，代码膨胀
+				b. 统一和自定义的分开
+			F. 解决问题
+				a. 解决服务降级的代码膨胀问题：
+					(1) 定义一个全局的服务降级处理方法：payment_global_fallback
+					(2) 在业务类上使用@DefaultProperties注解标注服务降级默认的处理方法
+						@DefaultProperties(defaultFallback = "payment_global_fallback")
+					(3) 可能发生异常的业务方法上使用@HystrixCommand注解，表名该方法需要服务降级，如果该注解指明了fallbackMethod属性，则使用特定的服务降级处理方法
+					(4) 代码：
+						@RestController
+						@DefaultProperties(defaultFallback = "payment_global_fallback")
+						public class OrderHystrixController {
+
+							@Autowired
+							private PaymentHystrixService paymentHystrixService;
+
+							@GetMapping("/consumer/payment/timeout")
+							/*@HystrixCommand(fallbackMethod = "paymentInfo_timeout_handler", commandProperties = {
+									@HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "2000")
+							})*/
+							@HystrixCommand
+							public String paymentInfo_timeout() {
+								int i = 10 / 0;
+								return paymentHystrixService.paymentInfo_timeout();
+							}
+
+							public String payment_global_fallback() {
+								return "Global 异常处理信息，请稍后再试";
+							}
+						}
+				b. 解决服务降级的代码和业务逻辑混在一起的问题：
+					(1) 服务降级，客户端去调用服务端，碰上服务端宕机或者关闭
+					(2) 本次案例服务降级处理是在客户端80实现完成的，与服务端8001没有关系，只需要为Feign客户端定义的接口添加一个服务降级处理的实现类即可实现解耦
+					(3) 未来要面对的异常
+						(A) 运行时异常（RuntimeException）
+						(B) 运行超时（TimeoutException）
+						(C) 宕机
+					(4) 修改cloud-consumer-hystrix-order80
+						(A) 根据cloud-consumer-hystrix-order80已有的PaymentHystrixService接口，新建一个类（paymentFallbackService）实现该接口，统一为接口里面的
+						方法进行异常处理。
+						(B) PaymentFallbackService类实现PaymentHystrixService，使用@Component将该实现类加入到容器中，并重写接口定义的方法，将重写的方法作为服务降级的处理方法
+						(C) 在PaymentHystrixService接口的@FeignClient注解中，使用fallback=PaymentFallbackService.class指明服务降级的处理逻辑
+						(D) 代码：
+							@Component
+							public class PaymentFallbackService implements  PaymentHystrixService {
+								@Override
+								public String paymentInfo_OK() {
+									return "PaymentFallbackService ... paymentInfo_OK ... fallback";
+								}
+
+								@Override
+								public String paymentInfo_timeout() {
+									return "PaymentFallbackService ... paymentInfo_timeout ... fallback";
+								}
+							}
+							
+							@Component
+							@FeignClient(value = "CLOUD-PROVIDER-HYSTRIX-PAYMENT", fallback = PaymentFallbackService.class)
+							public interface PaymentHystrixService {
+
+								@GetMapping("/payment/ok")
+								public String paymentInfo_OK();
+
+								@GetMapping("/payment/timeout")
+								public String paymentInfo_timeout();
+							}
+							
+							@GetMapping("/consumer/payment/ok")
+							public String paymentInfo_OK() {
+								return paymentHystrixService.paymentInfo_OK();
+							}
+
+		⑧ 服务熔断
+			A. 断路器：类似于保险丝
+			B. 熔断是什么：
+				a. 熔断机制概述：熔断机制是应对雪崩效应的一种微服务链路保护机制。当扇出链路的某个微服务出错不可用或者响应时间太长时，会进行服务的降级，进而熔断该节点微服务
+				的调用，快速返回错误的响应信息
+				b. 当检测到该节点微服务调用正常响应后，恢复调用链路
+				c. 在Spring Cloud框架里，熔断机制通过Hystrix实现。Hystrix会监控微服务间调用的状况，当失败的调用到了一定阈值，缺省是5秒内20次调用失败，就会启动熔断机制。熔断
+				机制的注解是@HystrixCommand
+				d. 服务熔断论文：https://martinfowler.com/bliki/CircuitBreaker.html
+			C. 实操：
+				a. 修改cloud-provider-hystrix-payment8001
+				b. PaymentServiceImpl，为什么配置这些参数，在HystrixCommandProperties抽象类中定义了以下属性，如果不配置则使用默认值
+					@HystrixCommand(fallbackMethod = "paymentCircultBreaker_fallback", commandProperties = {
+							@HystrixProperty(name = "circuitBreaker.enabled", value = "true"),//是否开启断路器
+							@HystrixProperty(name = "circuitBreaker.requestVolumeThreshold", value = "10"),//请求次数
+							@HystrixProperty(name = "circuitBreaker.sleepWindowInMilliseconds", value = "10000"),//时间窗口期
+							@HystrixProperty(name = "circuitBreaker.errorThresholdPercentage", value = "60")//失败率达到多个后断路
+					})
+					public String paymentCircultBreaker(String name) {
+						if (name == null) {
+							throw new RuntimeException("name 不能为空");
+						}
+						String serialNumber = IdUtil.simpleUUID();
+						return Thread.currentThread().getName() + "调用成功，编号：" + serialNumber;
+					}
+
+					public String paymentCircultBreaker_fallback() {
+						return "出错了，请重试";
+					}
+				c. PaymentController
+					@GetMapping("/payment/circuit")
+					public String payemntCircuitBreaker(String name) {
+						String result = paymentService.paymentCircultBreaker(name);
+						log.info("result: " + result);
+						return result;
+					}
+				d. 测试
+					(1) 自测cloud-provider-hystrix-payment8001
+					(2) 正确请求：http://localhost:8001/payment/circuit?name=LiXL
+					(3) 错误请求：http://localhost:8001/payment/circuit
+					(4) 效果：多次发送错误请求时发生服务降级，当再次发送正确请求时，此时服务已经发生熔断，只有当正确的请求的次数增加时，服务才会恢复链路
+			D. 原理（总结）：
+				a. 结论：多次发送错误请求时发生服务降级，当再次发送正确请求时，此时服务已经发生熔断，只有当正确的请求的次数增加时，服务才会恢复链路
+				b. 熔断类型：
+					(1) 熔断打开：请求不再进行调用当前服务，内部设置时钟一般为MTTR（平均故障处理时间），当打开时长达到所设时钟则进入半熔断状态
+					(2) 熔断关闭：熔断关闭不会对服务进行熔断
+					(3) 熔断半开：部分请求根据规则调用当前服务，如果请求成功且符合规则则认为当前服务已经恢复正常，关闭熔断
+				c. 断路器流程图：
+					(1) 配置：
+						@HystrixCommand(fallbackMethod = "paymentCircultBreaker_fallback", commandProperties = {
+								@HystrixProperty(name = "circuitBreaker.enabled", value = "true"),//是否开启断路器
+								@HystrixProperty(name = "circuitBreaker.requestVolumeThreshold", value = "10"),//请求次数
+								@HystrixProperty(name = "circuitBreaker.sleepWindowInMilliseconds", value = "10000"),//时间窗口期
+								@HystrixProperty(name = "circuitBreaker.errorThresholdPercentage", value = "60")//失败率达到多个后断路
+						})
+					(2) 断路器在什么情况下开始起作用：涉及到断路器的三个重要参数：快照时间窗、请求总数阈值、错误百分比阈值
+						(A) 快照时间窗：断路器确定是否打开需要统计一些请求和错误数据，而统计的时间范围就是快照时间窗，默认为最近的10秒
+						(B) 请求总数阈值：在快照时间窗内，必须满足请求总数阈值才有资格熔断。默认是20次，意味着在10秒内，如果该Hystrix命令的调用次数不足20次，即使所有请求都超时获取其他原因失败，
+						断路器都不会打开
+						(C) 错误百分比阈值：当请求总数在快照时间窗内超过阈值，比如发生了30次调用，如果在30次的调用中，有15次发生了超时异常，也就是超过50%的错误百分比，在默认设定50%阈值情况下，
+						这时就会将断路器打开。
+					(3) 断路器开启或者关闭的条件：
+						(A) 当满足一定的阈值的时候（默认10秒内超过20个请求次数）
+						(B) 当失败率达到一定的时候（默认10秒内超过50% 请求失败）
+						(C) 达到以上阈值，断路器将会开启
+						(D) 当开启时，所有请求都不会进行转发
+						(E) 一段时间之后（默认是5秒），这个时候断路器是半开状态，会让其中一个请求进行转发。如果成功，断路器会关闭，若失败，继续开启，重复4和5
+					(4) 断路器打开之后
+						(A) 再有请求调用时，将不会调用主逻辑，而是直接调用降级fallback，通过断路器，实现了自动地发现错误并将降级逻辑切换为主逻辑，减少响应延迟的效果。
+						(B) 原理的之逻辑要如何恢复？Hystrix实现可自动恢复功能，当断路器打开，对主逻辑进行熔断之后，Hystrix会启动一个休眠时间窗，在这个时间窗内，降级逻辑是临时称为主逻辑，当休眠时
+						间窗到期，断路器进入半开状态释放一次请求到原理的主逻辑上，如果此次请求正常返回，那么断路器继续闭合，主逻辑恢复，如果这次请求依然有问题，断路器继续进入打开状态，休眠时间窗重新计时。
+					(5) Hystrix的所有配置：
+						(A) execution.isolation.strategy=THREAD：设置隔离策略，THREAD表示线程池，SEMAPHORE表示信号池隔离
+						(B) execution.isolation.semaphore.maxConcurrentRequests=10：当隔离策略选择信号池隔离时，用来设置信号池的大小（最大并发数）
+						(C) execution.isolation.thread.timeoutInMilliseconds=10：配置命令执行的超时时间
+						(D) execution.timeout.enabled=true：是否启用超时时间
+						(E) execution.isolation.thread.interruptOnTimeout=true：执行超时时是否中断
+						(F) execution.isolation.thread.interruptOnFutureCancel=true：执行被取消时是否中断
+						(G) fallback.isolation.semaphore.maxConcurrentRequests=10：允许回调方法执行的最大并发数
+						(H) fallback.enabled=true：服务降级是否启用，是否执行回调函数
+						(I) circuitBreaker.enabled=true：是否启用断路器
+						(J) circuitBreaker.requestVolumeThreshold=20：该属性用来设置在滚动时间窗中，断路器熔断的最小请求数，例如：默认该值为20个时，如果滚动时间窗（默认是10秒）内仅收到19个请求，
+						即使19个请求都失败了，断路器也不会打开
+						(K) circuitBreaker.errorThresholdPercentage=50：该属性用来设置在滚动时间窗中，表示在滚动时间窗中，在请求数量超过circuitBreaker.requestVolumeThreshold=20的情况下，如果错误请求
+						数的百分比超过50%，就把断路器设置为“打开”状态，否则就设置为“关闭状态”
+						(L) circuitBreaker.sleepWindowInMilliseconds=5000：该属性用来设置当断路器打开之后的休眠时间窗，休眠时间窗结束之后，会将断路器置为“半开”状态，尝试熔断的请求命令，如果依然失败
+						就将断路器继续设置为“打开”状态，如果成功就设置为“关闭”状态。
+						(M) circuitBreaker.forceOpen=false：断路器强制打开
+						(N) circuitBreaker.forceClosed：断路器强制关闭
+						(O) metrics.rollingStats.timeInMilliseconds=10000：滚动时间窗设置，该时间用于断路器判断健康时需要收集信息的持续时间
+						(P) metrics.rollingStats.numBuckets=10：该属性用来设置滚动时间窗统计指标信息时划分“桶”的数量，断路器收集指标信息时会根据设置的时间窗长度拆分成多个“桶”来累计个度量值，每个“桶”记录了
+						一端时间内的采集指标。比如10秒内拆分成10个“桶”收集，所以timeInMilliseconds必须能被numBuckets整除，否则会抛出异常
+						(Q) metrics.rollingPercentile.enabled=false：该属性用来设置对命令执行的延迟是否使用百分比位数来跟踪和计算。如果设置为false，则所有的概要统计都将返回-1
+						(R) metrics.rollingPercentile.timeInMilliseconds=60000：该属性用来设计百分位统计的波动窗口的持续时间，单位为毫秒
+						(S) metrics.rollingPercentile.numBuckets=60000：该属性用来设置百分位统计波动窗口中使用“桶”的数量
+						(T) metrics.rollingPercentile.bucketSize=100：该属性用来设置在执行过程中每个“桶”中保留的最大执行次数。如果在滚动窗内发生超过该设定值的执行次数，就从最初的位置开始重写。例如：将该值设置
+						为100，滚动窗口为10秒，若在10秒内一个“桶”中发生了500次执行，那么该“桶”中只保留最后的100次执行的统计。另外，增加该值的大小将会增加内存的消耗，并增加排序百分位数所需要的计算时间。
+						(U) metrics.healthSnapshot.intervalInMilliseconds=500：该属性用来设置采集影响断路器的健康快照（请求成功、错误百分比）的间隔等待时间
+						(V) requestCache.enabled=true：是否开启请求缓存
+						(W) requestLog.enabled=true：HystrixCommand的执行和事件是否打印日志到HystrixLog中
+						(X) coreSize=10：该参数用来设置执行命令线程池的核心线程数，该值也就是命令执行的最大并发量
+						(Y) maxQueueSize=-1：该参数用来设置线程池的最大队列大小，当设置为-1时，线程池使用SynchronousQueue实现的队列，否则使用LinkedLockingQueue实现的队列
+						
+		⑨ 服务限流：见后续的Sentinel内容 
+	4. Hystrix工作流程
+		① 官网：https://github.com/Netflix/Hystrix/wiki/How-it-Works
+		② 官网图例：
+			------------------------------	   ---------------------------------
+			| construct a HystrixCommand |  ①  | ..or HystrixObservableCommand |
+			------------------------------	   ---------------------------------														----------------------------
+						  |									  |																		----| calculate circuit health |--------------------------report metrics----------------------|
+						  |---------------------------------- |																		|	----------------------------	   |													  |
+				  --------|-------					 ---------|--------																|									   |													  |
+				  ↓				 ↓					 ↓				  ↓																↓									   ↓													  |
+			--------------  ------------	   --------------  -------------------	③	-----------------------	  ④		-------------------------   ⑤	 ------------------------------------	⑥	  ------------------------	  |
+			| .execute() |  | .queue() |	   | .observe() |  | .toObservable() | ---> | available in cache? | --no--> | circuit-breaker open? | --no-- | Semaphore /Thread pool rejected? | --no--> | construct() or run() |	  |
+			--------------  ------------	   --------------  ------------------		-----------------------			-------------------------		 ------------------------------------		  ------------------------	  |
+				  |			  ↑		 |				 |				↑		↑					  |								   yes									 yes									 |				  |
+				  -------------		 --------------------------------		|					  |							  short-circuit							    reject									 ↓				  |
+			② Then choose one of the above method to obtain the				|					  |									|									   |							--------------------	  |
+			result(s) of the command. Note that they all ultimately			|					  |									----------------------------------------			   -----yes-----| execution fails? | -----|
+			depend on .toObservable()										|			 yes; return cache response									  ↓	⑧								   |			--------------------	  |
+																			|					  |									----------------------------------------			   |					 ↓ no			  |
+																			|-------------------- |									|getFallback() or resume WithFallback()| <------------ |			--------------------	  |
+																			|														----------------------------------------			   -----yes-----| 	  timeout  	   | -----|
+																			|																		  ↓													--------------------
+																			|				no; failed or not implemented				  -------------------------												 |
+																			|------------------------------------------------------------ | fallback successful ? |												 |
+																			|															  -------------------------  											 |
+																			|					yes;return fallback									  |															 |
+																			|--------------------------------------------------------------------------															 |
+																			|							 ⑨																										 |
+																			|				no; return resulting Observable																						 |
+																			|------------------------------------------------------------------------------------------------------------------------------------|
+		③ 步骤说明：																																		
+			A. 创建HystrixCommand（用再依赖的服务返回单个操作结果的时候）或HystrixObservableCommand（用在依赖的服务返回多个操作结果的时候）对象。
+			B. 命令执行，其中HystrixCommand实现了下面前两种执行方式；而HystrixObservableCommand实现了后两种执行方式：execute()，同步执行，从依赖的服务返回一个单一的结果对象，或是在发生错误的时候抛出异常。
+			queue()，异步执行，直接返回一个Future对象，其中包含了服务执行结束要返回的单一结果对象。observe()，返回Observable对象，它代表了操作的多个结果，它是一个Hot Observable（不论“事件源”是否有“订阅者”，
+			都会在创建后对事件进行发布，所以对于Hot Observable的每一个“订阅者”都有可能是从“事件源”的中途开始的，并可能只是看到了整个操作的局部过程）。toObservable()，同样会返回Observable对象，也代表了操作的
+			多个结果但它返回的是一个Cold Observable（没有“订阅者”的时候并不会发布事件，而是进行等待，直到有“订阅者”之后才发布事件，所以对于Cold Observable的订阅者，它可以保证从一开始看到整个操作的全局过程）。
+			C. 若当前命令的请求缓存功能是被启用的，并且该命令缓存中，那么缓存的结果会立即以Observable对象的形式返回
+			D. 检查断路器是否为打开状态。如果断路器是打开的，那么Hystrix不会执行命令，而是转接到fallback处理逻辑（第八步）；如果断路器是关闭的，检查是否有可用的资源来执行命令（第五步）。
+			E. 线程池/请求队列/信号量是否被占满。如果命令依赖服务的专有线程池和请求队列，或者信号量（不使用线程池时）已经占满，那么Hystrix也不会执行命令，而是转接到fallback处理逻辑（第八步）。
+			F. Hystrix会根据我们编写的方法来决定采取什么方式去请求依赖服务，HystrixCommand.run()，返回一个单一的结果，或者抛出异常。HystrixObservableCommand.construct()，返回一个Observable对象
+			来发射多个结果，或通过onError发送错误通知。
+			G. Hystrix会将“成功”、“失败”、“拒绝”和“超时”等信息报告给断路器，而断路器会维护一组计算器来统计这些数据，断路器会使用这些统计数据来决定是否要将断路器打开，来对某个依赖服务的请求进行
+			“熔断/短路”。
+			H. 当命令执行失败的时候，Hystrix会进入fallback城市回退处理，我们通常也成该操作作为“服务降级”。而能够引起服务降级处理的情况有以下几种：第四步，当前命令处于“熔断/短路”状态，断路器是打
+			开的时候。第五步：当前命令的线程池、请求队列或者信号量被占满的时候。第六步：HystrixObservableCommand.construct()或HystrixCommand.run()抛出异常的时候。
+			I. 当Hystrix命令执行成功之后，它会将处理结果直接返回或是以Observable的形式返回。
+			tips：如果没有为命令实现降级逻辑或在降级逻辑中抛出异常，Hystrix依然会返回一个Observable对象，但是他不会发送任何结果数据，而是通过onError方法通知命令立即中断请求，并通过onError()方法将引起命令失败
+			的异常发送给调用者。
+	5. 服务监控HystrixDashboard
+		① 概述：除了隔离依赖服务的调用以外，Hystrix还提供了准实时的调用监控（Hystrix Dashboard），Hystrix会持续地记录所有通过Hystrix发起的请求的执行信息，并以统计报表和图形的形式展示给用户，包括每秒执行多少次
+		请求多少成功，多少失败等。Netflix通过hystrix-metrics-event-stream项目实现了对以上指标监控。Spring Cloud也提供了Hystrix Dashboard的整合，对监控内容转换为可视化界面。
+		② 仪表盘9001
+			A. 新建cloud-consumer-hystrix-dashboard9001
+			B. 改POM：主要引入spring-cloud-starter-netflix-hystrix-dashboard依赖
+				 <dependency>
+					<groupId>org.springframework.cloud</groupId>
+					<artifactId>spring-cloud-starter-netflix-hystrix-dashboard</artifactId>
+				</dependency>
+			C. 写YML：
+				server:
+				  port: 9001
+			D. 主启动：HystrixDashboardMain9001+新注解@EnableHystrixDashboard
+				@SpringBootApplication
+				@EnableHystrixDashboard
+				public class HystrixDashboardMain9001 {
+
+					public static void main(String[] args) {
+						SpringApplication.run(HystrixDashboardMain9001.class, args);
+					}
+				}
+			E. 所有Provider微服务提供类（8001/8002）都需要监控依赖配置
+				<dependency>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-starter-web</artifactId>
+				</dependency>
+				<dependency>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-starter-actuator</artifactId>
+				</dependency>
+			F. 启动cloud-consumer-hystrix-dashboard9001该微服务后续将监控微服务8001
+			G. 访问http://localhost:9001/hystrix，进入HystrixDashboard的首页。
+		③ 断路演示（服务监控HystrixDashboard）
+			A. 修改cloud-provider-hystrix-payment8001
+				a. 被监控的微服务提供者都需要引入spring-boot-starter-web和spring-boot-starter-actuator依赖
+				b. 被监控的微服务提供者需要在主启动中加入依赖配置，否则会出现Unable to connect to Command Metric Stream 404的异常
+					(1) 该配置时为了服务监控而配置的，与服务容错本身无关，Spring Cloud升级后的坑，ServletRegistration因为SpringBoot的默认路径不是“/hystrix.stream”，只要早自己的项目中配置以下Servlet即可。
+					(2) 代码：
+						@Bean
+						public ServletRegistrationBean getServlet() {
+							HystrixMetricsStreamServlet streamServlet = new HystrixMetricsStreamServlet();
+							ServletRegistrationBean registrationBean = new ServletRegistrationBean(streamServlet);
+							registrationBean.setLoadOnStartup(1);
+							registrationBean.addUrlMappings("/hystrix.stream");
+							registrationBean.setName("HystrixMetricsStreamServlet");
+							return registrationBean;
+						}
+			B. 监控测试
+				a. 启动一个或者多个Eureka集群均可
+				b. 监控步骤：
+					(1) 在浏览器打开地址：http://localhost:9001/hystrix
+					(2) 监控 cloud-provider-hystrix-payment8001：在监控输入框中输入http://localhost:8001/hystrix.stream，输入Delay为2000ms，Title为T3，
+					(3) 点击 Monitor Stream进入 监控
+				c. 测试地址
+					(1) 正确访问：http://localhost:8001/payment/circuit?name=LiXL
+					(2) 错误访问：http://localhost:8001/payment/circuit
+					(3) 先访问正确地址，再访问错误地址，再访问正确地址，会发现图示的断路会慢慢放开
+				D. 如何看：
+					(1) 七色：分别是：成功、熔断、错误请求、超时、线程池拒绝、失败/异常、错误百分比
+					(2) 一圈：实心圆：两种含义。它通过颜色的变化代表了实例的健康程度，它的健康度从绿色<黄色<橙色<红色递减。实心圆除了颜色的变化之外，它的大小也会根据实例的请求流量发生变化，流量越大该实心圆就越大。
+					所以通过该实心圆的展示，就可以在大量的实例中快速的发现故障实例和高压实例。
+					(3) 一线：用来记录2分钟内流量的相对变化，可以通过它来观察到流量的上升和下降趋势
+					(4) 整图说明：绿色（成功数），蓝色（熔断数），黄色（错误请求数），橙色（超时数），紫色（线程池拒绝数），红色（失败/异常数），灰色（最近10秒错误百分比），Host：0.1/s（服务请求频率），
+					Cluster：0.1/s，Circuit Closed（断路状态）和集群主机状态报告最近百分位延迟统计等
+十一、Zuul路由网关
+
+
+
+
+

@@ -1,0 +1,684 @@
+一、JPA概述
+	1. JPA是什么
+		① Java Persistence API：用于对象持久化的API
+		② Java EE 5.0平台标准的ORM规范，使得应用程序以统一的方式访问持久层
+	2. JPA和Hibernate的关系
+		① JPA是Hibernate的一个抽象（就像JDBC和JDBC驱动的关系）
+			A. JPA是规范：JPA本质上就是一种ORM规范，不是ORM框架--因为JPA并未提供ORM实现，它只是订制了一些规范，
+				提供了一些编程的API接口，但具体实现由ORM厂商提供
+			B. Hibernate是实现：Hibernate除了作为ORM框架之外，它也是一种JPA实现
+		② 从功能上来说，JPA是Hibernate功能的一个子集
+	3. JPA的供应商
+		① JPA的目标之一是订制一个可以由多个供应商实现的API，目前Hibernate 3.2+、TopLink 10.1+以及OpenJPA都提供了JPA的实现
+		② Hibernate
+			A. JPA的始作俑者就是Hibernate的作者
+			B. Hibernate从3.2开始兼容JPA
+		③ OpenJPA：OpenJPA 是Apache组织提供的开源项目
+		④ TopLink：TopLink以前需要收费，如今开源了
+	4. JPA的优势
+		① 标准化：提供相同的API，这保证了基于JPA开发的企业应用能够经过少量的修改就能够在不同的JPA框架下运行
+		② 简单易用，集成方便：JPA的主要目的之一就是提供更加简单的编程模型，在JPA框架下创建实体和创建Java类一样简单，
+		只需要使用javax.perisistence.entity进行注解；JPAde框架和接口也非常简单
+		③ 可媲美JDBC的查询能力：JPA的查询语言是面向对象的，JPA定义了独特的JPQL，而且能够支持批量更新和修改、JOIN、
+		GROUP BY、HAVING等通常只有SQL才能够提供的感激查询特性，甚至还能够支持子查询
+		④ 支持面向对象的高级特性：JPA中能够支持面向对象的高级特性，如类之间的继承、多态和类之间的复杂关系，最大限度
+		的实=使用面向对象的模型
+	5. JPA包括三方面的技术
+		① ORM映射元数据：JPA支持XML和JDK5.0注解两种元数据的形式，元数据描述的对象和表之间的映射关系，框架据此将实体
+		对象持久到数据库表中
+		②JPA的API：用来操作实体对象，执行CRUD操作，框架在后台完成所有的事情，开发者从繁琐的JDBC和SQL代码中解脱出来
+		③ 查询语言（JPQL）：这是持久化操作中很重要的一个方面，通过面向对象而非面向数据库的查询语言查询数据，避免程序和
+		具体的SQL紧密耦合
+二、HelloWorld
+	1. 使用Myeclipse安装JPA插件
+		① 方式一：
+			A. 选择Myeclipse -> help -> Eclipse Marketplace
+			B. 搜索JPA，选择JPA Diagram Editor 1.1.1
+			C. 默认安装
+			D. 重启
+	2. . 使用JPA持久化对象的步骤
+		① 创建JPA工程，选择JPA的版本，完成即可
+		② 加入jar包
+			antlr-2.7.7.jar
+			dom4j-1.6.1.jar
+			hamcrest-core-1.3.jar
+			hibernate-commons-annotations-5.0.5.Final.jar
+			hibernate-core-5.4.9.Final.jar
+			hibernate-entitymanager-5.4.9.Final.jar
+			hibernate-jpa-2.1-api-1.0.2.Final.jar
+			javassist-3.24.1-GA.jar
+			jboss-logging-3.3.3.Final.jar
+			jboss-transaction-api_1.2_spec-1.1.1.Final.jar
+			byte-buddy-1.9.16.jar
+			classmate-1.4.0.jar
+			javax.persistence-api-2.2.jar
+		③ 打开persistence.xml，在这个文件中配置持久化单元
+			A. 需要指定跟哪个数据库进行交互，即Transaction type选择Resource Local
+			B. 需要指定JPA使用哪个持久化的框架以及配置该框架的基本属性，即在JDBC connection properties中输入连接数据库的信息
+			<property name="javax.persistence.jdbc.driver" value="com.mysql.jdbc.Driver"/>
+			<property name="javax.persistence.jdbc.url" value="jdbc:mysql://localhost:3306/test"/>
+			<property name="javax.persistence.jdbc.user" value="root"/>
+			<property name="javax.persistence.jdbc.password" value="2648"/>
+			C. 配置JPA实现产品的基本属性 。配置hibernate的基本属性
+			<property name="hibernate。formate_sql" value="true"/>
+			<property name="hibernate.show_sql" value="true"/>
+			<property name="hibernate.hbm2ddl.auto" value="update"/>
+			D. 配置使用什么ORM产品作为JPA的实现
+				a. 如果JPA项目中只有一个JPA的实现产品，则不需要指定其实现产品也行
+				b. 实际上配置的是javax.persistence.spi.PersistenceProvider接口的实现类
+			E. JPA规范要求在类路径的META-INF目录下放置persistence.xml, 文件的名称是固定的，在persistence.xml中有以下内容
+				a. persistence-unit，name属性用于定义持久化单元的名字，是必选的，主要是用于创建entityManagerFactory时指定persistenceName
+				transaction-type：指定JPA的事务处理策略。RESOURCE_LOCAL默认值，事务级别的事务，只能针对一种数据库，不支持分布式事务。
+				如果需要支持分布式事务，使用JTA：transaction-type="JTA";
+				b. 在persistence.xml显式列出实体类
+				<class>com.li.jpa.entity.Emps</class>
+		② 创建实体类，使用annotation来描述实体类数据库表之间的映射关系
+			A. 在类名上添加的注解
+				a. @Entity: 表示该实体类是一个持久化类
+				b. @Table(name = "emps"): 将持久化类与数据库的表进行对应，name属性指明对应表的名字
+			B. 在属性上添加的注解
+				a. @Column(name = "emp_id"): 将该java属性与数据库表中的属性对应，name属性指明该java属性在数据库表中对应的属性名
+				b. @Id: 表明该属性在数据库中对应的字段为主键
+				c. @GeneratedValue(strategy = GenerationType.AUTO): 指明主键的生成机制，strategy = GenerationType.AUTO指明主键的生成机制是自增
+		③ 使用JPA API完成数据增加、删除、修改和查询操作
+			A. 创建EntityManagerFactory
+				EntityManagerFactory entityManagerFactory = Persistence.createEntityManagerFactory("jpa");
+			B. 创建EntityManager
+				EntityManager entityManager = entityManagerFactory.createEntityManager();
+			C. 开启事务
+				EntityTransaction entityTransaction = entityManager.getTransaction();
+				entityTransaction.begin();
+			D. 进行持久化操作
+				Emps emp = new Emps();
+				emp.setEmpName("Li");
+				emp.setEmail("Li@qq.com");
+				emp.setGender(1);
+				emp.setBirthday(DateTimeUtil.getDate("1996-05-04"));
+			E. 执行保存操作
+				entityManager.persist(emp);
+			F. 提交事务
+				entityTransaction.commit();
+			G. 关闭EntityManager
+				entityManager.close();
+			H. 关闭EntityManagerFactory
+				entityManagerFactory.close();
+三、JPA的基本注解
+	1. 六大基本注解
+		① @Entity：
+			A. 标注用于实体类声明语句之前，指出该java类为实体类，将映射到指定的数据库表。如声明一个
+			实体类Employees，他讲映射到数据库中的employees表上，
+			B. 加上该注解，则@Table注解则可以省略，对应的表名即为该实体类的类名
+		② @Table: 
+			A. 当实体类与其映射的数据库表名不同名时，需要使用@Table标明注解，该标注与@Entity标注并列使用，置于
+			实体类声明的语句之前，可写于单独语句行，也可以与声明语句行同行
+			B. @Table标注的常用选项是name，用于指明数据库的表名
+			C. @Table标注还有两个选项catalog和schema用于设置表所属的数据库名录或者模式，通常为数据库名。
+			uniqueConstrains选项用于设置约束条件，通常不需要设置。
+			D. 举例：
+			@Table(name = "emps")
+			@Entity
+			public class Emps {
+		③ @Id
+			A. @Id注解用于声明一个实体类的属性映射为数据库的主键列。该属性通常置于属性声明语句之前可与声明语句同行，
+			也可以写在单独一行上
+			B. @Id注解也可以置于属性的getter方法之前
+		④ @GeneratedValue
+			A. @GeneratedValue用于标注主键的生成策略，通常strategy属性指定。默认情况下，JPA自动选择一个最合适底层数据库的
+			主键生成策略：SqlServer对应identity，MySQL对应auto_increment。
+			B. 在javax.persistence.GenerationType中定义了以下几种可选择的策略
+				a. IDENTITY：采用数据库ID自增长的方式来自增主键字段，Oracle不支持这种方式
+				b. AUTO：JPA自动选择合适的策略，是默认选项
+				c. SEQUENCE：通过序列产生主键，通过@SequenceGenerator注解指定序列名，MySQL不支持这种方式
+				d. TABLE：通过表产生主键，框架借由表模拟序列产生主键，使用该策略可以使应用更易于数据库移植
+		⑤ @Basic
+			A. @Basic表示一个简单的属性到数据库表的字段映射，对于没有任何标注的getXxx()方法，默认即为@Basic
+			B. fetch：表示该属性的读取策略，有EAGER和LAZY两种，分别表示主支抓取和延迟加载，默认为ENGER
+			C. optional：表示该属性是否允许为null，默认为true
+		⑥ @Column
+			A. 当实体类属性与其映射的数据库表的列不同名需要使用
+			B. @Column标注说明，该属性通常置于实体类的属性声明语句之前，还可与@Id注解一起使用
+			C. @Column注解的常用属性为name，用于设置映射数据库表的列名。此外，该注解还包含其他多个属性，如：unique、nullable和length等
+			D. @Column注解的columnDefinition属性：表示该字段在数据库中的实际类型，通常ORM框架可以根据属性类型自动判断数据库中字段的类型，但是
+			对于Date类型仍然无法确定数据库只能怪字段类型究竟是DATE、TIME还是TIMESTAPT，此外，String的默认映射类型为VARCHAR，如果要将String
+			映射成特定数据库的BLOD或TEXT字段类型
+			E. @Column注解也可以置于属性的getter方法之前
+	2. 其他注解
+		① @Transient
+			A. 表示该属性并非一个到数据库表字段的映射，ORM框架将忽略该属性
+			B. 如果一个属性并非数据库表的字段映射，就务必将其标识为@Transient，否则，ORM框架默认其注解为@Basic
+		② @Temporal
+			A. 在核心的Java API中并没有定义Date类型的精度（temporal precision），而在数据库中，表示Date类型的数据有DATE、TIME和TIMESTAMP三种精度
+			（即单纯的日期，时间或者两者兼备）在进行属性映射时可使用@Temporal注解来调整精度
+	3. 用table来生成主键详情
+		① 将当前主键的值单独保存到一个数据库的表中，主键的值每次都是从指定的表中查询来获得
+		② 这种方法生成主键的策略可以适应于任何数据库，不必担心不同数据库不兼容造成的问题
+		③ 解析使用table生成主键的注解
+			A. @TableGenerator
+				a. name属性表示该主键生成策略的名称，它被引用在@GeneratedValue中设置的generator值中
+				b. table属性表示主键生成策略的表名
+				c. pkColumnName属性表示在持久化表中，该主键生成策略所对应的键值的名称
+				d. pkColumnValue属性的值表示在持久化表中，该生成策略所对应的主键
+				e. valueColumnName属性的值表示在持久化表中，该主键当前所生成的值，它的值将会随着每次创建累加
+				f. allocationSize表示每次主键值增加的大小，默认为50
+			B. @GeneratedValue
+				a. strategy属性指定为GenerationType.TABLE，通过表产生主键，框架借由表模拟序列产生主键
+				b. generator属性则是用来引用@TableGenerator注解，以获取主键生成策略
+
+		④ 举例：
+		@TableGenerator(name = "ID_GENERATOR", table = "id_generator", pkColumnName = "pk_name", 
+			pkColumnValue = "emp_id", valueColumnName = "pk_value", allocationSize = 100)
+		@GeneratedValue(strategy = GenerationType.TABLE, generator = "ID_GENERATOR")
+四、JPA API 相关接口/类：
+	1. Persistence
+		① Persistence类是用于获取EntityManagerFactory实例。该类包含一个名为createEntityManagerFactory的
+		静态方法
+		② createEntityManagerFactory 方法有如下两个重载版本。
+			A. 带有一个参数的方法以JPA配置文件persistence.xml中的持久化单元为参数
+			B. 带有两个参数的方法：前一个参数含义相同，后一个参数Map类型，用于设置JPA的相关属性，这时将
+			忽略其他地方设置的属性，Map对象的属性名必须是JPA实现库提供商的名字空间约定的属性名
+			C. 举例：
+			Map<String, Object> persistences = new HashMap<String, Object>();
+			persistences.put("hibernate.format_sql", false);
+			EntityManagerFactory entityManagerFactory = 
+					//Persistence.createEntityManagerFactory("jpa");
+					Persistence.createEntityManagerFactory("jpa", persistences);
+	2. EntityManagerFactory
+		① EntityManagerFactory接口主要用来创建EntityManager。该接口约定了如下四个方法
+			A. createEntityManager()：用于创建实体类管理器对象实例
+			B. createEntityManager(Map map)：用于创建实体类管理器对象实体类的重载方法，Map参数用于提供EntityManagerFactory的属性
+			C. isOpen()：检查EntityManagerFactory是否处于开启状态，实体类管理器工厂创建后一直处于打开状态，除非调用close()方法将其关闭
+			D. close()：关闭EntityManagerFactory，EntityManagerFactory关闭后将释放所有资源，isOpen()方法测试将返回false，其他方法将
+			不能调用，否则将导致IllegalStateException异常。
+	3. EntityManager
+		① 在JPA规范中，EntityManager是完成持久化操作的核心对象。实体作为普通的java对象，只有在调用EntityManager将其持久化之后才会变成
+		持久化对象。EntityManager对象在一组实体类与底层数据源之间O/R映射的管理，它可以用来管理和更新Entity Bean，根据主键值查找Entity Bean
+		还可以通过JPQL语句查询实体
+		② 实体的状态：
+			A. 新建状态：新创建的对象，尚未拥有持久性主键
+			B. 持久化状态：已经拥有持久性主键和持久化建立了上下文环境
+			C. 游离状态：拥有持久化主键，但是没有与持久化建立上下文环境
+			D. 删除状态：拥有持久化主键，已经和持久化建立上下文环境，但是从数据库中删除。
+		③ EntityManager相关API
+			A. find(Class<T> entityClass, Object primaryKey)
+				a. 返回指定的OID对应的实体类对象，如果这个实体存在于当前持久化环境，则返回一个被缓存的对象；
+				否则返回一个新的Entity，并加载数据库中相关信息；若OID不存在与数据库中，则返回一个null。
+				b. 参数：第一个参数为被查询的实体类类型；第二个参数为待查询实体的主键值
+				c. 该方法类似于hibernate中session 的get方法
+				d. Emps emp = entityManager.find(Emps.class, 7);
+			B. getReference(Class<T> entityClass, Object primaryKey)
+				a. 与find()方法类似，不同的是：如果缓存中不存在指定的Entity，EntityManager会创建一个Entity的代理，但是不会立即加载数据库中
+				的信息，只有第一次真正用到Entity的属性时才会加载，所以如果此OID在数据库不存在，getReference()不会返回null值，而是抛出
+				EntityNotFoundException
+				b. 如果调用getReference方法后得到的entity并没有真正使用其属性则提交事务与关闭EntityManager，之后再使用得到的entity 属性会出现
+				懒加载异常LazyInitializationException
+				c. 该方法的参数与find()一样
+				d. 该方法类似于hibernate中session的 load()方法
+				e. Emps emp = entityManager.getReference(Emps.class, 7);
+			C. persist(Object entity)
+				a. 用于将新创建的entity纳入到EntityManager的管理。该方法执行后，传入persist()方法的entity对象转化成持久化状态
+				b. 如果persist()方法的entity对象已经处于持久状态，则persist()方法什么都不做
+				c. 如果对删除状态的entity进行persist()操作，会转化为持久化状态
+				d. 如果对游离状态的实体类执行persist()操作，可能会在persist()方法抛出EntityExistException（也有可能是在flush或者事务提交后抛出）
+				e. 该方法类似于hibernate中session的 save()方法，但是在hibernate中保存一个游离对象，则不会报错
+				f. entityManager.persist(emp);
+			D. remove(Object entity)
+				a. 删除实例：如果实例是被管理的，即与数据库实体记录关联，则同时会删除关联的数据库记录
+				b. 注意，JPA中，remove只能删除持久化状态的entity，而不能删除游离状态的entity，即调用remove()方法时传入的entity，必须是由find或者
+				getReference()获取到的对象，否则将抛出IllegalArgumentException异常
+				c. 该方法类似于hibernate中session的 delete()方法，但是在hibernate中可以删除游离状态的对象
+				d. Emps emp = entityManager.getReference(Emps.class, 10);
+				entityManager.remove(emp);
+			E. merge(T entity)
+				a. merge()用于处理Entity同步。即数据库的插入和更新操作
+				b. 总的来说。类似于Hibernate的saveOrUpdate()
+					(1) 若传入的是一个临时对象，会创建一个新的对象，把临时对象的属性赋值到新的对象中，然后对新的对象执行持久化操作，
+					所以新的对象中有主键值，而以前的临时对象中没有主键值
+					(2) 若传入的是一个游离对象，即传入的对象存在OID，若在EntityManager缓存中没有该对象并且在数据库中没有对应的记录，
+					JPA会创建会创建一个新的对象，把游离对象的属性赋值到新的对象中，然后对新的对象执行持久化操作；
+					(3) 若在EntityManager缓存中没有该对象但是在数据库中有对应的记录，JPA会查询对应的记录，并返回该记录对应的对象，
+					然后会把游离对象的属性赋值查询到的对象中，然后对查询得到的对象执行UPDATE；
+					(4) 若在EntityManager缓存中有对应的对象，JPA会把游离对象的属性赋值到EntityManager缓存中
+					对象，然后对EntityManager缓存中的对象执行UPDATE操作，但是在hibernate中，不允许该情况发生，因为hibernate不允许两个拥有相同OID的对象进行关联
+		④ EntityManager其他API	
+			A. flush()：
+				a. 同步持久上下文环境，即将持久上下文环境的所有未保存视图的状态信息保存到数据库中
+				b. 同hibernate中session的flush()
+			B. setFlushMode(FlushModeType flushMode)：设置持久上下文环境的Flush模式，参数可以取2个枚举
+				a. FlushModeType.AUTO：为自动更新数据库实体
+				b. FlushModeType.COMMIT：为直接提交事务时才更新数据库记录
+			C. getFlushMode()：获取持久上下文环境的Flush模式。返回FlushModeType类的枚举值
+			D. refresh(Object entity)：用数据库实体记录的值更新实体对象的状态，即更新实例的属性值，该方法同hibernate的refresh()
+			E. clear()：清除持久化上下文环境，断开所有关联的实体。如果这时还有未提交的更新则会被撤销
+			F. contains(Object entity)：判断一个实例是否属于当前持久化上下文环境管理的实体。
+			G. isOpen()：判断当前的实体管理器是否是打开状态
+			H. getTransaction：返回资源层的事务对象。EntityTransaction实例可以用于开始和提交事务。
+			I. close()：关闭实体管理器。之后若调用实体管理器实例的方法或者其派生的查询对象的方法都将抛出IllegalStateException异常，除了getTransaction
+			和isOpen方法（返回false）。不过，当与实体类管理器关联的事务处于活动状态时，调用close方法后持久上下文将仍处于被管理状态，直到事务完成。
+			J. createQuery(String qlString)：创建一个查询对象。
+			K. createNamedQuery(String name)：根据命名的查询语句块创建查询对象。参数为命名的查询语句
+			L. createNativeQuery(String sqlString)：使用标准SQL语句创建查询对象，参数为标准SQL语句字符串
+			M. createNativeQuery(String sqlString, String resultSetMapping)：使用标准SQL语句创建查询对象，并指定返回结果集Map的名称
+	4. EntityTransaction
+		① EntityTransaction接口用来管理资源层实体管理器的事务操作。通过调用实体管理器的getTransaction获取其实例
+		② begin()：用于启动一个事务，此后的多个数据库操作将作为整体被提交或者撤销。若这时事务已经启动则会抛出一个IllegalStateException异常
+		③ commit()：用于提交当前事务，即将事务启动以后的所有数据库更新操作持久化值数据库中
+		④ rollback()：撤销（回滚）当前事务，即撤销事务启动以后的所有数据库更新操作，从而不对数据库产生影响
+		⑤ setRollbackOnly()：使当前事务只能被撤销。
+		⑥ getRollbackOnly()：查询当前事务是否设置了只能被撤销的标志
+五、映射关联关系
+	1. 映射单向多对一的关联关系
+		① 单向多对一的关联关系，在关系为n的entity中，对关联的对象的getter属性上使用@ManyToOne来映射多对一的关联关系
+		使用@JoinColumn来映射外键，其name属性指定对应的外键列，举例：
+		@JoinColumn(name = "dep_id")
+		@ManyToOne(fetch = FetchType.LAZY)
+		public Deps getDeps() {
+			return deps;
+		}
+		② 保存多对一时，建议先保存1的一端，后保存n的一端，反之，则会多出额外的UPDATE语句，这是因为1的一端不存在时，会先把n的一端外键的值设为null，
+		1的一端插入时，再把n的一端的外键设置为具体的值。举例：
+		Deps dep = new Deps();
+		dep.setDepName("IT");
+		for (int i = 0; i < 2; i++) {
+			Emps emp = new Emps();
+			emp.setEmpName("Li" + (i + 1));
+			emp.setEmail("Li" + (i + 1) + "@qq.com");
+			emp.setGender(1);
+			emp.setBirthday(DateTimeUtil.getDate("1996-05-04"));
+			emp.setCreateDate(new Date());
+			emp.setDeps(dep);
+			entityManager.persist(emp);
+		}
+		entityManager.persist(dep);
+		③ 查询时，默认情况下，使用左外连接的方式获取n的一端和其关联的1的一端的对象，可使用@ManyToOne的fetch属性来修改默认的关联属性加载策略。举例
+		@ManyToOne(fetch = FetchType.LAZY)
+		④ 删除时，不能删除1的一端，因为有外键约束
+		//Emps emp1 = entityManager.find(Emps.class, 26);
+		Emps emp2 = entityManager.find(Emps.class, 27);
+		Deps dep = entityManager.find(Deps.class, 28);
+		//entityManager.remove(emp1);
+		entityManager.remove(emp2);
+		entityManager.remove(dep);
+		⑤ 修改时，支持修改级联属性，从而发送update语句对关联的属性进行更新
+		Emps emp = entityManager.find(Emps.class, 27);
+		emp.getDeps().setDepName("admin");
+	2. 映射单向一对多的关联关系
+		① 单向一对多的关联关系中，在关系为1的entity中，对关联的对象的getter属性上使用@OneToMany来映射1对多的关联关系
+		使用@JoinColumn来映射外键，其name属性指向对应的外键列
+		@OneToMany(fetch = FetchType.EAGER, cascade={CascadeType.REMOVE})
+		@JoinColumn(name = "dep_id")
+		② 执行保存操作时，一定会多出update语句，因为多的一端插入时，不会同时插入外键列，所以会多出update，也是因为多的
+		一端不维护关联关系，因此插入时，不会插入外键列的时。
+		③ 执行查询操作时，默认对关联多一方的使用懒加载的加载策略，同样可以使用@OneToMany的fetch属性来修改默认的加载策略
+		为左外连接。举例：
+		@OneToMany(fetch = FetchType.EAGER, cascade={CascadeType.REMOVE})
+		④ 执行删除操作时，默认情况下，若删除1的一端时，则会先把关联为n的一端的外键值置空，然后对1的一端执行删除操作，
+		可以通过修改@OneToMany的cascade属性来修改默认的删除策略，即删除1的一端，同时把其关联的多的一端的数据给删除了，举例：
+		@OneToMany(fetch = FetchType.EAGER, cascade={CascadeType.REMOVE})
+		⑤ 执行修改操作时，可以修改通过1端关联多的一端的属性，自动执行修改操作。举例：
+		Deps dep = entityManager.find(Deps.class, 34);
+		dep.getEmps().iterator().next().setEmpName("LiXL");
+	3. 映射双向一对多的关联关系（映射双向多对一的关联关系）
+		① 映射双向多对一的关联关系，需要在一的一端使用@OneToMany注解，在多的一端使用@ManyToOne注解。
+		其@JoinColumn外键属性都是指向1的一方的主键
+		② 执行保存操作时，
+			A. 若是先保存多的一端时，再保存1 的一端，默认情况下，会多出2n条update语句。因为首先先插入n的一方，此时
+			关联的外键的列值为null，当插入1的一端时，n的一端会维护关联关系，因此需要发送n条update语句，将外键列设置为新插入的1
+			的一端。由于1的一端也需要维护关联关系，因此也需要再发送n条查询语句
+			B. 若先保存1的一端，则会多出n条update语句，因为先插入1的一端，再插入
+			n的一端，n的那端插入时，外键列已经存在，因此不需要再维护关联关系。
+			C. 建议在双向多对一的关联关系中，先保存1的一端，再保存n的一端，同时，使用n的一端来维护关联关系，而1的一端不维护关联关系，
+			这样会有效的减少SQL语句。
+			D. 注意：
+				① 放弃在1的一端维护关联关系，即在1的一端的@的OneToMany中使用mappedBy 属性，该属性值是n的一端对1的一端的引用的属性名
+				② 若1的一端已经放弃了维护关联关系，则1的一端就不能再使用@JoinColumn注解。
+				③ 举例：
+				@OneToMany(fetch = FetchType.EAGER, cascade={CascadeType.REMOVE}, mappedBy = "deps")
+	4. 映射双向一对一的关联关系
+		① 使用@OneToOne来映射一对一关联关系，若需要在当前数据表中添加主键，则需要使用@JoinColumn来进行映射，并使用unique属性为true来指定
+		一对一关联关系。举例：
+		@OneToOne
+		@JoinColumn(name = "manager_id", unique = true)
+		② 在没有外键的表中选择不需要维护关联关系，因此需要添加mapped属性，该属性的属性值指定为关联当前对象的对当前对象进行引用的属性名。同时
+		不能添加@JoinColumn注解声明其映射的属性名
+		@OneToOne(mappedBy = "manager")
+		③ 执行保存操作时：建议先保存不维护关联关系的一方，即没有外键的一方，这样就不会多出来UPDATE语句，若先保存维护关联关系的一方，则会多出
+		update语句。
+		④ 执行查询操作时:
+			A. 若获取维护关联关系的一方，则默认是使用左外连接的加载策略获取不维护关联关系的属性，可以在维护关联关系中的@OneToOne中设置fetch属性
+			来修改加载策略指定其属性值为FetchType.LAZY即可
+			B. 若获取不维护关联关系的一方，默认情况下也会通过左外连接获取其关联的对象。可以通过设置不维护关联关系的@OneToOne中设置fetch属性来修改加载策略，
+			来修改加载策略指定其属性值为FetchType.LAZY即可，但依然会再发送发生SQL语句来初始化其关联悬系的对象。说明在不维护关联关系的一方，不建议修改fetch属性
+			C. 这是因为，在维护关联关系的一方，由于存在外键关系，因此可以通过外键的值判断其外键的对象是否存在，从而将关联对象设置代理对象或者置为空。
+			在不维护关联关系的一方，由于没有外键值，因此无法判断其关联的属性是否存在，因此无法建立代理对象，从而需要再次发送SQL语句
+	5. 映射双向多对多的关联关系
+		① 使用@ManyToMany注解表示双向多对多的关联关系
+		① 在双向多对多的关联关系中，我们必须制定一个关系维护端（owner side），可以通过@ManyToMany注解中指定mappedBy属性在表示其为关系维护端，mappedBy指向的是
+		维护端对放弃维护端的引用对象。
+		③ 使用@JoinTable来映射中间表
+			A. name：指向中间表的表名
+			B. joinColumns：映射当前类所在的表在中间表中的外键
+				a. name：指向外键列的列名，即中间表中关联当前类所在的表中外键列的列名
+				b. referenceedColumnNames：指定外键列关联当前表的哪一列
+			C. inverseJoinColumns：映射关联的类所在的表在中间表的外键
+			
+		④ 举例：
+			@JoinTable(name = "item_category", 
+				joinColumns = {@JoinColumn(name = "item_id", referencedColumnName = "id")}, 
+				inverseJoinColumns = {@JoinColumn(name = "category_id", referencedColumnName = "id")})
+			@ManyToMany
+			public Set<Category> getCategories() {
+				return categories;
+			}
+			
+			@ManyToMany(mappedBy = "categories")
+			public Set<Item> getItems() {
+				return items;
+			}
+			
+		⑤ 执行保存操作：
+			Item item1 = new Item();
+			item1.setItemName("i-1");
+			
+			Item item2 = new Item();
+			item2.setItemName("i-2");
+			
+			Category category1 = new Category();
+			category1.setCategoryName("c-1");
+			
+			Category category2 = new Category();
+			category2.setCategoryName("c-2");
+			
+			// 设置关联关系
+			item1.getCategories().add(category1);
+			item1.getCategories().add(category2);
+			
+			item2.getCategories().add(category1);
+			item2.getCategories().add(category2);
+			
+			category1.getItems().add(item1);
+			category1.getItems().add(item2);
+			
+			category2.getItems().add(item1);
+			category2.getItems().add(item2);
+			
+			// 执行保存
+			
+			entityManager.persist(item1);
+			entityManager.persist(item2);
+			
+			entityManager.persist(category1);
+			entityManager.persist(category2);
+		⑥ 执行查询操作：对于关联的集合对象，默认使用懒加载的策，使用维护关联关系的一方获取或者使用
+		不关联关系的一方或者发送的SQL一样，因为双向多对多的关联关系的地位是平等的。
+六、使用二级缓存
+	1. entityManager默认使用一级缓存，当事务提交，entityManager关闭时，一级缓存失效
+	2. 使用二级缓存，
+		① 引入jar包
+			A. ehcache-core-2.6.11.jar
+			B. hibernate-ehcache-5.4.10.Final.jar
+			C. slf4j-api-1.7.30.jar
+		② 加入ehcache.xml
+		② 配置二级缓存相关
+			A. 启用二级缓存
+				<property name="hibernate.cache.user_second_level_cache" value="true"/>
+			B. 配置二级缓存的产品			
+				<property name="hibernate.cache.region.factory_class" value="org.hibernate.cache.ehcache.EhCacheRegionFactory"/>
+			C. 配置查询缓存
+				<property name="hibernate.cache.use_query_cache" value="true"/>
+		④ 使用二级缓存，并配置二级缓存的策略
+			A. <shared-cache-mode>ENABLE_SELECTIVE</shared-cache-mode>
+			B. <shared-cache-mode>节点：若JPA实现支持二级缓存，该节点可以配置在当前的持久化单元中是否启用二级缓存，
+			可配置如下值：
+				a. ALl：所有实体类都被缓存
+				b. NONE：所有实体类都不被缓存
+				c. ENABLE_SELECTIVE：标识了@Cacheable(true)注解的实体类将被缓存
+				d. DISABLE_SELECTIVE：缓存除了标识@Cacheable(false)以外的所有实体类
+				e. UNSPECIFIED：默认值，JPA产品的默认值将被使用
+		⑤ 若二级缓存的策略使用的是ENABLE_SELECTIVE，则需要被缓存的实体类需要添加@Cacheable(true)注解
+七、JPQL
+	1. HelloWorld
+		① JPQL语言：
+			A. JPQL语言，即Java Persistence Query Language的简称，JPQL 是一种和SQL非常类似的中间性和对象化查询语言，
+			它最终会被翻译成针对不同底层数据库的SQL查询，从而屏蔽不同数据库的差异
+			B. JPQL 语言的语句可以是select 语句、update语句或者delete语句，他们都是通过Query接口执行封装的
+		② javax.persistence.Query
+			A. Query 接口封装了执行数据库查询的相关方法。调用EntityManager的createQuery、createNamedQuery以及createNativeQuery方法
+			可以获取查询对象，进而可调用Query接口的相关方法来执行查询操作。
+				a. entityManager.createQuery()
+					String jpql = "from Emps e where e.empId = ?1";
+					Query query = entityManager.createQuery(jpql);
+					query.setParameter(1, 60);
+					
+					List<Emps> emps = query.getResultList();
+					System.out.println(emps);
+				b. entityManager.createNamedQuery()
+					(1) 可以在实体类上声明@NamedQuery创建JPQL，通过entityManager.createNamedQuery进行调用
+					(2) 举例
+						@NamedQuery(name = "testNamedQuery", query = "select e from Emps e where e.empId = ?1")
+						@Table(name = "emps")
+						@Entity
+						public class Emps
+				
+						Query query = entityManager.createNamedQuery("testNamedQuery").setParameter(1, 60);
+				C. entityManager.createNativeQuery()：
+					(1) 创建本地的SQL，即标准的SQL语句
+					(2) 举例：
+						String sql = "select emp_name, email from emps where emp_id = ?1";
+						Query query = entityManager.createNativeQuery(sql).setParameter(1, 60);
+						Object object = query.getSingleResult();
+			B. Query接口的主要方法
+				a. int executeUpdate()：用于执行update或者delete语句
+				b. List getResultList()：用于执行select语句并返回结果集实体类列表
+				c. Object getSingleResult()：用于执行只返回单个结果实体类的select语句
+				d. Query setFirstResult(int startPosition)：用于设置从哪个实体类开始返回查询结果。
+				e. Query setMaxResult(int maxResult)：用于设置返回结果实体的最大数。与setFirstResult结合使用可实现分页查询
+				f. Query setFirstMode(FlushModeType flushModeType)：设置查询对象的Flush模式，参数可以取两个枚举值，FlushModeType.AUTO为自动更新数据库记录，
+				flushModeType.COMMIT为直到提交事务时才更新数据库记录
+				g. setHint(String hintName, Object value)：设置与查询对象相关的特定供应商参数或者提示信息。参数名及其取值需要参考特定JPA实现库提供商的文档。
+				如果第二个参数无效将抛出来IllegalArguException异常。
+				h. setParamter(int position, Object value)：为查询语句指定位置参数赋值，Position指定参数序号，value为赋值给参数的值
+				i. setParamter(int position, Date d, TemporalType, type)：为查询语句的指定位置参数赋Date值。Position指定参数序号，value为赋值给参数的值，
+				temporalType取TemporalType的枚举值常量，包括DATE、TIME及TIMPSTAMP三个，用于将java的Date型值临时转换为数据库支持的日期时间类型（java.sql.Date, 
+				java.sql.Time及java.sql.Timestamp）。
+				j. setParamter(int position, Calendar c, TemporalType type)：为查询语句指定位置参数赋Calendar值，position指定参数序号，value为赋值给参数的值， 
+				temporalType的含义及取舍同前。
+				k. setParamter(String name, Object value)：为查询语句指定名称参数赋值。
+				l. setParamter(String name, Date date, TemporalType type)：为查询语句的指定名称参数赋Date值。用法同前
+				m. setParamter(String name, Calendar c, TemporalType type)：为查询语句的指定名称参数赋Calendar值。name为参数名，其它同前。该方法调用时如果参数位置
+				或参数名不正确，或者所赋的参数值类型不匹配，将抛出IllegalArgumentException异常。
+		③ select语句
+			A. select语句用于执行查询，其语法可以表示为：
+			select_clause from_clause [where_clause] [groupby_clause] [having_clause] [orderby_clause]
+			B. select - from 子句：
+				a. from子句是查询语句的必选子句
+					(1) select 用来指定查询返回的结果实体类或实体类的某些属性
+					(2) from 子句声明查询源实体类，并指定标识符变量（相当于SQL表的别名）
+				b. 如果不希望返回重复实体，可使用关键字 distinct修饰。select、from 都是JPQL的关键字，通常全大写或者小写，建议不要大小写混写。
+			C. 查询所有实体：
+				a. 查询所有实体的JPQL查询语句很简单，例如：
+				select o from Order o 或者 select o from Order as o
+				b. 关键字as可以省去
+				c. 标识符变量的命名规范与Java标识符相同，且区分大小写。
+				d. 调用EntityManager的createQuery()方可以创造查询对象，接着调用Query接口的getResultList()方法就可以获取查询结果集。例如：
+					Query query = entityManager.createQuery("select o from Order o");
+					List orders = query.getResultList();
+					Iterator iterator = Orders.iterator();
+					while(iterator.hasNext) {
+						// 处理Order
+					}
+			D. where 子句
+				a. where子句用于指定查询条件，where跟条件表达式，例如
+					select o from Order o where  id = 1
+				b. JPQL 也支持包含参数的查询，例如：
+					select o from  Order o where id = :id
+				c. 注意：参数名前必须冠以冒号（:），执行查询前必须使用Query.setParameter(name, value)方法给参数赋值，并且占位符的起始索引是从1开始
+				d. 也可以不使用参数名而使用参数的序号，例如：
+					(1) select o from Order o where o.id = ?1 and o.customer = ?2
+					(2) 其中?1代表第一个参数，?2 代表第二个参数。在执行查询之前，需要使用重载Query.setParameter(pos, value)提供参数
+					Query query = entityManager.createQuery("select o from Order o where o.id = ?1 and o.customer = ?2");
+					query.setParameter(1, 2);
+					query.setParameter(2, "John");
+					List orders = query.getResultList();
+				e. where 条件表达式中可用运算符基本上与SQL一直，包括：
+					(1) 算数运算符：+ - * / +（正）-（负）
+					(2) 关系运算符：== <> > < >= <=  between... and like in is null等。
+					逻辑运算符：and or not 
+			E. 查询部分属性
+				a. 如果只须查询实体的部分属性而不需要返回整个实体。例如：select o.id, o.customerName, o.address.streeNumber from Order o 
+				order by o.id
+				b. 执行该查询返回的不再是Order实体集合，而是一个对象数组的集合（Object[]），集合每个成员为一个对象数组，可通过数组元素范文各个属性
+				c. 也可以在实体类中创建对应的构造器，然后在JPQL语句中利用对应的构造器返回实体类的对象
+					String jpql = "select new Emps(e.empName, e.email) from Emps e where e.empId = ?1";
+					Query query = entityManager.createQuery(jpql);
+					query.setParameter(1, 60);
+					List result = query.getResultList();			
+	2. 使用Hibernate的查询缓存 
+		① 使用Hibernate的查询缓存的前提是在persistence.xml配置文件中配置了Hibernate的缓存机制
+		② 每次获取Query接口的对象时，调用query的setHint(String arg0, Object arg1)，即可
+		③ 举例：
+			String jpql = "from Emps e where e.empId = ?1";
+			Query query = entityManager.createQuery(jpql).setHint(QueryHints.HINT_CACHEABLE, true);
+			query.setParameter(1, 60);
+			
+			List<Emps> emps = query.getResultList();
+			System.out.println(emps.size());
+			
+			query = entityManager.createQuery(jpql).setHint(QueryHints.HINT_CACHEABLE, true);
+			query.setParameter(1, 60);
+			
+			emps = query.getResultList();
+	3. ORDER BY 和 GROUP BY
+		① ORDER BY子句
+			A. order by子句用于对查询结果集进行排序。和SQL的用法类似。可以用“asc” 和 “desc”指定
+			查询的升降序。如果不显示注明，默认为升序。
+			B. 举例
+				String jpql = "from Emps e where e.empId = ?1 order by e.createDate desc";
+				Query query = entityManager.createQuery(jpql);
+				query.setParameter(1, 60);
+				List<Emps> emps = query.getResultList();
+		② GROUP BY 子句和聚合查询
+			A. group by子句用于对查询结果分组统计，通常需要使用聚合函数。常用的聚合函数主要有
+			AVG、SUM、COUNT、MAX、MIN等，他们的含义与SQL相同。例如 select max(e.empId) from Emps e
+			B. 没有group by子句的查询时基于整个实体类的，使用聚合函数将返回单个结果值，可以使用
+			Query.getSingleResult()得到查询结果。例如：
+				Query query = entityManager.createQuery("select max(e.empId) from Emps e");
+				Object result = query.getSingleResult();
+				Long max = (Long)result;
+			C. 举例：
+				String jpql = "select e.deps from Emps e group by e.deps having count(e.empId) >= 1";
+				Query query = entityManager.createQuery(jpql);
+				 
+				List<Deps> deps = query.getResultList();
+				System.out.println(deps.size());
+	4. 关联查询
+		① 在JPQL中，很多时候都是通过在实体类中配置实体关联的类属性来实现隐含的关联查询（join）。例如：
+		select e from Emps e where e.deps.depId = 26;，该JPQL语句编译成以下SQL时就会自动包含关联，默认为左连接
+		② 在某些情况下可能仍然为需要对关联做到精确的控制。为此，JPQL也支持和SQL中类似的关联语法。如：
+			A. left out join / left join 
+			B. inner join
+			C. left join fetch / inner join fetch
+			D. 其中，left join 和 left out join 等，都是允许符合条件的右边表达式中的实体类为空
+		③ 建议：做关联查询时建议将fetch加上，即left outer join fetch / inner join fetch，此时关联查询得到的将是一个对象
+		并且集合已经初始化成功，如果不加上fetch得到的是一组object数组组成的list。
+	5. 子查询和JPQL函数
+		① 子查询：
+			A. JPQL也支持子查询，咋where 或者 having 字句中可以包含另一个查询，当子查询返回多于一个结果集时，他常会出
+			现在any 、all 、 exists表达式中用于集合匹配查询。他们的用法与SQL语句基本相同
+			B. 举例：
+			String jpql = "select d from Deps d where d.emps in "
+				+ "(select e from Emps e where e.empName like ?1)";
+			Query query = entityManager.createQuery(jpql).setParameter(1, "%li%");
+			List<Deps> deps = query.getResultList();
+		② JPQL函数：
+			A. JPQL提供了一下一些内建函数，包括字符串处理函数，算术函数和日期函数
+			B. 字符串处理函数主要有
+				a. concat(String s1, String s2)：字符串合并/连接函数
+				b. substring(String s, int start, int length)：取子串函数
+				c. trim([leading|trailing|both], [char c], String s)：从字符串中去除首/尾指定的字符或者空格
+				d. lower(String s)：将字符串转换为小写形式。
+				e. upper(String s)：将字符串转换为大写形式
+				f. length(String s)：求字符串的长度
+				g. locate(String s, String s2[, int start])：从第一个字符串中查找第二个字符串（子串）出现的位置，若未找到则返回0.
+			C. 算术函数主要有：abs、mod、sqrt、size等。size用于求集合的元素个数。
+			D. 日期函数主要有三个，即current_date、current_tme和current_timestamp，他们不需要参数，返回服务器上的当前日期、时间和时间戳。
+			E. 举例：
+				String jpql = "select upper(e.empName) from Emps e where e.empId = ?1";
+				Query query = entityManager.createQuery(jpql).setParameter(1, 60);
+				String empName = (String) query.getSingleResult();
+	6. UPDATE 和 DELETE
+		① UPDATE语句：
+			A. update语句用于执行数据库更新操作。主要用于针对单个实体类的批量更新
+			B. 举例：
+				String jpql = "update Emps e set e.createDate = current_timestamp() where e.empId = ?1";
+				Query query = entityManager.createQuery(jpql).setParameter(1, 60);
+				query.executeUpdate();
+		② DELETE语句：
+			A. delete语句用于执行数据更新操作
+八、Spring 整合 JPA
+	1. 三种整合方式
+		① LocalEntityManagerFactoryBean：适用于那些仅使用JPA进行数据访问的项目，该Factory将根据JPA
+		PersistenceProvider自动检测配置文件进行工作，一般从“META-INF/persistence.xml”读取配置信息，
+		这种方式很简单，但不能设置Spring 中定义的DataSource，且不支持Spring管理全局的事务
+		② 从JNDI中获取：用于从JavaEE服务器获取指定的EntityManagerFactory，这种方式在进行Spring事务
+		管理时一般要使用JTA事务管理
+		③ LocalContainEntityManagerFactoryBean：适用于所有环境的FactoryBean，能全面控制
+		EntityManagerFactory配置，如指定Spring定义的DataSource
+	2. 采用LocalContainEntityManagerFactoryBean方式，整合步骤
+		① 引入jar包
+			A. 引入JPA的jar包
+			B. 引入hibernate的jar包
+			C. 引入spring和springMvc的jar包
+			D. 引入Spring整合JPA的jar包
+				a. spring-orm-4.3.22.RELEASE.jar
+				b. 该jar包需要运行在JDK1.8版本下
+			E. 引入MySQL数据库驱动和数据源的jar包
+		② 在spring的applicationContext容器下配置EntityManagerFactory
+			A. 定义数据库连接信息
+				jdbc.driverClass=com.mysql.jdbc.Driver
+				jdbc.jdbcUrl=jdbc:mysql://localhost:3306/jpa
+				jdbc.user=root
+				jdbc.password=2648
+			B. 引入外部文件
+				<context:property-placeholder location="classpath:jdbc.properties"/>
+			C. 配置数据源
+				<bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+					<property name="user" value="${jdbc.user}"></property>
+					<property name="password" value="${jdbc.password}"></property>
+					<property name="driverClass" value="${jdbc.driverClass}"></property>
+					<property name="jdbcUrl" value="${jdbc.jdbcUrl}"></property>
+				</bean>
+			D. 配置自动扫描的包
+				<context:component-scan base-package="com.li.springJpa">
+					<context:exclude-filter type="annotation" 
+						expression="org.springframework.stereotype.Controller"/>
+					<context:exclude-filter type="annotation" 
+						expression="org.springframework.web.bind.annotation.ControllerAdvice"/>
+				</context:component-scan>
+			E. 配置EntityManagerFactory
+				<bean id="entityManagerFactory"
+					class="org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean">
+					<!-- 配置数据源 -->
+					<property name="dataSource" ref="dataSource"></property>
+					<!-- 配置jpa提供商的适配器，通过内部bean来配置 -->
+					<property name="jpaVendorAdapter">
+						<bean 
+							class="org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter"></bean>
+					</property>
+					<!-- 配置entity所在的包的位置 -->
+					<property name="packagesToScan" value="com.li.springJpa.entity"></property>
+					<!-- 配置JPA 的基本属性，例如JPA的实现产品 -->
+					<property name="jpaProperties">
+						<props>
+							<prop key="hibernate.show_sql">true</prop>
+							<prop key="hibernate.format_sql">true</prop>
+							<prop key="hibernate.hbm2ddl.auto">update</prop>
+						</props>
+					</property>
+				</bean>
+			F. 配置JPA使用的事务管理器和支持基于注解的事务管理器
+				<bean id="transactionManager" 
+					class="org.springframework.orm.jpa.JpaTransactionManager">
+					<property name="entityManagerFactory" ref="entityManagerFactory"></property>
+				</bean>
+				<tx:annotation-driven transaction-manager="transactionManager"/>
+	3. 使用@PersistenceContext注解创建EntityManager

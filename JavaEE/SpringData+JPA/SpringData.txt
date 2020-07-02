@@ -1,0 +1,671 @@
+一、SpringData 概述
+	1. Spring Data 概述
+		① Spring Data : Spring 的一个子项目。用于简化数据库访问，支持NoSQL 和 关系数据存储。
+		其主要目标是使数据库的访问变得方便快捷。
+		② SpringData 项目所支持 NoSQL 存储：
+			A. MongoDB （文档数据库）
+			B. Neo4j（图形数据库）
+			C. Redis（键/值存储）
+			D. Hbase（列族数据库）
+		③ SpringData 项目所支持的关系数据存储技术：
+			A. JDBC
+			B. JPA
+	2. JPA Spring Data 概述
+		① JPA Spring Data : 致力于减少数据访问层 (DAO) 的开发量. 开发者唯一要做的，就只是声明持久层的接口，
+		其他都交给 Spring Data JPA 来帮你完成！
+		② 框架怎么可能代替开发者实现业务逻辑呢？比如：当有一个 UserDao.findUserById()  这样一个方法声明，
+		大致应该能判断出这是根据给定条件的 ID 查询出满足条件的 User  对象。Spring Data JPA 做的便是规范方法的名字，
+		根据符合规范的名字来确定方法需要实现什么样的逻辑。
+二、SpringData JPA HelloWorld
+	1. 使用 Spring Data JPA 进行持久层开发需要的四个步骤：
+		① 配置 Spring applicationContext容器 中配置整合 JPA
+			A. 加入jar包：
+				a. spring
+				b. SpringMVC
+				c. JPA
+				d. Hibernate
+				e. MySQL驱动和C3P0数据源
+			B. 配置数据库信息
+			C. 引入外部文件
+			D. 配置数据源
+			E. 配置自动扫描的包
+			F. 配置EntityManagerFactory
+			G. 配置JPA使用的事务管理器和支持基于注解的事务管理器
+	2. 在 Spring 配置文件中配置 Spring Data，让 Spring 为声明的接口创建代理对象。配置了 <jpa:repositories> 后，Spring 初始化容器时将会
+	扫描 base-package  指定的包目录及其子目录，为继承 Repository 或其子接口的接口创建代理对象，并将代理对象注册为 Spring Bean，业务层便
+	可以通过 Spring 自动封装的特性来直接使用该对象。
+		A. 加入SpringDate的jar包
+			a. spring-data-commons-2.2.4.RELEASE.jar
+			b. spring-data-jpa-2.2.4.RELEASE.jar
+		B. 搭建环境, 配置SpringData
+			a. 加入jpa 的命名空间 
+			b. base-package：扫描Repository Bean所在的package
+			<jpa:repositories base-package="com.li.springJpa.dao" 
+			entity-manager-factory-ref="entityManagerFactory"></jpa:repositories>
+		C. 声明持久层的接口，该接口继承  Repository，Repository 是一个标记型接口，它不包含任何方法，如必要，Spring Data 可实现 Repository 其他子接口，
+		其中定义了一些常用的增删改查，以及分页相关的方法。
+			public interface EmpRepository extends Repository<Emp, Integer>
+		D.  在接口中声明需要的方法。Spring Data 将根据给定的策略（具体策略稍后讲解）来为其生成实现代码。
+三、Repository
+	1. Repository 接口概述
+		① Repository 接口是 Spring Data 的一个核心接口，它不提供任何方法，开发者需要在自己定义的接口中声明需要的方法 
+			public interface Repository<T, ID extends Serializable> { } 
+		② Spring Data可以让我们只定义接口，只要遵循 Spring Data的规范，就无需写实现类。  
+		③ 若我们定义的接口继承了Repository接口，则该接口就会被IOC容器识别为一个Repository Bean，纳入到IOC容器中，进而可以在
+		该接口中定义满足一定规范的方法
+		④ 与继承 Repository 等价的一种方式，就是在持久层接口上使用 @RepositoryDefinition 注解，并为其指定 domainClass 和 idClass 属性。
+		如下两种方式是完全等价的
+			@RepositoryDefinition(domainClass = Emp.class, idClass = Integer.class)
+	2. Repository 的子接口
+		① 基础的 Repository 提供了最基本的数据访问功能，其几个子接口则扩展了一些功能。它们的继承关系如下： 
+		② Repository： 仅仅是一个标识，表明任何继承它的均为仓库接口类
+		③ CrudRepository： 继承 Repository，实现了一组 CRUD 相关的方法 
+		④ PagingAndSortingRepository： 继承 CrudRepository，实现了一组分页排序相关的方法 
+		⑤ JpaRepository： 继承 PagingAndSortingRepository，实现一组 JPA 规范相关的方法 
+		⑥ 自定义的 XxxxRepository 需要继承 JpaRepository，这样的 XxxxRepository 接口就具备了通用的数据访问控制层的能力。
+		⑦ JpaSpecificationExecutor： 不属于Repository体系，实现一组 JPA Criteria 查询相关的方法
+	3. 简单条件查询
+		① 简单条件查询: 查询某一个实体类或者集合
+		② 按照 Spring Data 的规范，查询方法以 find | read | get 开头
+		③ 涉及条件查询时，条件的属性用条件关键字连接
+		④ 要注意的是：条件属性以首字母大写, 条件的属性名称与个数要与参数的位置与个数一一对应。
+		⑤ 举例：
+			A. where emp_name like '?%' and emp_id < ?
+			public List<Emp> getByEmpNameStartingWithAndEmpIdLessThan(String empName, Integer empId);
+			B. where emp_id in(?, ?, ?) or birthday < ?
+			public List<Emp> getByEmpIdInOrBirthdayLessThan(List<Integer> empIdList, Date date);
+	4. 支持的关键字
+		直接在接口中定义查询方法，如果是符合规范的，可以不用写实现，目前支持的关键字写法如下：
+		Keyword					Sample									JPQL snippet
+		And						findByLastNameAndFirstName				...where x.lastName = ?1 and x.firstName = ?2
+		Or						findByLastNameOrFirstName				...where x.lastName = ?1 or x.firstName = ?2
+		Between					findByStartDateBetween					...where x.startDate between ?1 and ?2
+		LessThan				findByAgeLessThan						...where x.age < ?1
+		GreaterThan				findByAgeGreaterThan					...where x.age > ?1
+		After					findStartDateAfter						...where x.startDate > ?1
+		Before					findStartDateBefore						...where x.startDate < ?1
+		IsNull					findByAgeIsNull							...where x.age is null
+		IsNotNull, NotNull		findByAge[Is]NotNull					...where x.age not null
+
+		Like					findByFirstNameLike						...where x.firstName like ?1
+		NotLike					findByFirstNameLike						...where x.firstName not like ?1
+		StartingWith			findByFirstNameStartingWith				...where x.firstName like ?1(parameter bound with appended %)
+		EndingWith				findByFirstNameEndingWith				...where x.firstName like ?1(parameter bound with prepended %)
+		Containing				findByFirstNameContaining				...where x.firstName like ?1(parameter bound wrapped prepended %)
+		OrderBy					findByAgeOrderByLastNameDesc			...where x.age = ?1 order by x.lastName desc
+		Not						findByLastNameNot						...where x.lastName <> ?1
+		In						findByAgeIn(Collection<Age> age)		...where x.age in ?1
+		NotIn					findByAgeNotIn(Collection<Age> age)		...where x.age not in ?1
+		True					findByActiveTrue						...where x.active = true
+		False					findByActiveFalse						...where x.active = false
+	5. 查询方法解析流程
+		① 假如创建如下的查询：findByUserDepUuid()，框架在解析该方法时，首先剔除 findBy，然后对剩下的属性进行解析，假设查询实体为Doc
+			A. 先判断 userDepUuid （根据 POJO 规范，首字母变为小写）是否为查询实体的一个属性，如果是，则表示根据该属性进行查询；如果没有该属性，继续第二步；
+			B. 从右往左截取第一个大写字母开头的字符串(此处为Uuid)，然后检查剩下的字符串是否为查询实体的一个属性，如果是，则表示根据该属性进行查询；如果没有该属性，
+			则重复第二步，继续从右往左截取；最后假设 user 为查询实体的一个属性；
+			C. 接着处理剩下部分（DepUuid），先判断 user 所对应的类型是否有depUuid属性，如果有，则表示该方法最终是根据 “ Doc.user.depUuid” 的取值进行查询；
+			否则继续按照步骤 2 的规则从右往左截取，最终表示根据 “Doc.user.dep.uuid” 的值进行查询。
+			D. 可能会存在一种特殊情况，比如 Doc包含一个 user 的属性，也有一个 userDep 属性，此时会存在混淆。可以明确在属性之间加上 "_" 以显式表达意图，比如 
+			"findByUser_DepUuid()" 或者 "findByUserDep_uuid()"
+		② 特殊的参数： 还可以直接在方法的参数上加入分页或排序的参数，比如：
+		Page<UserModel> findByName(String name, Pageable pageable);
+		List<UserModel> findByName(String name, Sort sort);
+		③ 总结：
+			A. 简单条件查询支持级联查询
+			B. 若当前有符合条件的属性，则优先使用，而不使用关联查询
+			C. 若需要使用关联查询，则属性之间可以使用_进行连接
+			D. 举例：
+			public List<Emp> getByDep_Id(Integer depId);
+	6. 使用@Query自定义查询
+		① 这种查询可以声明在 Repository 方法中，摆脱像命名查询那样的约束，将查询直接在相应的接口方法中声明，结构更为清晰，这是 Spring data 的特有实现。
+			@Query("select e from Emp e where e.empId = (select max(e2.empId) from Emp e2)")
+			public Emp getByMaxId();
+		② 索引参数与命名参数
+			A. 索引参数如下所示，索引值从1开始，查询中 ”?X” 个数需要与方法定义的参数个数相一致，并且顺序也要一致
+				@Query("select e from Emp e where e.empName like ?1 and email like ?2")
+				public List<Emp> getByEmpNameAndEmail(String empName, String email);
+			B. 命名参数（推荐使用这种方式）：可以定义好参数名，赋值时采用@Param("参数名")，而不用管顺序。
+				@Query("select e from Emp e where e.empName like :empName and email like :email")
+				public List<Emp> getByEmpNameAndEmail1(@Param("email") String email, @Param("empName") String empName);
+			C. 如果是 @Query 中有 LIKE 关键字，后面的参数需要前面或者后面加 %，这样在传递参数值的时候就可以不加 %：
+				@Query("select e from Emp e where e.empName like %?1% and email like %?2%")
+				public List<Emp> getByEmpNameAndEmail2(String empName, String email);
+		③ 用@Query来指定本地查询
+			A. 还可以使用@Query来指定本地查询，只要设置nativeQuery为true，比如
+				@Query(value = "select count(emp_id) from emp", nativeQuery = true)
+				public Long getCountEmp();
+	7. @Query 与 @Modifying 执行更新操作
+		① @Query 与 @Modifying 这两个 annotation一起声明，可定义个性化更新（update、delete，insert不支持）操作，
+		例如只涉及某些字段更新时最为常用，示例如下： 
+		② 举例：
+			@Modifying
+			@Query("update Emp e set e.empName = :empName where e.empId = :empId")
+			public void updateEmpName(@Param("empId") Integer empId, @Param("empName")String empName);
+			@Transactional
+			public void updateEmpName(Integer empId, String empName) {
+				empRepository.updateEmpName(empId, empName);
+			}
+		③ 注意：
+			A. 方法的返回值应该是 int，表示更新语句所影响的行数
+			B. 在调用的地方（service层）必须加事务，没有事务不能正常执行
+			C. 默认情况下，SpringData的每个方法上都有事务，但都是一个只读操作，他们不能完成修改操作。
+			D. JPQL不支持insert 操作
+四、CrudRepository
+	1. CrudRepository介绍：
+		CrudRepository 接口提供了最基本的对实体类的添删改查操作
+	2. API
+		① T save(T entity);//保存单个实体 
+		② Iterable<T> save(Iterable<? extends T> entities);//保存集合        
+		③ T findOne(ID id);//根据id查找实体         
+		④ boolean exists(ID id);//根据id判断实体是否存在         
+		⑤ Iterable<T> findAll();//查询所有实体,不用或慎用!         
+		⑥ long count();//查询实体数量         
+		⑦ void delete(ID id);//根据Id删除实体         
+		⑧ void delete(T entity);//删除一个实体 
+		⑨ void delete(Iterable<? extends T> entities);//删除一个实体的集合         
+		⑩void deleteAll();//删除所有实体,不用或慎用!
+	3. 举例：
+	public interface EmpCrudRepository extends CrudRepository<Emp, Integer>
+	@Transactional
+	public void saveEmp(Emp emp) {
+		empCrudRepository.save(emp);
+	}
+五、PagingAndSortingRepository
+	1. 该接口提供了分页与排序功能 
+		① Iterable<T> findAll(Sort sort); //排序 
+		② Page<T> findAll(Pageable pageable); //分页查询（含排序功能） 
+		③ 举例：
+		public interface EmpPagingAndSortingRepository extends
+			PagingAndSortingRepository<Emp, Integer>
+	2. Pageable
+		① Pageable接口通常使用其PageRequest实现类，其中封装了需要分页的信息
+		② PageRequest实现类主要有两个构造器
+			A. PageRequest(int page, int size)：只分页
+			B. PageRequest(int page, int size, Sort sort)：带有排序的分页
+		③ 注意：Pageable分页的页码是从0开始的
+		④ 举例：
+			Pageable pageable = new PageRequest(pageNum, pageSize, sort);
+	3. Sort
+		① 封装了排序相关的order
+		② Sort主要有两个构造器：
+			A. Sort(List<Order> orders)：将order对象封装成集合
+			B. Sort(Order... orders)：为可变参数的order对象
+		③ 举例：
+			Sort sort = new Sort(order1, order2);
+	4. Order
+		① 是具体针对某个属性的升序或者降序
+		② Order 主要有两个构造器
+			A. Order(String property)：具体按照某个属性进行排序，默认升序
+			B. Order(Direction direction, String property)：具体按照某个属性升序或者降序，
+				Direction具有Direction.DESC和Direction.ASC两个可选值
+		③ 举例：
+			Order order1 = new Order(Direction.DESC, "empId");
+			Order order2 = new Order(Direction.ASC, "birthday");
+	5. Page<T> findAll(Pageable pageable)：
+		① 返回的是带有分页信息的Page对象，该对象需要传入实体类泛型
+		② Page<T>对象的API
+			A. getTotalElements()：获取查询的获取总记录数
+			B. getNumber()：获取当前页码，页码从0开始
+			C. getTotalPages()：获取总页数
+			D. getContent()：获取当前页对象的List
+			E. getNumberOfElements()：获取当前的记录数
+			F. isFirstPage()：判断当前页是否为第一页
+			G. isLastPage()：判断当前页是否为最后一页
+			H. hasNextPage()：判断是否有下一页
+			I. hasPreviousPage()：判断是否有上一页
+	6. 查询分页排序举例：
+		1. 创建继承PagingAndSortingRepository的接口
+			public interface EmpPagingAndSortingRepository extends
+			PagingAndSortingRepository<Emp, Integer>
+		2. 调用PagingAndSortingRepository接口的findAll(Pageable pageable)，返回Page<Emp>对象
+			Page<Emp> empPage = empPagingAndSortingRepository.findAll(pageable);
+		3. 创建Pageable接口的对象，该接口的主要实现类为PageRequest，该实现类需要传入pageNum（页码，从0开始）、
+			pageSize（每页的大小）和sort（排序相关）参数
+			Pageable pageable = new PageRequest(pageNum, pageSize, sort);
+		4. 创建排序相关的对象，该类可以传入多个Order对象
+			Sort sort = new Sort(order1, order2);
+		5. 创建Order对象，每个对象则是对某个属性进行升序或者降序排序
+			Order order1 = new Order(Direction.DESC, "empId");
+			Order order2 = new Order(Direction.ASC, "birthday");
+		6. 通过Page<Emp>对象可获取分页信息
+			// 获取总记录数
+			System.out.println("总记录数：" + empPage.getTotalElements());;
+			// 获取当前页码
+			System.out.println("当前页码：" + empPage.getNumber());
+			// 获取总页码
+			System.out.println("总页码：" + empPage.getTotalPages());
+			// 获取当前页的List
+			System.out.println("当前页的List：" + empPage.getContent());
+			// 获取当前页的记录数
+			System.out.println("当前页的记录数：" + empPage.getNumberOfElements());
+			// 判断当前页是否为第一页
+			System.out.println("是否为第一页：" + empPage.isFirstPage());
+			// 判断当前页是否为最后一页
+			System.out.println("是否为最后一页：" + empPage.isLastPage());
+			// 判断是否有下一页
+			System.out.println("是否有下一页：" + empPage.hasNextPage());
+			//	判断是否有上一页
+			System.out.println("是否有上一页：" + empPage.hasPreviousPage());
+六、JpaRepository
+	1. 该接口提供了JPA的相关功能 
+		① List<T> findAll()：查找所有实体 
+		② List<T> findAll(Sort sort)：排序、查找所有实体 
+		③ List<T> save(Iterable<? extends T> entities)：保存集合 
+		④ void flush()：执行缓存与数据库同步 
+		⑤ T saveAndFlush(T entity)：强制执行持久化 
+		⑥ void deleteInBatch(Iterable<T> entities)：删除一个实体集合 
+	2. saveAndFlush()与merge()一致
+	3. 举例：
+		public interface EmpJpaRepository extends JpaRepository<Emp, Integer>
+七、JpaSpecificationExecutor
+	1. 不属于Repository体系，实现一组 JPA Criteria 带条件的分页排序查询相关的方法
+	2. JpaSpecificationExecutor相关API
+		T findOne(Specification<T> spec)：或者一条带查询条件的记录
+		List<T> findAll(Specification<T> spec)：获取带查询条件的记录的集合
+		Page<T> findAll(Specification<T> spec, Pageable pageable)：获取带查询条件的记录的集合并实现分页排序
+		List<T> findAll(Specification<T> spec, Sort sort)：获取带查询条件的记录的集合并实现排序
+		long count(Specification<T> spec)：获取带查询条件的总记录数
+	3. Specification：封装  JPA Criteria 查询条件。通常使用匿名内部类的方式来创建该接口的对象
+		① 举例：
+		Specification<Emp> specification = new Specification<Emp>() {
+			@Override
+			public Predicate toPredicate(Root<Emp> root, CriteriaQuery<?> query,
+					CriteriaBuilder cb) {
+				Path<Integer> path = root.get("empId");
+				Predicate predicate = cb.gt(path, 0);
+				return predicate;
+			}
+			
+		};
+		② Root<Emp> root（重点）: 代表查询的实体类
+		③ CriteriaQuery<?> query: 可以从中得到root对象，即告知JPA Criteria 查询要查询哪一个实体类，还可以
+		来添加查询条件，还可以结合EntityManager 对象得到最终查询的TypeQuery对象
+		③ CriteriaBuilder cb: CriteriaBuilder对象，用于创建Criteria相关对象的工厂，当然可以从中获取到Predicate对象
+		④ Predicate predicate（重点）: Predicate类型，代表一个查询条件
+		⑤ Path<?> path: 属性导航，可以由root一直定位到目标属性Path<?>需要传入一个泛型代表属性的数据类型
+			Path<Integer> path = root.get("dep").get("id")
+	4. 举例：
+		① 创建继承JpaSpecificationExecutor<?> 的接口，由于JpaSpecificationExecutor<?>不属于Repository系列，
+		因此无法被SpringData创建为Repository Bean，因此需要再继承Repository接口或者其子接口
+			public interface EmpJpaSpecificationExecutor extends Repository<Emp, Integer>, 
+				JpaSpecificationExecutor<Emp>
+		② 调用JpaSpecificationExecutor 接口的findAll(Specification<T> specification, Pageable pageable)方法， 
+		该方法需要传入一个Specification对象代表查询条件，和一个封装了分页信息的Pageable对象，并返回具有分页信息的Page对象
+			Page<Emp> page = empJpaSpecificationExecutor.findAll(specification, pageable)
+		③ 创建封装分页和排序的Pageable对象
+			int pageNum = 1 - 1;
+			int pageSize = 5;
+			Sort sort = new Sort(new Order(Direction.DESC, "empId"));
+			Pageable pageable = new PageRequest(pageNum, pageSize, sort);
+		④ 创建带有查询条件的Specification对象
+			Specification<Emp> specification = new Specification<Emp>() {
+
+			@Override
+			public Predicate toPredicate(Root<Emp> root, CriteriaQuery<?> query,
+					CriteriaBuilder cb) {
+				Path<Integer> path = root.get("dep").get("id");
+				Predicate predicate = cb.gt(path, 0);
+				return predicate;
+			}
+		};
+		⑤ 通过Page<Emp>对象可获取分页信息
+八、自定义 Repository 方法
+	1. 为某一个 Repository 上添加自定义方法
+		① 步骤:
+			A. 定义一个接口: 声明要添加的, 并自实现的方法
+			B. 提供该接口的实现类: 类名需在要声明的 Repository 后添加 Impl, 并实现方法
+			C. 声明 Repository 接口, 并继承 A 声明的接口
+			D. 使用. 
+			E. 注意: 默认情况下, Spring Data 会在 base-package 中查找 "接口名Impl" 作为实现类. 也可以通过　repository-impl-postfix　声明后缀. 
+		② 举例：
+			A. 定义一个接口: 声明要添加的, 并自实现的方法
+			public interface EmpDao {
+				void test();
+			}
+			B. 提供该接口的实现类，该实现类是需要继承该接口的repository接口的类名+Impl，并实现方法
+			public class EmpJpaSpecificationExecutorImpl implements EmpDao {
+	
+				@PersistenceContext
+				private EntityManager entityManager;
+
+				@Override
+				public void test() {
+					Emp emp = entityManager.find(Emp.class, 1);
+					System.out.println(emp);
+				}
+
+			}
+			C. 声明 Repository 接口, 并继承 A 声明的接口，即将声明 Repository 接口与 entityManger Bean
+			完美地结合起来，实现自定义的方法。
+				public interface EmpJpaSpecificationExecutor extends JpaRepository<Emp, Integer>, 
+					JpaSpecificationExecutor<Emp>, EmpDao
+	2. 为所有的 Repository 都添加自实现的方法
+		① 步骤：
+		A. 声明一个接口, 在该接口中声明需要自定义的方法, 且该接口需要继承 Spring Data 的 Repository.
+		B. 提供 1) 所声明的接口的实现类. 且继承 SimpleJpaRepository, 并提供方法的实现
+		C. 定义 JpaRepositoryFactoryBean 的实现类, 使其生成 1) 定义的接口实现类的对象
+		D. 修改 <jpa:repositories /> 节点的 factory-class 属性指向 3) 的全类名
+		E. 注意: 全局的扩展实现类不要用 Imp 作为后缀名, 或为全局扩展接口添加 @NoRepositoryBean 注解告知  Spring Data: Spring Data 不把其作为 Repository
+九、SSSP整合
+	1. 概述：涉及技术
+		① SpringMVC、Spring、SpringData\JPA 整合完成 CRUD、翻页
+		② 基于Restful 风格
+		③ 使用 JPA 二级缓存
+		④ 使用 @ResponseBody 注解完成 Ajax.
+	2. 搭建环境
+		① 加入 Spring
+			A. 加入Spring的jar包
+				com.springsource.net.sf.cglib-2.2.0.jar
+				com.springsource.org.aopalliance-1.0.0.jar
+				com.springsource.org.aspectj.weaver-1.6.8.RELEASE.jar
+				commons-logging-1.1.3.jar
+				spring-aop-4.0.0.RELEASE.jar
+				spring-aspects-4.0.0.RELEASE.jar
+				spring-beans-4.0.0.RELEASE.jar
+				spring-context-4.0.0.RELEASE.jar
+				spring-core-4.0.0.RELEASE.jar
+				spring-expression-4.0.0.RELEASE.jar
+				spring-jdbc-4.0.0.RELEASE.jar
+				spring-orm-4.0.0.RELEASE.jar
+				spring-test-4.0.0.RELEASE.jar
+				spring-tx-4.0.0.RELEASE.jar
+			B. 加入数据源和数据库驱动jar包
+				c3p0-0.9.2.1.jar
+				hibernate-c3p0-4.2.4.Final.jar
+				mchange-commons-java-0.2.3.4.jar
+				mysql-connector-java-5.1.7-bin.jar
+			C. 在web.xml文化中配置启动 Spring IOC容器的Listener
+				<context-param>
+					<param-name>contextConfigLocation</param-name>
+					<param-value>classpath:applicationContext.xml</param-value>
+				</context-param>
+
+				<listener>
+					<listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+				</listener>
+			D. 配置SpringIOC容器 applicationContext.xml
+				<!-- 引入外部文件 -->
+				<context:property-placeholder location="classpath:jdbc.properties"/>
+				
+				<!-- 配置数据源 -->
+				<bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+					<property name="user" value="${jdbc.user}"></property>
+					<property name="password" value="${jdbc.password}"></property>
+					<property name="driverClass" value="${jdbc.driverClass}"></property>
+					<property name="jdbcUrl" value="${jdbc.jdbcUrl}"></property>
+				</bean>
+				
+				<!-- 配置自动扫描的包 -->
+				<context:component-scan base-package="com.li.springDataJpa">
+					<context:exclude-filter type="annotation" expression="org.springframework.stereotype.Controller"/>
+					<context:exclude-filter type="annotation" expression="org.springframework.web.bind.annotation.ControllerAdvice"/>
+				</context:component-scan>
+				
+				<!-- 配置事务 -->
+				<bean id="transactionManager" class="org.springframework.orm.jpa.JpaTransactionManager">
+					<property name="entityManagerFactory" ref="entityManagerFactory"></property>
+				</bean>
+				
+				<!-- 配置支持基于注解的事务 -->
+				<tx:annotation-driven transaction-manager="transactionManager"/>
+		② 加入 SpringMVC
+			A. 加入SpringMVC的jar包
+				spring-web-4.0.0.RELEASE.jar
+				spring-webmvc-4.0.0.RELEASE.jar
+			B. 在web.xml文件中配置启动SpringMVC IOC 容器的 dispatcherServlet
+				<!-- 配置字符编码过滤器 -->
+				<!-- 必须配置在所有过滤器的最前面 -->
+				<filter>
+					<filter-name>characterEncodingFilter</filter-name>
+					<filter-class>org.springframework.web.filter.CharacterEncodingFilter</filter-class>
+					<init-param>
+						<param-name>encoding</param-name>
+						<param-value>UTF-8</param-value>
+					</init-param>
+				</filter>
+				
+				<filter-mapping>
+					<filter-name>characterEncodingFilter</filter-name>
+					<url-pattern>/*</url-pattern>
+				</filter-mapping>
+				
+				<!-- 配置把POST请求转换为PUT请求或者DELETE请求的filter -->
+				<filter>
+					<filter-name>hiddenHttpMethodFilter</filter-name>
+					<filter-class>org.springframework.web.filter.HiddenHttpMethodFilter</filter-class>
+				</filter>
+				
+				<filter-mapping>
+					<filter-name>hiddenHttpMethodFilter</filter-name>
+					<url-pattern>/*</url-pattern>
+				</filter-mapping>
+
+				<!-- 配置启动SpringMVC IOC 容器的 dispatcherServlet-->
+				<servlet>
+					<servlet-name>springDispatcherServlet</servlet-name>
+					<servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+					<init-param>
+						<param-name>contextConfigLocation</param-name>
+						<param-value>classpath:applicationContext-mvc.xml</param-value>
+					</init-param>
+					<load-on-startup>1</load-on-startup>
+				</servlet>
+
+				<servlet-mapping>
+					<servlet-name>springDispatcherServlet</servlet-name>
+					<url-pattern>/</url-pattern>
+				</servlet-mapping>
+			C. 配置SpringMVCIOC容器的applicationContext-mvc.xml
+				<!-- 配置自动扫描的包 -->
+				<context:component-scan base-package="com.li.springDataJpa" use-default-filters="false">
+					<context:include-filter type="annotation" expression="org.springframework.stereotype.Controller"/>
+					<context:include-filter type="annotation" expression="org.springframework.web.bind.annotation.ControllerAdvice"/>
+				</context:component-scan>
+
+				<!-- 配置视图解析器 -->
+				<bean class="org.springframework.web.servlet.view.InternalResourceViewResolver">
+					<property name="prefix" value="/WEB-INF/views/"></property>
+					<property name="suffix" value=".jsp"></property>
+				</bean>
+				
+				<!-- 静态资源处理器 -->
+				<mvc:default-servlet-handler/>
+				<!-- 默认开启的配置，用于解决静态资源处理器后请求映射的问题 -->
+				<mvc:annotation-driven></mvc:annotation-driven>
+		③ 加入 JPA
+			A. 加入hibernate的jar包
+				antlr-2.7.7.jar
+				dom4j-1.6.1.jar
+				hibernate-commons-annotations-4.0.2.Final.jar
+				hibernate-core-4.2.4.Final.jar
+				hibernate-jpa-2.0-api-1.0.1.Final.jar
+				javassist-3.15.0-GA.jar
+				jboss-logging-3.1.0.GA.jar
+				jboss-transaction-api_1.1_spec-1.0.1.Final.jar
+			B. 加入JPA的jar包
+				hibernate-entitymanager-4.2.4.Final.jar
+			C. 加入JPA二级缓存相关的jar包
+				ehcache-core-2.4.3.jar
+				hibernate-ehcache-4.2.4.Final.jar
+				slf4j-api-1.6.1.jar
+			D. 加入ehcache.xml文件
+			E. 在applicationContext.xml中配置entityManagerFactory
+				<!-- 配置entityManagerFactory -->
+				<bean id="entityManagerFactory" class="org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean">
+					<!-- 配置数据源 -->
+					<property name="dataSource" ref="dataSource"></property>
+					<!-- 配置jpa提供商的适配器，通过内部bean来配置 -->
+					<property name="jpaVendorAdapter">
+						<bean class="org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter"></bean>
+					</property>
+					<!-- 配置entity所在的包的位置 -->
+					<property name="packagesToScan" value="com.li.springDataJpa"></property>
+					<!-- 配置JPA 的基本属性，例如JPA的实现产品 -->
+					<property name="jpaProperties">
+						<props>
+							<!-- 持久化类属性与数据表字段之间的映射策略 -->
+							<prop key="hibernate.ejb.naming_strategy">org.hibernate.cfg.ImprovedNamingStrategy</prop>
+						
+							<prop key="hibernate.show_sql">true</prop>
+							<prop key="hibernate.format_sql">true</prop>
+							<prop key="hibernate.hbm2ddl.auto">update</prop>
+							<!-- 数据库的方言 -->
+							<prop key="hibernate.dialect">org.hibernate.dialect.MySQL5InnoDBDialect</prop>
+
+							<!-- 二级缓存相关的属性配置 -->
+							<prop key="hibernate.cache.use_second_level_cache">true</prop>
+							<prop key="hibernate.cache.region.factory_class">org.hibernate.cache.ehcache.EhCacheRegionFactory</prop>
+							<prop key="hibernate.cache.use_query_cache">true</prop>
+						</props>
+					</property>
+					
+					<!-- 配置二级缓存策略 -->
+					<property name="sharedCacheMode" value="ENABLE_SELECTIVE"></property>
+				</bean>
+		④ 加入 SpringData
+			A. 加入SpringDatajar包
+				spring-data-commons-1.6.2.RELEASE.jar
+				spring-data-jpa-1.4.2.RELEASE.jar
+			B. 在applicationContext.xml中配置SpringData
+				<!-- 配置SpringData -->
+				<jpa:repositories base-package="com.li.springDataJpa" 
+				entity-manager-factory-ref="entityManagerFactory"></jpa:repositories>
+	3. 完成分页操作
+		① Dao 层：
+			A. 不带查询查询条件的分页，所以可以直接调用 PagingAndSortingRepository# findAll(Pageable pageable) 返回 Page 对象。
+		② Service 层：
+			A. 没有业务逻辑
+			B. 把 Controller 传入的 pageNo 和 pageSize 封装为 Pageable 对象。注意：Pageable 的 pageNo 是从 0 开始的
+			C. 调用 Dao 层的方法即可。
+		③ Controller 层：
+			A. 获取 pageNo，并对 pageNo 进行校验
+			B. 调用 Service 方法返回 Page 对象
+			C. 把 Page 对象放入到 request 中
+			D. 转发页面
+		④ JSP 页面：使用 JSTL 来显示页面
+		⑤ 在entity中，如果在映射多对一的关联关系没有采用懒加载的策略时，默认会查询每个实体类关联的的对象，造成性能的下降
+		因此需要在@ManyToOne注解中声明fetch = FetchType.LAZY，即采用懒加载的策略，但是会造成一个严重的问题就是懒加载异常，
+		原因是在service中，每次请求都是一个事务，而关联的对象在还没获取时，事务已提交，session关闭，当使用关联对象的代理
+		获取对象的属性时，则会报懒加载异常。解决方法是声明一个OpenEntityManagerInView的Filter，该Filter可以解决懒加载异常，
+		其原理是延长Session关闭的时间，因此在高并发的环境中会带来性能下降的问题，但是作为一个内部系统，才影响可以忽略。
+		<filter>
+			<filter-name>openEntityManagerInViewFilter</filter-name>
+			<filter-class>org.springframework.orm.jpa.support.OpenEntityManagerInViewFilter</filter-class>
+		</filter>
+		
+		<filter-mapping>
+			<filter-name>openEntityManagerInViewFilter</filter-name>
+			<url-pattern>/*</url-pattern>
+		</filter-mapping>
+	4. 添加操作：
+		① 显示页面 & 使用 JPA 二级缓存
+			A. Dao 层：是查询所有的 Department，且需要使用 JPA 的二级缓存 ？
+				a. 首先需要在applicationContext.xml文件的EntityManagerFactory配置二级缓存相关，设置二级缓存的机制为：ENABLE_SELECTIVE，
+				即需要在entity实体类上添加@Cache注解，才能被实现JPA的二级缓存
+				b. 在JPA中，使用二级缓存时，需要自定义JPQL，并每次调用Query的setHint()方法，该方法需要传入两个参数，分别是
+				org.hibernate.ejb.QueryHints.HINT_CACHEABLE和true，举例
+					EntityManager entityManager = entityManagerFactory.createEntityManager();
+					Query query = entityManager.createQuery(jpql);
+					List<Department> departmentList = query.setHint(QueryHints.HINT_CACHEABLE, true).getResultList();
+				c. 在repository bean中使用JPA的二级缓存需要自定义查询方法，使用@Query注解声明查询的JPQL，
+				使用@QueryHints注解设置缓存机制，在@QueryHints中可以定义多个@QueryHint注解，举例：
+					@QueryHints({@QueryHint(name=org.hibernate.ejb.QueryHints.HINT_CACHEABLE, value="true")})
+					@Query("select d from Department d")
+					public List<Department> getDepartmentList();
+			B. Service 层：调用 Dao 层的方法，获取所有的 Department，返回即可
+			C. Controller 层：
+				a. 调用 Service 层，获取所有的 Department，并放入到 request 中
+				b. 创建一个新的 Employee 对象，放入到 request 中。且其键和表单的 modelAttribute 属性值一致。
+				c. 转发页面
+			D. JSP 页面：
+				a. 需要使用 SpringMVC 的表单标签来显示表单页面
+				b. 注意：form:form 标签必须设置一个 modelAttribute 属性，以从 request 中获取对应的 bean，要求该 bean 的属性和表单字段是一一对应的。
+				c. 实例：
+					<form:form action="${pageContext.request.contextPath }/employee/addEmployee"
+						method="post" modelAttribute="employee">
+						EmpName: <form:input path="empName"/><br>
+						Email: <form:input path="email"/><br>
+						Birthday: <form:input path="birthday"/><br>
+						<jsp:useBean id="genders" class="java.util.HashMap"></jsp:useBean>
+						<c:set target="${genders }" property="1" value="男"></c:set>
+						<c:set target="${genders }" property="0" value="女"></c:set>
+						Gender: <form:radiobuttons path="gender" items="${genders }"/> <br>
+						DepName: <form:select path="dep.id" items="${departmentList }" itemLabel="depName" 
+							itemValue="id"></form:select><br>
+						<input type="submit" value="Submit">
+					</form:form>
+		② Ajax 验证用户名可用性
+			A. Dao 层：使用@Query声明一个JPQL根据empName统计employee的数量
+			B. Service 层：直接调用 Dao 方法返回结果即可。
+			C. Controller 层：
+				a. 获取请求参数
+				b. 调用 Service 层验证 lastName 对应的 Employee 是否存在
+				c. 若存在则返回 “1”，若不存在则返回 “0”。 需要使用 @ResponseBody 注解
+			D. JSP 页面：使用 jQuery 完成 Ajax 的发送，和结果的响应。
+		③ 完成添加
+			① Dao 层：不需要定义任何方法，直接使用 JpaRepository 或其父接口提供的 saveAndFlush() 方法即可
+			② Service 层：需要调用 Dao 层的方法。注意：需要设置 createTime 属性
+			③ Controller 层：调用 Service 层的方法，重定向到显示所有员工的页面--"redirect:/employee/getEmployeeList";
+			④ 注意：如何把页面上输入的字符串转为 Date 类型。在Employee的Date类型的属性上使用@DateTimeFormat 注解!
+	5. 完成添加操作
+		① 表单回显
+			A. SpringMVC 表单回显的原理：
+				a. 实际上表单的回显是由 SpringMVC 的 form 标签完成的
+				b. 在 Handler 方法中，向 request  中添加一个属性。键：SpringMVC form:form 标签 modelAttribute 属性值，值：包含了回显信息的一个 bean 对象
+			B. URL：/employee/getEmployee/{empId}，method：GET
+			C. Dao 层：直接调用方法，根据 id 来获取对应的 bean
+			D. Service 层：调用 Dao 层的方法，返回 bean 对象
+			E. Controller 层：
+				a. 获取 id
+				b. 调用 Service 方法，得到 bean 的对象
+				c. 获取全部的 Department，并放入到 request 中。
+				d. 把 bean 对象放入到 request 中，键为：form:form 标签的 modelAttribute 属性值
+				e. 转发页面
+		② 修改状态下 Ajax 验证用户名可用性
+			A. 和 添加状态下 Ajax 验证的区别：若修改后当前的 lastName，则不应该再发送任何 Ajax 请求，而直接 alert：用户名可用。
+			B. JSP 页面：修改 JS 的 Ajax 请求逻辑：若修改回之前的 lastName 则不发送任何请求，直接弹出 “用户名可用”
+		③ 完成修改
+			A. URL：employee/updateEmployee，method：PUT
+			B. Dao 层：继续使用 saveAndFlush 方法即可，
+			C. Service 层：
+				a. 不需要设置 createTime 属性
+				b. 判定添加和修改的标准：传入的 bean 的 id 是否为 null
+			D. Cotroller 层：
+				a. 建 @ModelAttribute 注解修饰的方法，在其中利用 id 获取对应的 bean，并把该 bean 放入到 map 中，键为：Employee 类名第一个字母小写
+				b. 在 @ModelAttribute 方法中，把关联的 department 置为 null
+				c. 调用 Service 的方法进行更新
+				d. 重定向到："redirect:/employee/getEmployeeList"
+			E. JSP 页面：判断empId是否存在，当其存在时将empId 和 _method 加入到隐藏域中，并将action的属性值切换为更新时映射的url
+			F. 注意：
+				从@ModelAttribute中获取到的并保存在request中的对象是持久化对象，当使用@ModelAttribute修饰入参时，并且入参中的关联对象
+				与@ModelAttribute保存的对象的关联对象不同时，此时会报错，原因是hibernate不允许修改持久化对象的关联对象，解决方法是在
+				@ModelAttribute中吧关联对象设置为null即可。
+	6. 完成删除
+		① URL：employee/deleteEmployee/{empId}、method：DELETE
+		② Dao 层：直接使用 SpringData 已经自带的 delete 方法即可
+		③ Service 层：直接调用 Dao 方法即可
+		④ Controller 层：
+			a. 直接调用 Service 方法
+			b. 重定向到 "redirect:/employee/getEmployeeList"
+		⑤ JSP 页面：
+			a. 使用 JS confirm：
+			b. 把超链接的 GET 请求转为 POST 请求，且携带 _method=DELETE 的请求参数
+			c. 实例：
+				<form action="" method="post" id="deleteEmployee">
+					<input type="hidden" name="_method" value="DELETE"/>
+				</form>
+				$('.deleteEmployee').click(function() {
+					var flag = confirm("确定删除该员工的信息吗");
+					if(flag) {
+						var url = $(this).attr("href");
+						$('#deleteEmployee').attr("action", url);
+						$('#deleteEmployee').submit();
+					}
+					return false;
+				});
+
+		
+
+		
+		
+		

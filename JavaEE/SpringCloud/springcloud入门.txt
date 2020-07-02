@@ -1,0 +1,760 @@
+一、微服务架构零基础理论入门
+	1. 微服务架构概述
+		① 什么是微服务架构
+			微服务是一种架构模式，它提倡将单一应用划分成一组小的服务，服务之间互相协调、互相配合，为用户提供最终价值，每个服务运行在其独立的进程中，
+			服务与服务之间采用轻量级的通信机制互相协作（通常是基于HTTP协议的RESTful API），每个服务都能围绕着具体业务进行构建，并且能独立的部署到生
+			产环境、类生产环境等。另外，应当尽量避免统一的、集中式的服务管理机制，对具体的一个服务而言，应根据上下文，选择合适的语言、工具对其进行构建。
+		② 分布式微服务架构-落地维度
+			A. Spring Cloud融合组装一切，使构建分布式系统变得更加简单
+			B. 构建分布式系统需要的维度：
+				a. 服务注册与发现
+				b. 服务调用
+				c. 服务熔断
+				d. 负载均衡
+				e. 服务降级
+				f. 服务消息队列
+				g. 配置中心管理
+				h. 服务网关
+				i. 服务监控
+				j. 全链路追踪
+				k. 自动化构建部署
+				l. 服务定时任务调度操作
+	2. Spring Cloud简介
+		① Spring Cloud是什么
+			A. 分布式微服务架构的一站式解决方案，是多种微服务架构落地技术的集合体，俗称微服务全家桶
+			B. Spring Cloud俨然已成为微服务开发的主流技术栈，在国内开发者社区非常火爆
+		② 符合微服务技术维度
+	3. Spring Cloud技术栈
+		A. Eureka：服务注册与发现
+		B. Netflix OSS Ribbon：服务负载与调用
+		C. Netflix：服务负载与调用
+		D. Hystrix：服务熔断降级
+		E. Zuul：服务网关
+		F. Spring Cloud Config：分布式配置
+		G. Spring Boot：服务开发
+	4. 总结
+二、从2.2.X和H版开始说起
+	1. SpringBoot版本选择
+		① git源码地址：https://github.com/spring-projects/spring-boot/releases
+		② SpringBoot2.0新特性
+			A. 官网：https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-2.0-Release-Notes
+			B. Boot官网强烈建议升级到2.x以上的版本
+		③ 官网查看Boot版本
+			A. 截止2019年，SpringBoot的最新稳定版为2.2.0
+			B. 截止2020年，SpringBoot的最新稳定版为2.2.4
+	2. SpringCloud版本选择
+		① git源码地址https://github.com/spring-projects/spring-cloud/wiki，SpringCloud不再维护git源码
+		② 官网：https://spring.io/projects/spring-cloud
+		③ 官网看Cloud版本：
+			A. Cloud命名规则（SpringCloud的版本关系）：
+				a. Spring Cloud采用了英国伦敦地铁站的名称来命名，并由地铁站名称A-Z依次类推的形式来发布迭代版本。
+				b. Spring Cloud是一个有许多子项目组成的子项目，各子项目有不同的节奏，为了管理SpringCloud与各子项目的版本依赖关系，发布了一个清单，其中
+				包括了某个SpringCloud版本对应的子项目版本，为了避免SpringCloud版本号与子项目版本号混淆，SpringCloud版本采用了名称而非版本号命名，这些
+				版本的名字采用了伦敦地铁站的名字，根据字母表的顺序来对应版本时间顺序。例如Angle是第一个版本，Brixton是第二个版本。当SpringCloud的发布内容
+				积累到临界点或者一个重大BUG被解决后，会发布一个“Service Release”版本，检查SRX，比如Greenwich SR2就是SpringCloud发布的Greenwich版本的第二个SRX版本。
+			B. 截止2019年，SpringCloud的最新稳定版为Greenwich SR3，并且没有F以前的版本
+			C. 截止2020年，SpringCloud的最新稳定版为Hoxton SR5
+	3. SpringCloud和SpringBoot之间的依赖关系如何查看
+		① 地址：https://spring.io/projects/spring-cloud#overview，SpringCloud官方给出的SpringCloud与SpringBoot的搭配
+			SpringCloud		SpringBoot
+			Hoxton			2.2.x
+			Greenwich		2.1.x
+			Finchley		2.0.x
+			Edgware			1.5.x
+			Dalston			1.5.x
+		② 依赖：
+			A. Finchley是基于Spring Boot 2.0.x 构建的不再支持Spring Boot 1.5.x
+			B. Dalston 和 Edgware 是基于Spring Boot 1.5.x 构建的，不支持Spring Boot 2.0.x
+			C. Camden构建于Spring Boot 1.4.x，但是依然能支持Spring Boot 1.5.x
+			D. Angel版本对应1.2.x版本，Brixton版本对应1.3.x版本，Camden版本对应1.4.x Stripes以及Dalston 和 Edgware版本对应1.5.x版本，建议不再使用。
+			E. 建议使用Greenwich版本搭配2.1.x版本以及Hoxton搭配2.1.x版本
+		③ 更详细的版本对应查看方法：https://start.spring.io/actuator/info，如：
+			A. Hoxton.SR5版本对应的Spring Boot版本 >=2.2.0.M4 and <2.3.1.BUILD-SNAPSHOT
+			B. Greenwich.SR5版本对应的Spring Boot版本 >=2.1.0.RELE… <2.1.15.BUILD-SNAPSHOT
+	4. SpringCloud定稿版x
+		① Spring Cloud：Hoxton.SR1
+		② Spring Boot： 2.2.2.RELEASE
+		③ Spring Cloud Alibaba：2.1.0.RELEASE
+		④ Java：JDK1.8
+		⑤ Maven：3.5及以上
+		⑥ MySQL：5.7及以上
+		⑦ 为什么使用Spring Boot 2.2.2
+			A. 如果只使用Spring Boot做开发，那么可以使用最新版的Spring Boot
+			B. 同时使用BOOT与Cloud，需要照顾CLoud，由Cloud决定Boot的版本
+三、关于Cloud各种自检的停更/升级/替换
+	1. 服务注册中心：
+		① Euceka		：			X
+		② Zookeeper		：			/
+		③ Consul		：			/
+		④ Nacos			：			/
+	2. 服务调用1：
+		① Ribbon		：			/
+		② LoadBalancer	：			/
+	3. 服务调用2：
+		① Feign			：			X
+		② OpenFeign		：			/
+	4. 服务降级：
+		① Hystrix		：			X
+		② resilience4j	：			/
+		③ sentinel		：			/
+	5. 服务网关：
+		① Zuul			：			X
+		② Zuul2			：			？
+		③ gateway		：			/
+	6. 服务配置
+		① Config		：			X
+		② Nacos			：			/
+	7. 服务总线
+		① Bus			：			X
+		② Nacos			：			/
+四、微服务架构编码构建
+	1. 约定 > 配置 > 编码
+	2. IDEA新建project工作空间
+		① 微服务cloud整体聚合父工程Project，创建步骤
+			A. 新建工程
+				a. 选择 FIle -> New -> Project -> Maven
+				b. Project SDK选择自定义的1.8版本，选择create from archetype，并选择org.apache.maven.archetype:maven-archetype-site，点击next
+				c. 输入GroupId：com.li.springcloud，和ArtifactId：cloud2020，版本为1.0-SNAPSHOT，点击Next
+				d. 确认Maven为自定义的3.5版本以上无误后，点击Next
+				e. 确认Project name和Project location之后，点击Finish完成创建
+			B. 聚合总父工程名字：cloud2020
+			C. Maven的选择版本为：D:\Program Files\OpenSource\maven\apache-maven-3.6.0\
+			D. 父工程名称：cloud2020
+			E. 字符编码：
+				a. 点击FIle -> Settings... -> Editor -> File Encodings
+				b. 在Global Encoding中选择UTF-8，在Project Encoding中选择UTF-8，Default encoding for properties file 中选择UTF-8，勾选Transparent
+				native-to-ascii conversion，点击Apply和OK完成设置
+			F. 注解生效激活
+				a. 点击FIle -> Settings... -> Build,Execution,Deployment -> Compiler -> Annotation Processors
+				b. 选择Default，勾选Enable annotation processing，点击Apply和OK完成设置
+			G. java编译版本选择1.8
+				a. 点击FIle -> Settings... -> Build,Execution,Deployment -> Java Compiler -> Annotation Processors
+				b. 确定新建工程的JDK版本为1.8
+			H. File Type过滤
+				a. 点击FIle -> Settings... -> Editor -> File Type -> ActionScript
+				b. 在ignore files and folders中新增“*.idea;*.iml;”，即过滤.idea和.iml文件，点击Apply和OK完成设置
+			
+		② 父工程POM
+			A. 声明父工程的打包方式为pom方式
+				<groupId>com.li.springcloud</groupId>
+				<artifactId>cloud2020</artifactId>
+				<version>1.0-SNAPSHOT</version>
+				<packaging>pom</packaging>
+			B. 删除父工程中的src目录
+			C. 统一管理jar包版本
+				<properties>
+					<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+					<maven.compiler.source>1.8</maven.compiler.source>
+					<maven.compiler.target>1.8</maven.compiler.target>
+					<junit.version>4.12</junit.version>
+					<log4j.version>1.2.17</log4j.version>
+					<lombok.version>1.16.18</lombok.version>
+					<mysql.version>5.1.47</mysql.version>
+					<druid.version>1.1.16</druid.version>
+					<mybatis.spring.boot.version>1.3.0</mybatis.spring.boot.version>
+				</properties>
+			D. dependencyManagement：
+				<dependencyManagement>
+					<dependencies>
+						<!-- https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-test -->
+						<dependency>
+							<groupId>org.springframework.boot</groupId>
+							<artifactId>spring-boot-dependencies</artifactId>
+							<version>2.2.2.RELEASE</version>
+							<type>pom</type>
+							<scope>import</scope>
+						</dependency>
+						<dependency>
+							<groupId>org.springframework.cloud</groupId>
+							<artifactId>spring-cloud-dependencies</artifactId>
+							<version>Hoxton.SR1</version>
+							<type>pom</type>
+							<scope>import</scope>
+						</dependency>
+						<dependency>
+							<groupId>com.alibaba.cloud</groupId>
+							<artifactId>spring-cloud-alibaba-dependencies</artifactId>
+							<version>2.1.0.RELEASE</version>
+							<type>pom</type>
+							<scope>import</scope>
+						</dependency>
+						<dependency>
+							<groupId>mysql</groupId>
+							<artifactId>mysql-connector-java</artifactId>
+							<version>${mysql.version}</version>
+						</dependency>
+						<dependency>
+							<groupId>com.alibaba</groupId>
+							<artifactId>druid</artifactId>
+							<version>${druid.version}</version>
+						</dependency>
+						<dependency>
+							<groupId>org.mybatis.spring.boot</groupId>
+							<artifactId>mybatis-spring-boot-starter</artifactId>
+							<version>${mybatis.spring.boot.version}</version>
+						</dependency>
+						<dependency>
+							<groupId>junit</groupId>
+							<artifactId>junit</artifactId>
+							<version>${junit.version}</version>
+							<scope>test</scope>
+						</dependency>
+						<dependency>
+							<groupId>log4j</groupId>
+							<artifactId>log4j</artifactId>
+							<version>${log4j.version}</version>
+						</dependency>
+						<dependency>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+							<version>${lombok.version}</version>
+						</dependency>
+					</dependencies>
+				</dependencyManagement>
+			E. 插件
+				<build>
+					<plugins>
+						<plugin>
+							<groupId>org.springframework.boot</groupId>
+							<artifactId>spring-boot-maven-plugin</artifactId>
+							<configuration>
+								<fork>true</fork>
+								<addResources>true</addResources>
+							</configuration>
+						</plugin>
+					</plugins>
+				</build>
+		③ Maven工程复习：
+			A. dependencyManagement：
+				a. Maven使用dependencyManagement元素来统一管理依赖版本号的方式
+				b. 通常会在一个组织或者项目的最顶层的f父POM中看到dependencyManagement元素
+				c. 使用pom.xml中的dependencyManagement元素能能让所有在子项目中引用一个依赖而不用显示列出版本号，Maven会沿着父子层次向上走，直到
+				找到一个拥有dependencyManagement元素的项目，然后就会使用这个dependencyManagement元素指定的版本号。
+				d. 这样做的好处是：如果有多个子项目都引用一样的依赖，则可以避免在每个子项目中都声明一个版本号，这样如果想升级或者切换到另一个版
+				本时，只需要在顶层父容器里更新，而不需要一个一个子项目的修改；另外如果某个子项目需要另外使用一个版本，只需要声明version即可
+				e. dependencyManagement里只是声明依赖，并不实现引入。因此子项目需要显示声明需要的依赖。
+				f. 如果不在子项目中声明依赖，是不会从父项目中继承下来的，只有在子项目中写了该依赖项，并且没有指定具体的版本，才会从父项目中继承
+				该项，并且version和scope都读取自父pom
+			B. Maven 中如何跳过单元测试：
+				一般在部署和安装Maven工程时，为了节约时间成本，会选择跳过单元测试，即在IDEA中打开 Maven Projects，选择工具栏的闪电图标，选择后
+				工程的Leftcycle的test生命周期就会被禁用。
+		④ 父工程创建完成后执行mav:install将父工程发布到仓库中方便子工程继承
+			打开Maven Projects，选择工程的Leftcycle，选择install，则可实现安装父工程到本地仓库
+	3. Rest微服务工程构建
+		① cloud-provider-payment8001：微服务提供者支持Module模块
+			A. 建Module：
+				a. 选择父工程 -> 右键 -> New -> Module -> Maven
+				b. 选择Project SDK，点击Next
+				c. 在ArtifactId中输入工程的名字，其他选择默认跟父工程一致，点击Next
+				d. 在Module name中再次输入工程名，点击Finish，完成模块创建。
+			B. 改POM
+				<dependencies>
+					<dependency>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-starter-web</artifactId>
+					</dependency>
+					<dependency>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-starter-actuator</artifactId>
+					</dependency>
+					<dependency>
+						<groupId>org.mybatis.spring.boot</groupId>
+						<artifactId>mybatis-spring-boot-starter</artifactId>
+					</dependency>
+					<dependency>
+						<groupId>com.alibaba</groupId>
+						<artifactId>druid-spring-boot-starter</artifactId>
+					</dependency>
+					<dependency>
+						<groupId>mysql</groupId>
+						<artifactId>mysql-connector-java</artifactId>
+					</dependency>
+					<dependency>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-starter-jdbc</artifactId>
+					</dependency>
+					<dependency>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-devtools</artifactId>
+						<scope>runtime</scope>
+						<optional>true</optional>
+					</dependency>
+					<dependency>
+						<groupId>org.projectlombok</groupId>
+						<artifactId>lombok</artifactId>
+						<optional>true</optional>
+					</dependency>
+					<dependency>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-starter-test</artifactId>
+						<scope>test</scope>
+					</dependency>
+				</dependencies>
+			C. 写YML
+				server:
+				  port: 8001
+
+				spring:
+				  application:
+					name: cloud-payment-service
+				  datasource:
+					username: root
+					password: 2648
+					url: jdbc:mysql://192.168.107.6:3306/test
+					driver-class-name: com.mysql.jdbc.Driver
+					type: com.alibaba.druid.pool.DruidDataSource
+					#   数据源其他配置
+					initialSize: 5
+					minIdle: 5
+					maxActive: 20
+					maxWait: 60000
+					timeBetweenEvictionRunsMillis: 60000
+					minEvictableIdleTimeMillis: 300000
+					validationQuery: SELECT 1 FROM DUAL
+					testWhileIdle: true
+					testOnBorrow: false
+					testOnReturn: false
+					poolPreparedStatements: true
+					#   配置监控统计拦截的filters，去掉后监控界面sql无法统计，'wall'用于防火墙
+					filters: stat,wall,log4j
+					maxPoolPreparedStatementPerConnectionSize: 20
+					useGlobalDataSourceStat: true
+					connectionProperties: druid.stat.mergeSql=true;druid.stat.slowSqlMillis=500
+
+				mybatis:
+				  mapper-locations: classpath:mapper/*.xml
+				  type-aliases-package: com.li.springcloud.entities
+			D. 主启动和配置类
+				import org.springframework.boot.SpringApplication;
+				import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+				@SpringBootApplication
+				public class PaymentMain1001 {
+
+					public static void main(String[] args) {
+						SpringApplication.run(PaymentMain1001.class, args);
+					}
+				}
+				
+				import com.alibaba.druid.pool.DruidDataSource;
+				import com.alibaba.druid.support.http.StatViewServlet;
+				import com.alibaba.druid.support.http.WebStatFilter;
+				import org.springframework.boot.context.properties.ConfigurationProperties;
+				import org.springframework.boot.web.servlet.FilterRegistrationBean;
+				import org.springframework.boot.web.servlet.ServletRegistrationBean;
+				import org.springframework.context.annotation.Bean;
+				import org.springframework.context.annotation.Configuration;
+
+				import javax.sql.DataSource;
+				import java.util.Arrays;
+				import java.util.HashMap;
+				import java.util.Map;
+
+				@Configuration
+				public class MyDruidConfig {
+
+					@Bean
+					@ConfigurationProperties(prefix = "spring.datasource")
+					public DataSource druid() {
+						return new DruidDataSource();
+					}
+
+					@Bean
+					public ServletRegistrationBean statViewServlet() {
+						ServletRegistrationBean registrationBean = new ServletRegistrationBean();
+						registrationBean.setServlet(new StatViewServlet());
+						registrationBean.setUrlMappings(Arrays.asList("/druid/*"));
+						Map<String, String> initParames = new HashMap<>();
+						initParames.put("loginUsername", "admin");
+						initParames.put("loginPassword", "2648");
+						initParames.put("allow", "localhost");
+						registrationBean.setInitParameters(initParames);
+						return registrationBean;
+					}
+
+					@Bean
+					public FilterRegistrationBean webStatFilter() {
+						FilterRegistrationBean registrationBean = new FilterRegistrationBean();
+						registrationBean.setFilter(new WebStatFilter());
+						registrationBean.setUrlPatterns(Arrays.asList("/*"));
+						Map<String, String> initParames = new HashMap<>();
+						initParames.put("exclusions", "*.css,*.js,/druid/*");
+						registrationBean.setInitParameters(initParames);
+						return  registrationBean;
+					}
+				}
+			E. 业务类
+				a. 建表SQL：
+					CREATE TABLE payment(
+						id BIGINT(20) NOT NULL AUTO_INCREMENT COMMENT 'ID',
+						`serial` VARCHAR(200) DEFAULT '', 
+						PRIMARY KEY(id)
+					) ENGINE=INNODB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+				b. entities：
+					(1) 实体类：Payment
+						import lombok.AllArgsConstructor;
+						import lombok.Data;
+						import lombok.NoArgsConstructor;
+						
+						@Data
+						@AllArgsConstructor
+						@NoArgsConstructor
+						public class Payment implements Serializable {
+							private Long id;
+							private String serial;
+						}
+					(2) Json封装体CommonResult
+						import lombok.AllArgsConstructor;
+						import lombok.Data;
+						import lombok.NoArgsConstructor;
+
+						@Data
+						@AllArgsConstructor
+						@NoArgsConstructor
+						public class CommonResult<T> {
+							private Integer code;
+							private String message;
+							private T data;
+
+							public CommonResult(Integer code, String message) {
+								this.code = code;
+								this.message = message;
+							}
+						}
+				c. dao：
+					(1) 接口PaymentDao
+						import com.li.springcloud.entities.Payment;
+						import org.apache.ibatis.annotations.Mapper;
+
+						@Mapper
+						public interface PaymentDao {
+
+							public int addPaymen(Payment payment);
+
+							public Payment getPaymenById(Long id);
+						}
+					(2) mybatis的映射文件PaymenMapper.xml
+						(A) 路径src/main/resources/mapper/PaymenMapper.xml
+						(B) 内容
+							<?xml version="1.0" encoding="UTF-8" ?>
+							<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+							<mapper namespace="com.li.springcloud.dao.PaymentDao">
+								<insert id="addPaymen" parameterType="payment" useGeneratedKeys="true" keyProperty="id">
+									INSERT INTO payment(serial) VALUES (#{serial})
+								</insert>
+
+								<resultMap id="getPaymenByIdMap" type="payment">
+									<id column="id" property="id"/>
+									<result column="id" property="id"/>
+								</resultMap>
+								<select id="getPaymenById" parameterType="long" resultMap="getPaymenByIdMap">
+									SELECT * FROM payment WHERE id=#{id}
+								</select>
+							</mapper>
+				d. service：
+					(1) PaymentService接口：
+						import com.li.springcloud.entities.Payment;
+
+						public interface PaymentService {
+
+							public int addPayment(Payment payment);
+
+							public Payment getPaymentById(Long id);
+						}
+					(2) PaymentServiceImpl实现类：
+						import com.li.springcloud.dao.PaymentDao;
+						import com.li.springcloud.entities.Payment;
+						import com.li.springcloud.service.PaymentService;
+						import org.springframework.stereotype.Service;
+
+						@Service
+						public class PaymentServiceImpl implements PaymentService {
+
+							private PaymentDao paymentDao;
+							@Override
+							public int addPayment(Payment payment) {
+								return paymentDao.addPayment(payment);
+							}
+
+							@Override
+							public Payment getPaymentById(Long id) {
+								return paymentDao.getPaymentById(id);
+							}
+						}
+				E. controller：
+					import com.li.springcloud.entities.CommonResult;
+					import com.li.springcloud.entities.Payment;
+					import com.li.springcloud.service.PaymentService;
+					import org.springframework.beans.factory.annotation.Autowired;
+					import org.springframework.web.bind.annotation.*;
+
+					@RestController
+					public class PaymentController {
+
+						@Autowired
+						private PaymentService paymentService;
+
+						@PostMapping("/payment")
+						public CommonResult<Integer> addPayment(Payment payment) {
+							int data = paymentService.addPayment(payment);
+							CommonResult<Integer> result = null;
+							if (data > 0){
+								result = new CommonResult<>(200, "添加成功", data);
+							} else {
+								result = new CommonResult<>(500, "添加失败", null);
+							}
+							return result;
+						}
+
+						@GetMapping("/payment/{id}")
+						public CommonResult<Payment> getPaymentById(@PathVariable("id") Long id) {
+							Payment payment = paymentService.getPaymentById(id);
+							CommonResult<Payment> result = null;
+							if (payment == null) {
+								result = new CommonResult<>(404, id + "号支付信息不存在", null);
+							} else {
+								result = new CommonResult<>(200, "查询成功", payment);
+							}
+							return result;
+						}
+					}
+				F. 注意事项
+					A. 由于Druid依赖了log4j，需要在POM文件中引入log4j的依赖，或者删除Druid配置项filters: stat,wall,log4j中的log4j
+					B. idea中使用lombok注解无效，dea使用lombok需要安装对应插件，在File -> Setting -> Plugins中搜索lombok安装对应插件，重启IDEA后即可使用。
+		② 热部署Devtools
+			A. 引入热部署依赖到pom.xml
+				<dependency>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-devtools</artifactId>
+					<scope>runtime</scope>
+					<optional>true</optional>
+				</dependency>
+			B. 引入插件到聚合总父工程的pom.xml中
+				<build>
+					<!-- 可省略 -->
+					<!-- <finalName>总父工程名</finalName> -->
+					<plugins>
+						<plugin>
+							<groupId>org.springframework.boot</groupId>
+							<artifactId>spring-boot-maven-plugin</artifactId>
+							<configuration>
+								<fork>true</fork>
+								<addResources>true</addResources>
+							</configuration>
+						</plugin>
+					</plugins>
+				</build>
+			C. 	开启自动编译的选项
+				a. 选择File -> Settings -> Build,Execution,Deployment -> compiler
+				b. 勾选以下选项
+					AutoMatically show first_error in editor（默认已勾选）
+					Display notification onbuild completion（默认已勾选）
+					Build project automatically
+					Compile independent modules in parallel
+				c. 点击Apply和OK完成设置
+			D. 更新选项
+				a. 使用快捷键：ctrl+shift+alt+/
+				b. 选择registry...
+				c. 勾选以下选项
+					compiler.automake.allow.when.app.running
+					autionSystem.assertFocusAccessFromEdt（默认已勾选）
+				d. 点击Close完成设置
+			E. 重启IDEA。
+		③ cloud-consumer-order80：微服务消费者订阅Module模块
+			A. 建Module：cloud-consumer-order80
+			B. 该POM：
+				<dependencies>
+					<dependency>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-starter-web</artifactId>
+					</dependency>
+					<dependency>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-starter-actuator</artifactId>
+					</dependency>
+					<dependency>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-devtools</artifactId>
+						<scope>runtime</scope>
+						<optional>true</optional>
+					</dependency>
+					<dependency>
+						<groupId>org.projectlombok</groupId>
+						<artifactId>lombok</artifactId>
+						<optional>true</optional>
+					</dependency>
+					<dependency>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-starter-test</artifactId>
+						<scope>test</scope>
+					</dependency>
+				</dependencies>
+			C. 写YML：
+				server:
+				  port: 80
+				
+				spring:
+				  application:
+					name: cloud-order-service
+			D. 主启动和配置类
+				import org.springframework.boot.SpringApplication;
+				import org.springframework.boot.autoconfigure.SpringBootApplication;
+				
+				@SpringBootApplication
+				public class OrderMain80 {
+
+					public static void main(String[] args) {
+						SpringApplication.run(OrderMain80.class, args);
+					}
+				}
+				
+				import org.springframework.context.annotation.Bean;
+				import org.springframework.context.annotation.Configuration;
+				import org.springframework.web.client.RestTemplate;
+
+				@Configuration
+				public class ApplicationContextConfig {
+
+					@Bean
+					public RestTemplate restTemplate() {
+						return new RestTemplate();
+					}
+				}
+			F. 业务类
+				a. entities
+					(1) 实体类：Payment
+					(2) Json封装体CommonResult
+				b. RestTemplate：
+					(1) 官网地址：https://docs.spring.io/spring-framework/docs/5.2.2.RELEASE/javadoc-api/org/springframe/web/client/RestTemplate.html
+					(2) 使用
+						(A) restTemplate访问restful接口非常简单粗暴
+						(B) (url, requestMap, ResponseBean.class)这三个参数分别代表REST请求地址，请求参数，HTTP响应转换被转换成的对象类型。
+				c. controller：
+					import com.li.springcloud.entities.CommonResult;
+					import com.li.springcloud.entities.Payment;
+					import org.springframework.beans.factory.annotation.Autowired;
+					import org.springframework.web.bind.annotation.GetMapping;
+					import org.springframework.web.bind.annotation.PathVariable;
+					import org.springframework.web.bind.annotation.PostMapping;
+					import org.springframework.web.bind.annotation.RestController;
+					import org.springframework.web.client.RestTemplate;
+
+					@RestController
+					public class OrderController {
+
+						@Autowired
+						private RestTemplate restTemplate;
+
+						private static final String PAYMENT_URL = "http://localhost:8001";
+
+						@PostMapping("/consumer/payment")
+						public CommonResult<Integer> addPayment(Payment payment) {
+							CommonResult result = restTemplate.postForObject(PAYMENT_URL + "/payment", payment, CommonResult.class);
+							return result;
+						}
+
+						@GetMapping("/consumer/payment/{id}")
+						public CommonResult<Payment> getPaymentById(@PathVariable("id") Long id) {
+							CommonResult result = restTemplate.getForObject(PAYMENT_URL + "/payment/" + id, CommonResult.class);
+							return result;
+						}
+					}
+				d. 注意，
+					(1) 使用订单服务远程调用支付模块的创建订单，需要给创建订单的Payment参数使用@@RequestBody标注
+						@PostMapping("/payment")
+						public CommonResult<Integer> addPayment(@RequestBody Payment payment) {
+					(2) 启用run dashboard功能，能显示控制所有微服务模块
+						(A) 通过修改idea的workspace.xml的方式来快速打开Run dashboard窗口：
+							(a) 选择父工程 -> 右键 -> Show in Explorer，定位工程在本地磁盘路径
+							(b) 点进父工程所在的文件目录，点进.idea，进入workspace.xml
+						(B) 启动RunDashboard
+							找到<component name="RunDashboard">节点，增加以下内容：
+							<option name="configurationTypes">
+								<set>
+									<option value="SpringBootApplicationConfigurationType" />
+								</set>
+							</option>
+						(C) 重启IDEA。
+					(3) 在run dashboard中添加模块
+						(A) 找到菜单栏主程序，点击下拉，选择Edit Configuration
+						(B) 选择Spring Boot模块，点击右边的“+”添加按钮，选择Spring Boot，新增一个微服务模块
+						(C) 在Name输入框中输入微服务模块主程序类名，在Main class中选择主程序类，在 Use classpath of module中选择微服务模块，在JRE中
+						选择自定义的JDK
+						(D) 点击Apply和OK完成设置
+		④ 工程重构	
+			A. 背景：服务提供者和服务消费者都需要定义CommonResult和Payment实体类，该内容属于重复内容，因此需要将共同部分内容提取出来，进而重构代码
+			B. 步骤：
+				a. 创建一个新的Module：cloud-api-commons
+				b. 修改pom.xml文件
+					<dependency>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-devtools</artifactId>
+						<scope>runtime</scope>
+						<optional>true</optional>
+					</dependency>
+					<dependency>
+						<groupId>org.projectlombok</groupId>
+						<artifactId>lombok</artifactId>
+						<optional>true</optional>
+					</dependency>
+					<dependency>
+						<groupId>cn.hutool</groupId>
+						<artifactId>hutool-all</artifactId>
+						<version>5.1.0</version>
+					</dependency>
+				c. 将微服务共同的entities抽取到新的工程中。
+				d. 使用Maven命令clean install将工程安装到本地仓库供其他模块调用。
+				e. 对订单80服务和支付8001分别改造
+					(1) 删除各自的原先有过的entities包
+					(2) 各自粘贴POM内容
+						<dependency>
+							<artifactId>cloud-api-commons</artifactId>
+							<groupId>com.li.springcloud</groupId>
+							<version>${project.version}</version>
+						</dependency>
+Jmeter下载安装配置及使用（windows）
+	1. 下载安装：
+		① 官网：https://jmeter.apache.org/download_jmeter.cgi
+		② 下载版本：Apache JMeter 5.3 (Requires Java 8+)
+		③ 依赖：Requires Java 8+
+	2. 配置环境变量
+		① 新增JMETER_HOME=D:\Program Files\OpenSource\Jmeter\apache-jmeter-5.3
+		② 新增classpath=%JMETER_HOME%\lib\ext\ApacheJMeter_core.jar;%JMETER_HOME%\lib\jorphan.jar
+		③ 保存退出
+	3. 使用	Jmeter测试高并发				
+		① 新建线程组：
+			A. 右键Test Plan -> Add -> Threads(Users) -> Thread Group
+			B. 在name输入框中输入线程组的名称：Hystrix2020
+			C. 在Number of Threads(Users)输入框中输入线程池大小：200
+			D. 在Loop Count输入框中输入每秒执行的次数：100
+			E. Ctrl+s保存				
+		② 新建HTTP请求：
+			A. 右键新建的线程组Hystrix2020 -> Add -> Sample -> Http Request
+			B. 在Name输入框中输入测试的名称：HystrixRequest2020
+			C. 在Web Server栏的Protocol [http]输入框中输入请求协议：http，在Server Name Or IP输入框中输入服务名称：localhost，在Port Number中输入端口号：8001
+			选择Http Request：GET，在path输入框中输入测试的地址：http://localhost:8001/payment/timeout，
+			D. Ctrl+s保存，点击菜单栏的开始按钮进入测试		
+						
+						
+						
+						
+						
+						
+						
+						
+						
+						
+						
+						
+						
+						
+						
+						
+						
+						
+						
+						
+						
+						
+						
+
