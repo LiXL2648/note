@@ -1,0 +1,206 @@
+一、Bootstrap：
+	1. 中文官网：http://www.bootcss.com/
+	2. 文档介绍：
+		①bootstrap-3.7.7：bootstrap的源码
+		②bootstrap-3.7.7-dist：编译好的插件
+	3. 容器：
+		①流体容器：在大的div容器声明class属性为container-fluid，默认宽度为100%
+		②固定容器：在大的div容器中声明class属性为container，其宽度有三个阈值，四个状态
+			阈值						width
+			>= 1200（ld:大屏PC）		1170（1140 + 槽宽）
+			<1200 >=992（md:中屏PC）	970（940 + 槽宽）
+			<992  >=768（sd:平板）		750（720 + 槽宽）
+			<768（xs:移动手机）			auto
+		③栅格系统：将内行分成12列，以lg作为标识。
+	4. 栅格源码分析
+		①流动容器、固定容器公共样式
+			margin-right: auto;
+			margin-left: auto;
+			padding-left:  floor((@gutter / 2));//@gutter：槽宽：30px
+			padding-right: ceil((@gutter / 2));
+			&:extend(.clearfix all);//清除浮动
+		②固定容器的特定样式
+			//媒流体、该顺序不能变换
+			@media (min-width: @screen-sm-min) {
+				width: @container-sm;
+			}
+			@media (min-width: @screen-md-min) {
+				width: @container-md;
+			}
+			@media (min-width: @screen-lg-min) {
+				width: @container-lg;
+			}
+		③行的样式
+			margin-left:  ceil((@gutter / -2));
+			margin-right: floor((@gutter / -2));
+			&:extend(.clearfix all);
+		④列的样式
+			A. 第一步：调用.make-grid-columns()
+				a. 调用.col(@index)得到：.col-xs-1, .col-sm-1, .col-md-1, .col-lg-1
+				b. .col(@index, @list) when (@index =< @grid-columns)得到
+					@list = .col-xs-1, .col-sm-1, .col-md-1, .col-lg-1，
+							.col-xs-2, .col-sm-2, .col-md-2, .col-lg-2
+					并递归最终得到
+					@list = .col-xs-1, .col-sm-1, .col-md-1, .col-lg-1，
+					.col-xs-2, .col-sm-2, .col-md-2, .col-lg-2，
+					......
+					.col-xs-12, .col-sm-12, .col-md-12, .col-lg-12
+				c. 当index=13时结束递归并调用	.col(@index, @list) when (@index > @grid-columns) {	得到	
+					.col-xs-1, .col-sm-1, .col-md-1, .col-lg-1，
+					.col-xs-2, .col-sm-2, .col-md-2, .col-lg-2，
+					......
+					.col-xs-12, .col-sm-12, .col-md-12, .col-lg-12{
+						position: relative;
+						min-height: 1px;
+						padding-left:  ceil((@grid-gutter-width / 2));
+						padding-right: floor((@grid-gutter-width / 2));
+					}
+			B. 第二步：调用.make-grid(@class)（bootstrap中移动端支持优先）
+				a. 控制列向左浮动：调用.float-grid-columns(@class)
+					（1）调用.float-grid-columns(@class)得到.col-xs-1
+					（2）调用.col(@index, @list) when (@index =< @grid-columns)得到：
+						.col-xs-1，
+	  				 	.col-xs-2
+						并递归最终得到：
+						.col-xs-1，
+						.col-xs-2，
+						......， 
+						.col-xs-12
+					（3）结束递归并调用.col(@index, @list) when (@index > @grid-columns)得到
+						.col-xs-1，
+					    .col-xs-2，
+					    ......， 
+					    .col-xs-12{
+							float: left;
+					    }
+				b. 控制列的宽度：调用.loop-grid-columns(@index, @class, @type) when (@index >= 0) 
+					（1）调用.calc-grid-column(@index, @class, @type);得到
+						.col-xs-12 {
+							width: percentage(12 / 12);
+						}
+					（2）递归调用.loop-grid-columns((@index - 1), @class, @type)当@index < 0时结束
+							得到
+							col-xs-11 {
+							   width: percentage(11 / 12);
+							}
+							......
+							col-xs-1 {
+								   width: percentage(1 / 12);
+							}
+				c. 控制列的向左排序：调用.loop-grid-columns(@grid-columns, @class, pull)得到：
+					.col-xs-push-12 {
+						left: percentage(12 / 12);
+					}
+					.col-xs-push-11 {
+						left: percentage(11 / 12);
+					}
+					......
+					.col-xs-push-1 {
+						left: percentage(1 / 12);
+					}
+					.col-xs-push-0 {
+						left: auto;
+					}
+				d. 控制列的向右排序：调用.loop-grid-columns(@grid-columns, @class, push)得到：
+					.col-xs-pull-12 {
+						right: percentage(12 / 12);
+					}
+					.col-xs-pull-11 {
+						right: percentage(11 / 12);
+					}
+					......
+					.col-xs-pull-1 {
+						right: percentage(1 / 12);
+					}
+					.col-xs-pull-0 {
+						right: auto;
+					}
+				e. 控制列的偏移量：loop-grid-columns(@grid-columns, @class, offset)得到：
+					.col-xs-offset-12 {
+						margin-left: percentage(12 / 12);
+					}
+					.col-xs-offset-11 {
+						margin-left: percentage(11 / 12);
+					}
+					......
+					.col-xs-offset-1 {
+						margin-left: percentage(1 / 12);
+					}
+					.col-xs-offset-0 {
+						margin-left: 0;
+					}
+	5. 	响应式工具
+		①当阈值到达某个条件时，显示容器
+			A. 隐藏所有的容器：
+				.visible-xs,
+				.visible-sm,
+				.visible-md,
+				.visible-lg {
+				  .responsive-invisibility();
+				}
+			B. 接着当阈值到达某个条件时，显示容器
+			.visible-xs {
+			  @media (max-width: @screen-xs-max) {
+				.responsive-visibility();
+			  }
+			}
+			.visible-sm {
+			  @media (min-width: @screen-sm-min) and (max-width: @screen-sm-max) {
+				.responsive-visibility();
+			  }
+			}
+			.visible-md {
+			  @media (min-width: @screen-md-min) and (max-width: @screen-md-max) {
+				.responsive-visibility();
+			  }
+			}
+			.visible-lg {
+			  @media (min-width: @screen-lg-min) {
+				.responsive-visibility();
+			  }
+			}
+			②阈值到达某个条件时，隐藏容器
+				.hidden-xs {
+				  @media (max-width: @screen-xs-max) {
+					.responsive-invisibility();
+				  }
+				}
+				.hidden-sm {
+				  @media (min-width: @screen-sm-min) and (max-width: @screen-sm-max) {
+					.responsive-invisibility();
+				  }
+				}
+				.hidden-md {
+				  @media (min-width: @screen-md-min) and (max-width: @screen-md-max) {
+					.responsive-invisibility();
+				  }
+				}
+				.hidden-lg {
+				  @media (min-width: @screen-lg-min) {
+					.responsive-invisibility();
+				  }
+				}
+	6. 栅格盒模型设计的精妙之处
+		①容器两边具有 15px 的padding
+		②行  两边具有-15px 的margin
+		③列  两边具有 15px 的padding
+		
+		④意义：
+			A. 为了维护槽宽的规则，列两边必须得要15px的padding
+			B. 为了能使列嵌套行，行两边必须要有-15px的margin
+			C. 为了让容器可以包裹住行，容器两边必须要有15px的padding
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+		

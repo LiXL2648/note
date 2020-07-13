@@ -1,0 +1,247 @@
+/*设置body的样式*/
+body{
+	background: url(../img/bg-body.png) repeat-x;
+	font-size: 12px;
+}
+
+/*固定div的大小和剧中*/
+.w{
+	width: 940px;
+	margin: 0 auto;
+	/*background-color: #bfa;*/
+}
+
+/*解决高度塌陷和垂直外边距重合问题*/
+.clearfix:before, .clearfix:after{
+	content: "";
+	display: table;
+	clear: both;
+}
+
+/*设置header的内边距*/
+.header{
+	padding: 37px 0 46px 0;
+}
+
+/*设置logo的外边距*/
+.logo{
+	margin-left: 15px;
+}
+
+/*设置ul向右浮动*/
+.nav{
+	float: right;
+	margin-top: 22px;
+}
+
+/*设置li向左浮动*/
+.nav li{
+	float: left;
+	padding: 0 10px 5px 10px;
+	border-left: 1px #d7d7d7 dotted;
+}
+
+/*设置li中a的字体样式*/
+.nav a{
+	text-decoration: none;
+	color: #666666;
+	font: bold 14px Georgia;
+}
+/*给超链接设置鼠标移入效果*/
+.nav a:hover{
+	color: #cacaca;
+	text-decoration: underline;
+}
+/*设置li中p的字体样式*/
+.nav p{
+	font: 11px Tahoma;
+	color: #b7b7b7;
+}
+/*设置banner背景图片*/
+.banner{
+	height: 356px;
+	background: url(../img/shadow.png) no-repeat bottom center;
+	position: relative;
+}
+/*设置pointer的样式*/
+.pointer{
+	position: absolute;
+	top: 314px;
+	left: 15px;
+}
+/*设置pointer中a的样式*/
+.pointer a{
+	float: left;
+	width: 17px;
+	height: 17px;
+	background: url(../img/pointer.png);
+	margin-left: 4px;
+}
+.pointer a:hover,.pointer a:active,.pointer .secondPointer{
+	background: url(../img/pointer-hover-active.png);
+}
+
+/*设置content中h1的样式*/
+.content h1{
+	text-align: center;
+	font: bold 24px Georgia;
+	padding: 9px 0 20px 0;
+	background: url(../img/break.png) no-repeat bottom center;
+	margin-bottom: 30px;
+}
+.content .pl, .content .cs, .content .uc, 
+.contact .sc, .contact .co, .contact .nu{
+	float: left;
+	width: 300px;
+}
+
+.content .cs, .contact .co{
+	margin: 0 20px;
+}
+/*设置content中h2的样式*/
+.content h2{
+	color: #11719e;
+	font: 21px Georgia;
+}
+/*设置content中h3的样式*/
+.content h3{
+	color: #8c8c8c;
+	font: 12px helvetica;
+}
+.content .imgDiv{
+	background: url(../img/bg-imgDiv.png) no-repeat;
+	width: 300px;
+	height: 190px;
+	text-align: center;
+	padding-top: 12px;
+	margin: 16px 0 10px 0;
+}
+.content p{
+	height: 92px;
+	color: #3e3e3e;
+	font: 13px helvetica;
+}
+.content a{
+	width: 163px;
+	height: 32px;
+	display: block;
+	text-decoration: none;
+	text-indent: 1em;
+	color: #016999;
+	font: 12px/32px helvetica;
+	background: url(../img/botton/btn1.jpg) no-repeat;
+	margin-bottom: 35px;
+}
+
+.contact{
+	background: url(../img/break1.png) no-repeat top center;
+}
+
+/*设置contact中h2的样式*/
+.contact h2{
+	color: #444;
+	font: 25px/1 Georgia;
+	padding: 36px 0 9px;
+	border-bottom: 1px dashed #d3d3d3;
+	margin-bottom: 15px;
+}
+
+/*设置contact中间栏表单的样式*/
+.contact .text{
+	width: 276px;
+	height: 33px;
+	line-height: 33px;
+	background: url(../img/input.png) no-repeat;
+	/*兼容IE6*/
+	_background-attachment: fixed;
+	border: none;
+	padding: 0 10px;
+	margin: 0 0 16px;
+}
+.contact .tarea{
+	width: 276px;
+	height: 114px;
+	background: url(../img/textarea.png) no-repeat;
+	/*兼容IE6*/
+	_background-attachment: fixed;
+	resize: none;
+	border: none;
+	overflow: auto;
+	padding: 10px;
+	margin: 0px;
+}
+.contact .btn{
+	width: 163px;
+	height: 32px;
+	background: url(../img/btn2.png);
+	padding: 0px;
+	margin: 11px 0 23px;
+	color: #fff;
+	font: 13px/32px Georgia;
+	text-align: left;
+	text-indent: 1em;
+	cursor: pointer;
+}
+/*设置左侧的样式*/
+.contact p{
+	color: #8c8c8c;
+	font: 12px/1 helvetica;
+}
+.icon{
+	font-size: 0;
+	margin-top: 10px;
+}
+.sc .icon a{
+	margin-right: 6px;
+}
+.sc .nl{
+	color: #444;
+	font: bold 18px/1 Gill Sans MT;
+	padding-top: 28px;
+}
+.sc .text{
+	margin: 15px 0 0;
+}
+/*设置contact右侧的样式*/
+.nu p{
+	height: 58px;
+	padding-bottom: 9px;
+	margin-bottom: 14px;
+	border-bottom: 1px dashed #d3d3d3;
+}
+.nu .no-margin{
+	margin-bottom: 0;
+}
+.nu img{
+	float: left;
+	margin-right: 6px;
+}
+.nu .btn{
+	_margin-left: -1em;
+}
+
+/*设置底部的样式*/
+.floor{
+	height: 163px;
+	background: url(../img/bg-floor.gif) repeat-x;
+	border-top: 10px solid #4c4c4c;
+}
+.floor a, .floor p{
+	color: #999;
+	font: 11px/1 helvetica;
+	text-decoration: none;
+}
+.floor a:hover{
+	color: f2f2f2;
+	text-decoration: underline;
+}
+.floor .w{
+	padding-top: 18px;
+}
+.floor p{
+	margin: 0 23px 10px 8px;
+	
+}
+.floor .right-float{
+	float: right;
+}

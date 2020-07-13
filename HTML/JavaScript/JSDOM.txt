@@ -1,0 +1,379 @@
+一、DOM简介：
+	1. DOM：全程Document Object Model文档对象模型
+		①JS中通过DOM来对HTML文档进行操作，主要理解了DOM就可以随心所欲地操作WEB页面
+		②5文档：文档表示的是整个HTML网页文档
+		③对象：对象表示将网页中的每一个部分都转换为了一个对象
+		④模型：使用模型来表示对象与对象之间的关系，这样方便我们获取对象
+	2. 节点：构成HTML文档最基本的单元
+		①节点Node，是构成网页的最基本的组成部分，网页中的每一个部分都可以称为四一个节点
+		②举例：html标签、属性、文本、注释、整个文档等都是一个节点
+		③虽然是节点，但是实际上他们的具体类型不同
+		④比如：标签我们称为元素节点，属性我们称为属性节点，文本成为文本节点，文档称为文档节点
+		⑤节点的类型不同，属性和方法也不尽相同
+		⑥常用的节点分为四类：
+			A. 文档节点：
+				Ⅰ. 文档节点document，代表的是整个HTML文档，网页中的所有节点都是他的子节点
+				Ⅱ. doucument对象作为window对象的属性存在的，我们不用获取可以直接使用
+				Ⅲ. 通过该对象我们可以在整个文档访问内查找节点对象，并可以通过该对象创建各种节点对象				
+			B. 元素节点：HTML文档中的HTML标签
+			C. 属性节点：
+				Ⅰ. 属性节点表示的是标签中的一个一个属性，这里要注意的是属性节点并非是元素节点的子节点，
+					而是元素节点的一部分
+				Ⅱ. 可以通过元素节点来获取指定的属性节点
+				Ⅲ. 比如：元素节点.getAttributeNode("属性名")
+				Ⅳ. 注意：我们一般不使用属性节点
+			D. 文本节点：HTML标签中的文本内容
+	3. 获取一个文档元素节点对象的方法：
+		var dtn = document.ElementByID(元素属性名);
+	4. 修改一个元素节点的HTML代码：
+		dtn.innerHTML = "";
+二、事件Event：
+	1. 事件，就是文档或者浏览器窗口发生的一些特定的交互瞬间
+	2. JavaScript与HTML之间的交互是通过事件实现的
+	3. 对于Web应用来说，有下面这些代表性的事件：点击某个元素、将鼠标移动至某个元素上方、
+		按下键盘上某个键、等等
+	4. 可以在时间对象的属性中设置一些js执行代码，这些事件被触发时，JS代码将会被执行
+		①方式一
+			A. 例如：<button id = "id" onclik = "alert('');">我是一个btn</button>
+			B. 但是这种方式是行为与结构耦合，不方便维护，不推荐使用
+		②方式二
+			A. <button id = "btn">我是一个button</button>
+			   <script type = "text/javascript">
+					var btn = document.getElementById("btn");
+					btn.onclik = function(){
+						alert("");
+					}
+			   </scritp>
+			B. 这种方式是为按钮的对应事件绑定处理函数的形式来响应事件，这样当事件被触发时，其对应的函数将会被调用
+			C. 像这种为事件绑定的函数，我们称为单击响应函数
+	5. 事件的方法：
+		1. onclick：单击鼠标按钮的位置触发的事件
+			举例：btn01.onclick = function(){};
+		2. ondblclick：双击鼠标按钮的位置触发的事件
+			举例：btn01.ondbclick = function(){};
+		3. onmousemove：鼠标移动按钮位置触发的事件
+			举例：btn01.onmousemove = function(){};
+		4. onload()：事件会在整个页面加载之后才触发
+			举例：window.onload = function(){};
+三、文档的加载
+	1. JS的编写位置
+		①在body标签的上面
+			A. 如果单纯将JS代码写在上面，也会导致无法获取DOM对象，原因是浏览器在加载一个页面时，是按照自上而下的顺序，
+				当浏览器读取到一行代码时会执行一行代码，所以浏览器是先加载JS代码再加载页面，从而导致没有加载到DOM对象
+			B. 解决方法：
+				通过window对象onload事件绑定响应函数解决问题
+				onload事件会在整个页面加载之后才触发，因此为window绑定一个onload事件后，该事件对应的响应函数将会在页面
+				加载完成之时执行，这样可以确保我们的代码执行时所有的DOM对象已经加载完毕
+		②在body标签的下面：只需要通过页面加载到元素节点，为对象添加事件响应函数即可
+	2. JS的编写位置的比较
+		①编写在body标签上面时，易于管理
+		②编写在body标签下面时，页面加载的速度更加快
+四、对象查询：获取元素节点，通过document对象调用
+	1. getElementById(id属性名)：通过id属性获取一个元素节点
+		①通过节点元素对象的innerHtml可以获取节点元素内部的HTML代码
+		②举例：
+			var btn01 = document.getElementById("btn01");
+			btn01.onclick = function(){
+				var bj = document.getElementById("bj");
+				alert(bj.innerHTML);
+			};
+	2. getElementsByTagiName(标签名)：通过标签名获取一组元素节点对象
+		①getElementsByTagiName(标签名)这个方法返回一个类数组对象，所有查询到的元素都会封装到对象中
+		②即便查询到一个元素，同样是会保存到对象中返回
+		③举例：
+			var btn02 = document.getElementById("btn02");
+			btn02.ondblclick = function(){
+				var liLists = document.getElementsByTagName("li");
+				for (var i = 0; i < liLists.length; i++) {
+					alert(liLists[i].innerHTML);
+				}
+			};
+	3. getElementsByName(表单中name属性名)：通过那么属性获取一组元素节点对象
+		①如果一个节点元素是一个自结束标签，即便访问innerHTML属性也没有意义
+		②如果需要访问元素节点的属性，直接使用元素.属性名，比如元素.id、元素.name、元素.value、元素.className（特殊）
+		③举例：
+			var btn03 = document.getElementById("btn03");
+			btn03.onmousemove = function(){
+				var names = document.getElementsByName("gender");
+				for(var i = 0; i < names.length; i++){
+					alert(names[i].value);
+				}
+			};
+	4. 获取元素节点的子节点：通过具体的元素节点调用
+		①getElementByTagName()：通过元素节点的方法根据子元素节点的标签名去获取
+			A. 该方法和document对象的getElementByTagName()作用一样，但是作用的范围缩小了
+		②childNodes：表示当前节点的所有子节点
+			A. childNodes属性会获取包括文本节点在内的所有节点
+			B. 根据DOM标签间的空格也会当作文本节点
+			C. 在IE8及以下的版本的浏览器中，不会将空格文本也当作子节点
+			D. 可以使用children属性来代替childNodes熟悉，该属性可以获取当前元素下所以的子元素
+		③firstChild：表示当前节点的第一个子节点
+			A. 包括空白文本
+			B. 可以使用firstElementChild获取当前元素的第一个子元素
+			C. 但是不推荐使用，因为它不兼容IE9及以下版本的浏览器
+		④lastChild：表示当前节点的最后一个子节点，该属性与firstChild属性作用一样
+	5. 获取父节点和兄弟节点：通过具体的节点调用
+		①parentNode：表示当前节点的父节点，由于父节点只能是元素，因此该属性不会返回文本节点
+		②previousSibling：表示当前节点的前一个兄弟节点，该属性会返回一个文本节点
+							可以调用previousElementSibling熟悉获取前一个兄弟元素节点，但是不兼容IE8及以下版本的浏览器
+		③nextSibling：表示当前节点的后一个兄弟节点，该方法同样会返回一个文本节点
+		注：
+		A. 如果在script标签中，获取单击按钮响应事件次数太多，会导致代码的重复性严重
+			可以设置一个单击按钮响应事件函数，该函数中传入两个参数，分别是按钮的id属性
+			和一个响应函数，当点击一个按钮时会调用该函数和激发响应函数
+		B. innerText属性：该属和InnerHTML类似，能够获得一个节点中的内容，
+							不同的是innerText获取的是去除HTML标签的内容
+	6. DOM查询的剩余方法：
+		①获取body标签：
+			A. //通过document对象调用getElementByTagName()方法，返回的是一个类数组，而页面body只有一个
+				var body = document.getElementByTagName("body")[0];
+			B. //直接获取document对象的body属性获取body
+				var body = document.body
+		②获取heml标签：
+			var html = document.documentElement;
+		③获取页面中所以的元素：该属性返回的是类数组
+			var allElements = document.all;
+		④根据class属性值查询一组元素节点对象
+			A. var className = document.getElementsByClassName(class属性值);
+			B. 该方法可以获取一组元素节点对象，但是不支持IE8及以下的浏览器
+		⑤document.querySelector()：根据选择器获取元素节点
+			A. 需要一个选择器的字符串作为参数，可根据一个CSS选择器里查询一个元素节点对象
+			B. 虽然IE8不支持getElementsByClassName(),但是可以使用querySelector()支持IE8及以上的浏览器
+			C. 该方法总会返回唯一一个元素，如果满足条件的元素有多个，那么它只会返回第一个元素
+		⑥document.querySelectorAll()：根据选择器获取多个元素节点
+			A. 该方法和querySelector()用法一样，不同的是它将符合条件的元素储存在数组中返回
+			B. 即使该方法符合的条件只有一个，它也会通过数组返回
+	7. DOM的增删改操作
+		①document.createElement():
+			A. 可以用于创建一个元素节点对象
+			B. 需要一个标签名字符串作为参数，将会根据该标签名创建元素节点对象
+			C. 将创建好的对象作为返回值返回
+		②document.createTextNode():
+			A. 可以用于创建文本节点
+			B. 需要一个文本字符串作为参数，将会根据该内容创建文本，并将该文本节点返回
+		③父节点.appendChild(新的子节点对象)：向父节点添加一个子节点
+		④insertBefore():
+			A. 可以在指定的子节点前插入新的子节点
+			B. 语法：父节点.insertBefore(新节点对象, 旧节点对象)
+		⑤replaceChild():
+			A. 可以使用指定的直接点替换已有的子节点
+			B. 语法：父节点.replaceChild(新子节点，旧子节点);
+		⑥removeChild()：
+			A. 可以删除一个子节点
+			B. 语法：父节点.removeChild(子节点);
+		⑦元素节点对象.innerHTML:
+			A. 可以读取元素节点对象的内部HTML代码
+			B. 可以修改元素节点对象的内部HTML代码
+			C. 使用innerHTML属性也可以完成DOM的增删改的相关操作
+			D. 但是使用一般会结合使用innerHTML完成DOM的增删改的动作太大，会使得增删改的事件失效，
+				因此会将DOM中增删改操作与innerHTML结合使用。
+五、样式操作
+	1. 通过JS修改元素的样式
+		①语法：元素.style.样式名 = 样式值;
+		②注意：
+			A. 如果CSS中的样式名中含有“-”，比如background-color，这种命名在JS中是不合法的
+			B. 需要将这种样式名修改为驼峰命名法，即去掉“-”，将后面的单词首字母大写
+		③通过style属性设置的样式都是内敛样式，而内敛样式具有较高的优先级，所以通过JS修改的样式往往会立即显示
+		④如果在样式中写了!important，则此时的样式会有最高的优先级，即便通过JS修改也不能覆盖该样式，此时JS修改样式会失效
+			因此尽量不要为样式添加!important.
+	2. 通过JS获取元素的样式
+		①语法：元素.style.样式名
+		②注：通过style属性设置和读取都是内联样式，无法读取样式表中的样式
+	3. 获取元素的样式
+		①currentStyle：
+			A. 语法：元素.currentStyle.样式名
+			B. 它可以用来读取当前元素正在显示的样式
+			C. 如果当前元素没有使用样式，而获取它的默认值
+			D. currentStyle只有IE浏览器支持，其他浏览器都不支持该属性
+		②getComputedStyle():
+			A. 这个是window对象的方法，不需要通过其他对象调用该方法
+			B. 参数：
+				第一个值：要获取样式的元素
+				第二个值：可以传递一个伪元素，一般都传null
+			C. 该方法返回一个对象，该对象封装了元素对应的样式，可以通过该对象直接获取元素的样式
+			D. 在元素没有设置样式时，不会获取默认值，而是具体的值。
+			E. 该方法不支持IE8及以上版本的浏览器
+		③自定义一个函数getStyle，用于获取当前元素正在使用的样式，要求该函数既要支持IE8及以下的浏览器，又要支持其他浏览器。
+			A. 参数：
+				obj：要获取样式值的元素
+				name：要获取样式的属性名
+			B. 实现：
+				function getStyle(obj, name){
+					if(window.getComputedStyle){
+						return getComputedStyle(obj, null)[name];
+					}else{
+						return obj.currentStyle[name];
+					}
+				}
+六、其他样式的操作
+	1. clientWidth和clientHeight：
+		①这两个属性可以获取元素的可见宽度和高度
+		②这些属性获取的值都不带单位px,返回的是一个数字，可以直接进行计算
+		③会获取元素的宽度和高度，包括内容区和内边距，但是不包括边框
+		④这些属性是可读的，不能修改
+	2. offsetWidth和offsetHeight：
+		①用法和clientWidth和clientHeight一样
+		②它们能获取元素的整个宽度和高度，包括内容区、内边距和边框
+	3. offsetParent
+		①可以获取当前元素的定位父元素
+		②会获取到离当前元素最近开启了定位的祖先元素
+		③如果所有的祖先元素都没有开启定位，则会返回body
+	4. offsetLeft和offsetTop：获取当前元素相对于其定位祖先元素的水平偏移量或许垂直偏移量
+	5. scrollWidth和scrollHeidth：可以获取元素整个滚动区域的宽度和高度
+	6. scrollLeft和scrollTop：可以获取元素水平和垂直滚动条滚动的距离
+	7. 应用：
+		①当满足scrollWidth-scrollLeft==clientWidth时说明水平滚动条滚动到底
+		②当满足scrollHeight-scrolltop==clientHeight时说明垂直滚动条滚动到底
+	8. 拓展：
+		①滚动条触发事件：onscroll
+		②将表单设置为不可用：disabled="disabled";
+		③通过JS改变表单的可用属性：元素.disabled = true|false，表示禁用或者不禁用
+七、事件对象
+	1. onmousemove：该事件会当鼠标移动元素时被触发
+	2. 事件对象：
+		当事件的响应函数被触发时，浏览器每次都会将一个事件对象作为一个实参传递给该函数，
+		在事件对象中封装了当前事件相关的一切信息，比如：鼠标的坐标、键盘的哪个键被按下、
+		鼠标滚轮滚动的方向
+	3. 属性：
+		①clientX：可以获取鼠标指针的水平坐标
+		②clientY：可以获取鼠标指针的垂直坐标
+	4. 注：在IE8及以下版本浏览器中，浏览器不会传递事件对象，而是会将事件对象作为window对象属性进行保存
+	5. 事件对象的实例：
+		//获取div元素
+		var areaDiv = document.getElementById("areaDiv");
+		var showMsg = document.getElementById("showMsg");
+		//鼠标在areaDiv元素中移动添加事件
+		areaDiv.onmousemove = function(event){
+			//在IE8及以下浏览器中将事件对象作为window对象的属性保存
+			//但是火狐浏览器中并没有将事件对象保存在window对象中
+			//所以需要对是否存在event实参进行判断
+			if(!event){
+				event = window.event;
+			}
+			//该判断方式可以简写为
+			//event = event || window.event;
+			//获取鼠标指针的水平和垂直偏移量
+			var x = event.clientX;
+			var y = event.clientY;
+			//将鼠标的坐标写在showMsg中
+			showMsg.innerHTML = "x = " + x + ", y = " + y;
+		};
+八、div跟随鼠标移动
+	var div = document.getElementById("div");
+	//将事件绑定给文档
+	document.onmousemove = function(event){
+		//解决兼容性问题
+		if(!event){
+			event = window.event;
+		}
+		//获取鼠标的坐标
+		var left = event.clientX;
+		var top = event.clientY;
+		//但是鼠标的坐标是根据浏览器窗口的，而div的坐标则是根据页面的
+		//所以当给body设置width和height属性时，当拖动滚动条时，鼠标与div之间会出现一段距离
+		//此时可以将鼠标的坐标设置为根据页面即：
+		/*var left = event.pageX;
+		var top = event.pageY;*/
+		//此时，IE8及以下的浏览器不支持pageX和pageY属性
+		//最终的解决方法是将鼠标与div之间的距离设置给偏移量，即通过计算滚动条滚动的距离
+		//但是又出现一个问题是，chrome浏览器默认滚动条是body的，而火狐和IE浏览器则认为是html的
+		//因此需要考虑兼容性问题
+		x = document.body.scrollLeft || document.documentElement.scrollLeft;
+		y = document.body.scrollTop || document.documentElement.scrollTop;
+		//设置div的坐标
+		div.style.left = left + x + "px";
+		div.style.top = top + y + "px";
+	};
+九、事件的冒泡
+	1. 所谓的冒泡指的是事件的向上传导，当后代元素上的事件被触发时，其祖先元素的相同事件也会被触发
+	2. 在开发中大部分情况下冒泡都是有用的，如果不希望发生事件冒泡可以通过事件对象来取消冒泡
+	3. 可以将事件对象的cancelBubble设置为true，即可取消冒泡
+	4. 举例：event.cancelBubbl = true;
+十、事件的委派
+	1. 将事件统一绑定给元素的共同祖先元素，这样当后代元素上的事件触发时，会一直冒泡到祖先元素，从而
+		通过祖先元素的响应函数来处理事件。
+	2. 事件的委派十利用了事件的冒泡，通过事件的委派可以减少事件的绑定次数，提高程序的性能
+	3. target：
+		①事件对象event中的属性，表示事件触发的对象
+		②如果触发事件的对象是我们期望的的元素，则执行，否则不执行
+		③举例：
+			if(event.target.className == "link"){
+				alert();
+			}
+十一、事件绑定
+
+	1. 使用 对象.事件 = 函数 的形式绑定响应函数，它只能同时为一个元素的一个事件绑定一个响应函数，
+		不能绑定多个，如果绑定多个，则后边的响应函数会覆盖前边的响应函数
+	2. addEventListener()：
+		①同这个方法也可以为元素绑定一个响应函数
+		②参数：
+			A. 事件的字符串，不要在事件前边加on
+			B. 回调函数，当事件触发时该函数为被调用
+			C. 是否在捕获阶段触发事件，需要一个布尔值，一般都传false
+		③使用addEventListene()可以同时为一个元素的相同事件同时触发多个响应函数，这样当事件被触发时，
+			响应函数将会按照函数被绑定顺序执行
+		④addEventListener()在IE8及以下的浏览器中不被支持
+	3. attachEvent():
+		①该方法和addEventListener()作用一样,不同的是它的执行是后绑定先执行
+		②参数：
+			A. 事件的字符串，在事件前边需要加on
+			B. 回调函数，当事件被触发时，该函数被调用
+		③attachEvent()在火狐和Chrome浏览器中不被支持
+	4. blnd():
+		①为兼容所有浏览器而自定义的浏览器
+		②参数：
+			A. obj：要绑定事件的对象
+			B. eventStr：事件的字符串
+			C. callback：回调函数
+		③在addEventListene()中，this是绑定事件的对象，而attachEvent()中，this是window
+			因此需要统一this。
+		③举例：
+			var btn = document.getElementById("btn");
+			/*btn.addEventListener("click", function(){
+				alert("hello");
+			},false);*/
+			bind(btn, "click", function(){
+				alert(this);
+			});
+			
+			function bind(obj, eventStr, callback){
+				//通过判断对象是否有addEventListener方法来判断浏览器的版本
+				if(obj.addEventListener){
+					//addEventListener()和attachEvent()方法的事件类型不同
+					obj.addEventListener(eventStr, callback, false);
+				}else{
+					//统一this的指向,由于回调函数由window直接调用，我们不能也无法干预
+					//因此在回调函数采用匿名函数的方式由浏览器调用，在函数中，我们可以直接调用
+					//实际的回调函数，并且修改函数的call()方法，将obj作为attachEvent中的this
+					obj.attachEvent("on" + eventStr, function(){
+						callback.call(obj);
+					});
+				}
+			}
+十二、事件的传播
+	1. 关于事件的传播，网景公司与微软公司有不同的理解
+		①微软公司认为：事件应该是由内往外传播，也就是当事件触发时，应该触发当前元素的事件，然后由当前
+		元素向祖先元素传播，也就是事件应该在冒泡阶段执行
+		②网景公司则认为：事件应该是由外往内执行，也就是当前事先被触发时，应该先触发当前元素的祖先元素的事件，
+		然后在从祖先元素从子元素传播
+	2. W3C综合了两家公司的方案，将事件的传播分成了三个阶段
+		①捕获阶段：在捕获阶段时，最外层的祖先元素向目标元素进行事件捕获，但是默认此时不会触发事件
+		②目标阶段：事件捕获到目标元素，捕获结束开始在目标元素上触发事件
+		③冒泡阶段：事件从目标元素上开始触发，向祖先元素传递，按顺序触发祖先元素的事件
+	3. 如果希望在捕获阶段就触发事件，可以将addEventListener()的第三个参数设置为true，
+		但是一般情况下我们不会希望在捕获阶段就触发事件，所以这个参数一般会默认设置为false。
+	4. IE8及以下的浏览器只有冒泡阶段。
+十三、键盘事件：
+	1. 键盘事件：	
+		①onkeydown：按键被按下
+		②onkeyup：按键被松开
+		③键盘事件一般都会绑定给一些可以获取焦点的对象或者是document
+	2. keyCode：获取按键的编码，
+		①可以通过事件对象中的keyCode来判断哪个按键被按下
+		②除了keyCode,事件对象中还提供了几个属
+			A. altKey
+			B. ctrlKey
+			C. shiftKey
+		③这几个属性可以判断alt\ctrl\shift是否被按下，如果被按下，则会返回true，否则返回false
+		④判断ctrl+c是否被同时按下：if(event.keyCode === 99 && event.ctrlKey){alert();}
+		

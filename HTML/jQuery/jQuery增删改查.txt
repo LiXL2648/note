@@ -1,0 +1,404 @@
+一、jQuery：JavaScript查找
+	1. 什么是jQuery
+		①官网：http://jQuery.com/
+		②一个优秀的JS函数库
+		③中大型WEB项目开发首选
+		④口号：write less, do more
+		⑤j插件：jQuery包装了原生的DOM，在JS之上，开发了基于jQuery的库，这些库不依赖与JS，
+			而是依赖jQuery，于是把这些库成为jQuery的插件
+	2. 为什么要用jQuery
+		①HTML元素选取（选择器）
+		②HTML元素操作
+		③CSS操作
+		④HTML事件处理：响应用户操作
+		⑤JS动画效果
+		⑥链式调用
+		⑦读写合一
+		⑧浏览器兼容
+		⑨浏览器兼容
+		⑩易扩展插件
+		ajax封装...
+	3. 如何使用jQuery
+		①引入jQuery库
+		②使用jQuery
+			A. jQuery核心函数：$/jQUery
+			B. jQuery核心对象: 执行$()/jQuery()返回的对象，一般用$变量储存对象
+		③区别两种js库库文件：测试版与生产版(压缩版)
+		④区别两种引用js库的方式：
+			A. 本地引入：引入jQuery库
+			B. CDN远程引入：www.bootcdn.cn
+		⑤区别jQuery的不同版本
+			A. 1.x:
+				Ⅰ. 兼容老版本IE
+				Ⅱ. 文件更大
+			B. 2.x:
+				Ⅰ. 部分IE8及以下版本不支持
+				Ⅱ.文件小，执行效率更高
+			C. 3.x:
+				Ⅰ. 完全不再支持IE8及以下版本的浏览器
+				Ⅱ. 提供一些新的API
+				Ⅲ. 提供不包含ajax/动画API的版本
+二、jQuery的两把利器：
+	1. jQuery核心函数：$/jQUery
+		①jQuery向外暴露的就是jQuery函数，可以直接使用
+		②当成一般函数使用：$(param)/jQuery(param)
+			A. 当param为function时：相当于window.onload = function(){};(绑定文档加载完成的监听，
+				当文档加载完成，执行此回调函数)
+			B. 当param为选择器字符串时：查找所以匹配的DOM元素，返回所有包含DOM元素的jQuery对象
+			C. 当param为DOM元素时：将DOM对象包装为jQuery对象返回，$(this)为封装了DOM元素的jQuery对象
+			D. 当param为标签字符串时：创建标签字符串对象并包装为jQuery对象返回
+		③当成对象使用：$.xxx()/$.xxx
+			A. $.each()：隐式遍历数组
+				var arr = [1, 2, 3, 4, 5];
+				Ⅰ. 原生JS：
+					//调用数组对象的foreach方法，在foreach中绑定回调函数，循环每遍历一次，调用一次回调函数
+					//在回调函数中需要传递三个参数，value表示数组的元素，index表示元素的索引，obj表示数组对象
+					arr.forEach(function(value, index, obj){
+						console.log("index = " + index + " : value = " + value);
+					});
+				Ⅱ. jQuery
+					//核心函数作为对象调用each()方法遍历数组，在each()方法中需要传递两个参数，arr表示遍历的数组
+					//回调函数function()，循环每进行一次，调用一次回调函数，在回调函数中需要传递两个参数，index表示
+					//数组元素的索引，item表示数组的元素
+					$.each(arr, function(index, item){
+						console.log("index = " + index + " : item = " + item);
+					});
+			B. $.trim()：去除两端空格
+				var str = "  hello  ";
+				Ⅰ. 原生JS：
+					str.trim();
+				Ⅱ. jQuery
+					$.trim(str);
+			C. $("<p>我是一个p标签</p>").appendTo(元素选择器)：将一个子元素插到一个父元素中
+	2. jQuery核心对象：执行$()/jQuery()返回的对象
+		①理解：
+			A. 即执行jQuery核心函数返回的对象
+			B. jQuery对象内部包含的是dom元素对象的伪数组（可能只有一个元素）
+			C. jQuery对象拥有很多有用的属性和方法，让程序员能很方便的操作dom
+		②属性和方法（基本行为）：
+			A. size()/length：包含的DOM元素个数：
+				$buttons = $('button');
+				console.log($buttons.length, $buttons.size());
+			B. [index]/get(index)：得到对于位置的DOM元素
+				console.log($buttons[1].innerHTML);
+				console.log($buttons.get(1).innerHTML);
+			C. each()：便利包含的所以DOM元素
+				$buttons.each(function(index, domEle){
+					console.log("index = " + index + " : " + domEle.innerHTML);
+				});
+				$buttons.each(function(){
+					//this表示的是当前伪数组遍历的当前dom元素
+					console.log(this.innerHTML);
+				});
+			D. index()：得到在所以兄弟元素中的下标
+				console.log($('#btn3').index());
+		③伪数组：
+			A. 伪数组是一个Object的对象，具有length属性和数值下标属性，而没有数组特殊的方法
+				例如：forEach()、push()、pop()、splice()方法
+			B. 自定义一个伪数组
+				var obj = {};
+				obj.length = 0;
+				obj[obj.length++] = 1;
+				obj[obj.length++] = 2;
+				obj[obj.length++] = 3;
+				for (var i = 0; i < obj.length; i++) {
+					console.log("index = " + i + " : value = " + obj[i]);
+				}
+三、选择器：
+	1. 说明：
+		①选择器本身只是一个有特定语法规则的字符串，没有实质用处
+		②它的基本语法规则使用的就是CSS选择器语法，并对此进行了扩展
+		③只有调用了$()，并将选择器作为参数传入才能起作用
+		④S(selector)作用：
+			根据选择器规则在整个文档中查找所以匹配的标签的数组，并封装为jQuery对象
+	2. 分类：
+		①基本选择器：最基本最常用的选择器
+			A. #ID
+			B. element
+			C. .class
+			D. *
+			E. selector1, selector1, selector1, selector1：交集选择器
+			F. selector1selector1selector1selector1：并集选择器
+		②层次选择器：查找子元素，后代元素，兄弟元素的选择器
+			A. ancestor descendant：后代元素选择器
+				选中ul下所有的的span
+				$('ul span').css('background-color', 'red');
+			B. parent > child：子元素选择器
+				举例
+				选中ul下所有的子元素span
+				$('ul>span').css('background-color', 'red');
+			C. prev + next：匹配所有紧接在prev元素后的next元素
+				举例
+				选中class为box的下一个li
+				$('.box + li').css('background-color', 'red');
+			D. prev ~ sibblings：匹配在prev元素之后的所有siblings元素
+				举例
+				选中ul下的class为box的元素后面的所有兄弟元素
+				$('ul .box ~ *').css('background-color', 'red');
+		③过滤选择器：在原有匹配元素中筛选出其中一些
+			A. :first
+				选择第一个div
+				$('div:first').css('background-color', 'red');
+			B. :last
+				选择最后一个class为box的元素
+				$('.box:last').css('background-color', 'red');
+			C. :eq(index)：选择索引为index的元素
+			D. :lt(index)：小于
+			E. :gt(index)：大于
+				选择第二个和第三个li元素
+				$('li:gt(0):lt(2)').css('background-color', 'red');// 多个过滤选择器不是同时执行, 而是依次
+				$('li:lt(3):gt(0)').css('background-color', 'red');
+			F. :odd：奇数
+			G. :even：偶数
+			H. :not(selector)：没有指定选择器的元素
+				选择所有class属性不为box的div
+				$('div:not(.box)').css('background-color', 'red');//没有class属性也可以
+			I. :hidden：元素属性为隐藏
+				选择隐藏的li
+				$('li:hidden').css('display', 'block');
+			J. :visible：元素属性为可见
+			K. [attrName]：选择有指定属性的元素
+				选择有title属性的li元素
+				$('li[title]').css('background-color', 'red');
+			L. [attrName=value]：选择有指定的属性与属性值的元素
+				选择所有属性title为hello的li元素
+				$('li[title = "hello"]').css('background-color', 'red');
+			M. :contains()：选择含有指定内容的元素
+				选择内容为BBBBB的li
+				$('li:contains("BBBBB")').css('background-color', 'red');
+			N. :has(selector)：含有指定选择器的元素
+		④表单选择器
+			A. :input：选择input标签
+			B. :text：选择单行文本框
+			C. :checkbox：选择多选按钮
+			D. :radio：选择单选按钮
+			E. :checked: 选中的
+			F. :disable：选择不可以的文本输入框
+				//两种方法设置disabled属性
+				$('#areaSelect').attr("disabled",true);
+				$('#areaSelect').attr("disabled","disabled");
+
+				//三种方法移除disabled属性
+				$('#areaSelect').attr("disabled",false);
+				$('#areaSelect').removeAttr("disabled");
+			G. :submit：选择提交按钮
+			H. 举例
+				显示选择的城市名称
+				/*jQuery实现获取下拉框选中的值与HTML代码方式一*/
+				//alert($(':input>option:selected').html());
+				/*jQuery实现获取下拉框选中的值与HTML代码方式二*/
+				//alert($('select>option:selected').html());
+				/*JS实现获取下拉框选中的值与HTML代码方式一*/
+				var element = document.getElementsByTagName("select")[0];//获取下拉款元素
+				var value = element.value;//获取当前被选中的选项的value值
+				
+				var index = element.selectedIndex//获取当前被选中选项的下标索引
+				var selected = element.options[index];//获取当前被选中选项的option元素
+				//alert(selected.innerHTML);//获取当前被选中选项的HTML代码
+				//alert(selected.text);//获取当前被选中选项的HTML代码
+				/*JS实现获取下拉框选中的值与HTML代码方式二*/
+				for (var i = 0; i < element.length; i++) {
+					if(element[i].selected){
+						//alert(element[i].text);
+						//alert(element[i].innerHTML);
+					}
+				}
+四、jQuery工具方法：
+	1. $.each()：遍历数组或者对象中的数据
+		举例：
+		var obj = {
+			name:"Li",
+			age:18,
+			getName:function(){
+				console.log(this.name);
+			}
+		};
+		$.each(obj, function(key, value) {
+			console.log("key : " + key + " , value : " + value);
+		});
+	2. $.trim()：去除字符串两边的空格
+	3. $.type(obj)：得到数据的类型
+		举例：
+		console.log($.type($));//function
+	4. $.isArray(obj)：判断是否是数组
+		举例：
+		console.log($.isArray($('body')));//false, jQuery对象时封装了DOM元素的伪数组
+		console.log($.isArray([]));//true，数组时以[]形式出现
+	5. $.isFunction(obj)：判断是否是函数
+		举例：
+		console.log($.isFunction($));//true，$/jQuery是一个函数
+		console.log($.isFunction(function(){}));//true
+	6. $.parseJSON(json)：解析json字符串转换为js对象或者数组
+		var jsonObj = '{"name":"Li", "age":18}';
+		var jsonArr = '[{"name":"Li", "age":18}, {"name":"Li", "age":18}]';
+		var obj = {name:"Li", age:18};
+		var arr = [{name:"Li", age:18}, {name:"Li", age:18}];
+		//json对象：具有特定格式、特定语法的字符串，一般采用JS进行对JSON对象和JS对象之间进行转换
+		/*jQuery中，将json对象转换为js对象*/
+		//console.log($.parseJSON(jsonObj));//Object
+		//console.log($.parseJSON(jsonArr));//Object, Object
+		/*JS中，json对象与js对象的转换*/
+		//console.log(JSON.parse(jsonObj));//Object，json对象转换为JS对象
+		//console.log(JSON.parse(jsonArr));//Object,Object，json对象转换为JS数组
+		//console.log(JSON.stringify(obj));//{"name":"Li","age":18}，js对象转换为json对象
+		//console.log(JSON.stringify(arr));//[{"name":"Li","age":18},{"name":"Li","age":18}]js数组转换为json对象
+五、属性/文本
+	1. 操作元素属性
+		①attr(name|pro|key,val|fn) ：专门操作元素属性值为非布尔类型的属性
+		②removeAttr(name) ：删除元素的属性
+		③prop(name|pro|key,val|fn)1.6+ ：专门操作元素属性值为布尔类型的属性
+		④removeProp(name)1.6+ ：删除元素的属性
+	2. 操作CSS 类
+		①addClass(class|fn) ：添加一个class属性
+		②removeClass([class|fn]) ：删除一个class属性
+		③toggleClass(class|fn[,sw]) ：一个class属性存在则删除，不存在则添加
+	3. HTML代码/文本/值
+		①html([val|fn]) ：读取/改变元素的文本
+		②text([val|fn]) ：读取/改变元素的文本，兼容性不高，一般不常用
+		③val([val|fn|arr]) ：读取/改变元素的value属性
+六、css样式
+	1. CSS
+		①css(pro, [val])：
+			A. 操作元素的style属性，可以设置/读取元素的当前样式
+			B. 当操作多个样式，可以将多个样式封装到JS对象中
+				举例：
+				$('p:eq(1)').css({
+					color:'#ff0011',
+					backgroundColor:'blue',
+					width:300,
+					height:30
+				});
+	2. 位置
+		①offset([coordinates]) ：
+			A. 获取匹配元素在当前浏览器的相对偏移量。
+			B. 返回的对象包含两个整型属性：top 和 left。此方法只对可见元素有效。
+			C. 参数：一个对象，必须包含top和left属性，作为元素的新坐标。
+			D. 获取偏移量举例：
+				//调用DOM元素的jQuery对象的offset()，返回的是一个包含两个数值属性left/top的对象
+				var offset = $('.div1').offset();
+				alert("left : " + offset.left + " ,top : " + offset.top);//10 20，没有单位
+			E. 设置偏移量举例：
+				//调用调用DOM元素的jQuery对象的offset()，传递一个包含两个新属性left/top的对象
+				$('.div2').offset({
+					left:50,
+					top:50
+				});
+		②position() ：
+			A. 获取匹配元素相对父元素的偏移。
+			B. 返回的对象包含两个整型属性：top 和 left。
+			C. 该方法不可设置参数
+			D. 获取相对父元素偏移量举例：
+				//调用DOM元素的jQuery对象的offset()，返回的是一个包含两个数值属性left/top的对象
+				var position = $('.div1').position();
+				alert("left : " + position.left + " ,top : " + position.top);//10 20
+		③scrollTop([val])：
+			A. 此方法对可见和隐藏元素均有效。
+			B. 获取匹配元素相对滚动条顶部的偏移。
+				$('div').scrollTop();//读取当前元素的滚动条坐标
+				$('body').scrollTop() + $('html').scrollTop();//获取当前页面滚动条的坐标，兼容所有浏览器
+				$(document.body).scrollTop() + $(document.documentElement).scrollTop();//性能更加
+			C. 参数：设定垂直滚动条值
+				$('div').scrollTop(200);//设置当前元素滚动条的坐标
+				$('html, body').scrollTop(200);//取并集，设置当前页面滚动条的位置，兼容所有浏览器
+	3. 元素的尺寸
+		①内容尺寸
+			A. height(): height
+			B. width(): width
+		②内部尺寸
+			A. innerHeight(): height+padding
+			B. innerWidth(): width+padding
+		③外部尺寸
+			A. outerHeight(false/true): height+padding+border  如果是true, 加上margin
+			B. outerWidth(false/true): width+padding+border 如果是true, 加上margin
+七、筛选：得到的仍然是jQuery对象
+	1. jQuery对象（包含DOM元素）的过滤：在jQuery对象中原有的DOM元素的基础上进一步过滤
+		①first()：jQuery对象（包含DOM元素）的第一个DOM元素封装的对象
+			ul下li标签第一个
+			$lis.first().css('background-color', 'red');
+		②last()：jQuery对象（包含DOM元素）的最后一个DOM元素封装的对象
+			ul下li标签的最后一个
+			$lis.last().css('background-color', 'red');
+		③eq(index|-index)：根据索引获取jQuery对象（包含DOM元素）中DOM元素封装的对象
+			A. ul下li标签的第二个
+			   $lis.eq(1).css('background-color', 'red');
+			B. $lis[index]/$lis.get(index)得到的是DOM元素，不能调用jQuery对象的方法
+		④filter(selector)：获取获取jQuery对象（包含DOM元素）中包含某个属性的DOM元素封装的对象
+			A. ul下li标签中title属性为hello的
+			   $lis.filter('[title = "hello"]').css('background-color', 'red');
+			B. [属性]/[属性 = 属性值]是一个选择器
+		⑤not(selector)：获取获取jQuery对象（包含DOM元素）中不包含某个属性的DOM元素封装的对象
+			A. ul下li标签中title属性不为hello的
+				$lis.not('[title = "hello"]').css('background-color', 'red');
+				$lis.filter('[title != "hello"]').css('background-color', 'red');
+	
+			B. ul下li标签中有title，且title属性不为hello的
+			$lis.not('[title = "hello"]').filter('[title]').css('background-color', 'red');
+		⑥has(selector)：获取获取jQuery对象（包含DOM元素）中不包含某个元素的DOM元素封装的对象
+			ul下li标签中有span子标签的
+			$lis.has('span').css('background-color', 'red');
+	2. jQuery对象（包含DOM元素）的查找：查找当前DOM元素的兄弟元素、父元素、祖先元素和后代元素
+		①children(): 子标签中找
+			ul标签的第2个span子标签
+			$('ul').children('span:eq(1)').css('background-color', 'red');
+		②find() : 后代标签中找
+			ul标签的第2个span后代标签
+			$('ul').find('span:eq(1)').css('background-color', 'red');
+		③parent() : 父标签
+			ul标签的父标签
+			$('ul').parent().css('background-color', 'red');
+		④prevAll() : 前面所有的兄弟标签
+			id为cc的li标签的前面的所有li标签
+			$('#cc').prevAll('li').css('background-color', 'red');
+		⑤nextAll() : 后面所有的兄弟标签
+		⑥siblings() : 前后所有的兄弟标签
+			id为cc的li标签的所有兄弟li标签
+			$('#cc').siblings('li').css('background-color', 'red');
+八、文档的增删改
+	1. 内部插入
+		①append(content|fn)：向当前匹配的所有元素内部的最后插入指定内容
+			向id为ul1的ul下添加一个span(最后)
+			$('#ul1').append('<span>append()内部插入</span>');//直接插入span标签
+			//$('#ul1').append($('<span>append()内部插入</span>'));//创建span标签再插入
+		②appendTo(content)：
+			$('<span>appendTo()插入</span>').appendTo($('#ul1'))//必须先创建span标签
+		③prepend(content|fn)：向当前匹配的所有元素内部的最前面插入指定内容
+			向id为ul1的ul下添加一个span(最前)
+			$('#ul1').prepend('<span>prepend()内部插入</span>');//直接插入span标签
+		④prependTo(content) 
+			$('<span>prependTo()内部插入</span>').prependTo($('#ul1'))//必须先创建span标签
+	2. 外部插入
+		①after(content|fn)：将指定内容插入到当前所有匹配元素的后面替换节点
+			在id为ul1的ul下的li(title为hello)的后面添加span
+			$('#ul1>li[title = hello]').after('<span>before()外部插入</span>');
+		②before(content|fn)：将指定内容插入到当前所有匹配元素的前面
+			在id为ul1的ul下的li(title为hello)的前面添加span
+			$('#ul1>li[title = hello]').before('<span>before()外部插入</span>');
+	3. 替换
+		①replaceWith(content|fn) ：用指定内容替换所有匹配的标签删除节点
+			将在id为ul2的ul下的li(title为hello)全部替换为p
+			$('#ul2>li[title=hello]').replaceWith('<p>replaceWith()替换</p>');
+		②replaceAll(selector) ：通过选择器将页面中指定的元素替换当前所有匹配的元素
+	4. 删除
+		①empty() ：删除所有匹配元素的子元素
+			移除id为ul2的ul下的所有li
+			$('#ul2').empty()//移除所有在所有匹配元素下的子元素
+		②remove([expr]) 删除所有匹配的元素
+			$('#ul2>li').remove();//移除所有匹配的元素
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+				

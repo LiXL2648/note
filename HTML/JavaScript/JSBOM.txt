@@ -1,0 +1,172 @@
+一、BOM：浏览器对象模型，可以使我们通过使用JS操作浏览器
+	1. BOM对象：
+		①Window：代表的是整个浏览器的窗口，同时window也是网页中的全局变量
+		②Navigator：代表的是当前浏览器的信息，通过该对象可以来识别不同的浏览器
+		③History：
+			A. 代表浏览器的历史记录，可以通过该对象来操作浏览器的历史记录
+			B. 由于隐私原因，该对象不能获取到具体的历史记录，只能操作浏览器向前或者向后翻页
+				而且该访问只在当次有效
+		④Location：代表当前的浏览器的地址栏信息，通过Location可以获取地址栏信息，或者可以操作网页的跳转
+		⑤Screen：代表用户的屏幕信息，通过该对象可以获取到用户的显示器的相关信息
+	2. 这些BOM对象在浏览器中都是作为window对象的属性保存的，可以通过window对象来使用，也可以直接使用
+二、Navigator：
+	1. 代表当前的浏览器的信息，该对象可以识别不同的浏览器
+	2. 由于历史原因，最开始的浏览器是由网景Navigator公司开发的，该浏览器的名称为Netscape，因此通过Navigator对象中
+		的appName属性获取的浏览器名称都为Navigator，并且在Navigator对象中的大部分属性已经不能识别浏览器的名称
+	3. userAgent：一般我们都只使用这个属性来判断浏览器的信息
+		①userAgent：通过访问Navigator对象中的该属性会得到一个字符串，这个字符串中包含用来描述浏览器信息的内容
+			而且不同的浏览器会有不同的userAgent
+		②识别浏览器：
+			举例：
+			var ua = navigator.userAgent;
+			if(/firebox/i.test(ua)){
+				alert("Firebox")
+			}else if(/chrome/i.test(ua)){
+				alert("Chrome");
+			}else if(/msie/i.test(ua)){
+				alert("IE");
+			}else if("ActiveXObject" in window){
+				alert("IE11");
+			}
+		③在IE11中，微软和IE所有的相关标识已经被去除了，所以进本不能通过userAgent来识别一个IE11的浏览器
+		④如果通过userAgent不能识别一个浏览器，可以通过一些浏览器特有的对象来识别它
+		⑤ActiveXObject：
+			A. IE浏览器中特有的对象，在火狐以及Chrome中不存在该对象，因此不能直接判断，否则在火狐和Chrome中会抛出异常
+			B. 通过window.ActiveXObject判断是否存在该属性会返回false
+			C. 可以使用"ActiveXObject" in window的方式来判断该属性是否存在的方式来识别IE浏览器
+三、History：
+	1. 对象可以用来操作浏览器向前或者向后翻页
+	2. 属性：
+		①length：可以用来获取当前访问的链接数量
+	3. 方法：
+		①back()：可以用来回退到上一个页面，作用和浏览器的回退按钮一样
+		②forward()：可以跳转下一个页面，作用和浏览器的前进按钮一样
+		③go()：可以用于跳转到指定的页面，它需要一个整数作为参数
+			 1：表示向前跳转一个页面，作用和forward()一样
+			 2：表示向前跳转两个页面
+			-1：表示向后跳转一个页面，作用和back()一样
+			-2：表示向后跳转两个页面。
+四、Location：
+	1. 如果在直接打印location：则可以获取到地址栏的信息（当前页面的相对路径）
+		在location的属性中有各种用于操作地址信息的属性，直接打印location与调用href属性一致	
+	2. 如果直接将location属性修改为一个完整的路径或者相对路径，则页面会自动跳转到该路径，
+		并且会生成相应的历史记录
+	3. 方法：
+		①assign()：用来跳转到其他页面，作用和直接修改location一样
+		②reload():
+			A. 用于重新加载当前页面，作用和刷新按钮一样
+			B. reload(true)：会强制清空缓存刷新页面，作用和ctrl+f5一样
+	4. replace(url)：
+		A. 可以使用一个新的页面替换当前页面，调用完毕时也会跳转到指定的页面
+		B. 该方法不会生成历史记录，也就是不能点击回退按钮回退
+五、定时器简介
+	1. JS中程序执行速度是非常快的，如果希望一段程序，可以每隔一段时间执行一次，则可以使用定时器
+	2. setInterval()：定时调用
+		①该方法函数是window的方法，可以直接使用
+		②使用该函数，可以将一个函数，隔一段时间执行一次
+		③参数：
+			A. 回调函数，该函数会每隔一段时间被执行一次
+			B. 每次调用的事件间隔，单位是毫秒
+		④返回值：
+			A. 返回的是一个Number类型的数据
+			B. 这个数字用来作为定时器的唯一标识
+	3. clearInterval(timer)：
+		①可以用来关闭一个定时器
+		②方法中需要一个定时器的标识作为参数，从而关闭该标识对应的定时器
+	4. 举例：
+		var num = 0;
+		var count = document.getElementById("count");
+		var timer = setInterval(function(){
+			count.innerHTML = num++;
+			if(num == 11){
+				clearInterval(timer)'
+			}
+		}, 1000);
+六、延时调用：
+	1. setTimeout()：延时调用函数
+		①该方法与定时调用的用法相同，而且二者可以相互代替，在开发中可以根据需求去选择
+		②延时调用一个函数并不会马上执行，而是会隔一段时间后再执行，而且只会执行一次
+		③延时调用与定时调用的区别，定时调用会执行多次，而延时调用只会执行一次
+		④该方法同样会返回一个number类型的值，表示该延时器的唯一标识
+	2. clearTimeout(timer)：该方法可以关闭延时调用函数，需要传递一个唯一标识参数，用于标识将要关闭的延时调用
+	3. 举例：
+		var num = 0;
+		var timer = setTimeout(function(){
+			console.log(num++);
+		}, 3000);
+		clearTimeout(timer);
+七、类的操作：
+	1. 在JS中，通过style属性类修改元素的样式，每修改一个样式，浏览器需要重新渲染一次页面，
+		这样的执行性能是比较差的，而且当我们要修改多个样式时通过这种形式，也不太方便
+	2. 可以通过修改元素的class属性来间接的修改样式，这样我们只需要修改一次，即可同时修改多个
+		样式，而且浏览器只需要重新渲染一次，性能有很大的提升，而且这种方式，可以使表现和行为进一步分离
+	3. 举例：
+		var obj = document.getElementById("obj");
+		obj.className = "newClass";
+	4. addClass():定义一个函数，用来向一个元素中添加指定的class属性
+		①参数：
+			A. obj:要添加class属性的元素
+			B. cn:要添加的class属性值
+		②举例：
+			function addClass(obj, cn){
+				obj.className += " " + cn;
+			}
+		③该函数存在着缺陷，当点击多次是，该元素会重复添加该class属性，因此需要判断元素是否存在该class属性
+		④修改：
+			function addClass(obj, cn){
+				if(!hasClass(obj, cn)){
+					obj.className += " " + cn;
+				}
+			}
+	5. hasClass():定义一个函数，用于判断一个元素是否有指定的class属性值
+		①参数：
+			A. obj:要添加class属性的元素
+			B. cn:要添加的class属性值
+		②返回值
+			A. 如果存在指定的属性值则返回true
+			B. 如果不存在指定的属性值则返回false
+		③该函数中需要创建一个正则表达式对象，用于判断元素是否存在指定的属性值
+			A. 通过字面量无法创建由变量指定的class属性值
+			B. 需要通过正则表达式的构造函数进行创建
+			C. 必须判断该属性值是否单独出现，通过\b来判断是否为字符边界
+			D. 在进行字符串拼串时，需要通过\对特殊字符进行转义
+			E. 语法：var reg = new RegExp("\\b" + cn + "\\b");
+		④举例：
+			function hasClass(obj, cn){
+				var reg = new RegExp("\\b" + cn + "\\b");
+				return reg.test(obj.className);
+			}
+	6. removeClass():定义一个函数，用于删除一个元素中指定的class属性
+		①参数：
+			A. obj:要添加class属性的元素
+			B. cn:要添加的class属性值
+		②该函数中需要创建一个正则表达式对象，用于判断元素是否存在指定的属性值
+		③通过replace()将指定的属性改为空
+		④举例：
+			function removeClass(obj, cn){
+				var reg = new RegExp("\\b\\s" + cn + "\\b");
+				obj.className = obj.className.replace(reg, "");
+			}
+	7. 定义一个函数可以用于切换一个类
+		①参数：
+			A. obj:要添加class属性的元素
+			B. cn:要添加的class属性值
+		②执行流程：
+			A. 如果一个元素存在指定的class属性值，则删除该类
+			B. 如果一个元素没有指定的class属性值，则添加该类
+		③举例：
+			function toggleClass(obj, cn){
+				if(hasClass(obj, cn)){
+					removeClass(obj, cn);
+				}else{
+					addClass(obj, cn);
+				}
+			}
+
+
+
+
+
+
+
+			

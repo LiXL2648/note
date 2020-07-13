@@ -1,0 +1,677 @@
+一、Vue 核心
+	1. Vue 的基本使用
+		① 步骤：
+			A. 引入Vue.js
+			B. 创建Vue对象
+				a. el : 指定根element(选择器)
+				b. data : 初始化数据(页面可以访问)
+			C. 双向数据绑定，在元素中使用v-model绑定Vue实例中的属性，即可将Vue实例中的属性值绑定在元素上，也可以通过元素动态改变Vue实例中的属性值
+			D. 显示数据 : {{xxx}}
+		② 编码：
+			<div id="app">
+			  <input type="text" v-model="username">
+			  <p>Hello, {{username}}</p>
+			</div>
+
+			<script type="text/javascript" src="../js/vue.js"></script>
+			<script>
+			  const vm = new Vue({
+				  el: "#app",
+				  data: {
+					  username: 'LiXL'
+				  }
+			  })
+			</script>
+		③ 使用vue 开发者工具调试，安装vue-devtools
+			A. 安装npm步骤：
+				a. 首先前往nodejs官网下载nodejs：https://nodejs.org/en/
+				b. 然后点击安装，选择自己要安装的路径，此处选择的是：D:\Program Files\nodejs，安装至完成。 
+				c. window+R,输入cmd,打开命令提示符窗口，输入：npm -v，检测是否安装成功，如果输出版本号，则表示安装成功
+				d. 首先配置npm的全局模块的存放路径、cache的路径，也可以通过‪C:\Users\Administrator\.npmrc进行设置，完成后可以在文件夹中看到相应名字的文件夹
+					npm config set prefix "D:\Program Files\nodejs\node_global"
+					npm config set cache"D:\Program Files\nodejs\node_cache"
+				e. 在系统环境变量添加NODE_PATH,输入路径为：D:\Program Files\nodejs\node_global 
+				f. 在命令行输入以下命令安装express（注：“-g”表示安装到global目录下，就是上面设置的node_global中）：npm install express -g
+				g. 在命令行输入node进入编辑模式，输入以下代码检测是否能正常加载模块：require('express')，如果出错，检测下上面配置的NODE_PATH是否配置或者配置正确
+			B. 安装cnpm
+				a. 安装cnpm，输入以下命令：npm install -g cnpm --registry=https://registry.npm.taobao.org
+				b. 输入cnpm -v ，检测是否正常，但是这里会报错。
+				c. 添加系统变量path的内容，在Path后面追加：D:\Program Files\nodejs\node_global，然后再次输入cnpm -v显示版本号即证明安装cnpm成功
+			C. 下载vue-devtools项目编译安装
+				a. 官网：https://github.com/vuejs/vue-devtools，下载或者克隆的时候切换到主分支，下载完成之后解压
+				b. 打开cmd，进入vue-devtools-master根目录，使用命令：cnpm install安装依赖包
+				c. 修改vue-devtools-master\shells\chrome\manifest.json文件，修改的内容是将persistent的值改为true
+				d. 使用npm run build编译代码
+				e. vue-devtools-master\shells下的chrome目录添加到浏览器的扩展程序中，或者直接将该文件夹拖拽到浏览器的扩展程序中。
+			D. 在其他网站上直接下载chrome的插件
+				a. 访问https://chrome.zzzmh.cn/网站
+				b. 查找Vue Devtools并下载
+				c. 解压后将Vue.js Devtools_5.3.3_chrome.zzzmh.cn.crx拖拽到浏览器的扩展程序中。
+		④ 理解Vue的MVVM
+			A. M（Model）：Vue实例的Object对象
+			B. V（View）：DOM元素，视图
+			C. VM（View Model）：Vue实例，DOM Listener和Data Bindings
+	2. 模板语法
+		① 模板的理解
+			A. 动态的html 页面
+			B. 包含了一些JS 语法代码
+				a. 双大括号表达式
+				b. 指令(以v-开头的自定义标签属性)，举例：
+					(1) <p v-text="html"></p>，类似于textContent
+					(2) <p v-html="html"></p>，类似于innerHTML
+		② 双大括号表达式
+			A. 语法: {{exp}}
+			B. 功能: 向页面输出数据
+			C. 可以调用对象的方法
+			D. 举例：
+				a. <p>{{msg}}</p>
+				b. <p>{{msg.toUpperCase()}}</p>
+		③ 指令一: 强制数据绑定
+			A. 功能: 指定变化的属性值
+			B. 完整写法: v-bind:xxx='yyy' //yyy 会作为表达式解析执行
+			C. 简洁写法: :xxx='yyy'
+			D. 举例：
+				<img v-bind:src="imageUrl">
+				<img :src="imageUrl">
+		④ 指令二: 绑定事件监听
+			A. 功能: 绑定指定事件名的回调函数
+			B. 完整写法：
+				v-on:keyup='xxx'
+				v-on:keyup='xxx(参数)'
+				v-on:keyup.enter='xxx'
+			C. 简洁写法:
+				@keyup='xxx'
+				@keyup='xxx(参数)'
+				@keyup.enter='xxx'
+			D. 举例：
+				<button v-on:click="test">submit</button>
+				<button @click="test2(msg)">submit</button>
+		⑤ 编码：
+			<div id="app">
+			  <input type="text" v-model="msg">
+			  <h2>1. 双大括号表达式</h2>
+			  <p>{{msg}}</p>
+			  <p>{{msg.toUpperCase()}}</p>
+
+			  <p>{{html}}</p>
+			  <p v-text="html"></p>
+			  <p v-html="html"></p>
+
+			  <h2>2. 指令一: 强制数据绑定</h2>
+			  <img v-bind:src="imageUrl">
+			  <img :src="imageUrl">
+
+			  <h2>3. 指令二: 绑定事件监听</h2>
+			  <button v-on:click="test">submit</button>
+			  <button @click="test2(msg)">submit</button>
+			</div>
+
+			<script type="text/javascript" src="../js/vue.js"></script>
+			<script type="text/javascript">
+			  new Vue({
+				  el: "#app",
+				  data: {
+					  msg: 'hello LiXL',
+					  html: '<a href="www.baidu.com" target="_blank">去百度</a>',
+					  imageUrl: 'https://chrome.zzzmh.cn/crx/nhdogjmejiglipccpnnnanhbledajbpd/nhdogjmejiglipccpnnnanhbledajbpd-icon.png'
+				  },
+				  methods: {
+					  test (){
+						  alert("hello")
+					  },
+					  test2 (text){
+						  alert(text);
+					  }
+				  }
+			  })
+	3. 计算属性和监视
+		① 计算属性
+			A. 在computed 属性对象中定义计算属性的方法，方法的返回值作为属性值
+			B. 在页面中使用{{方法名}}来显示计算的结果
+			C. computed的执行时期是初始化显示以及相关的data属性数据发生变化
+			D. 举例：
+				computed: {
+				  fullName1 () {
+					  console.log("fullName1 ()")
+					  return this.firstName + " " + this.lastName
+				  }
+			  }
+		② 监视属性
+			A. 通过通过vm 对象的$watch()或watch 配置来监视指定的属性
+			B. 当属性变化时, 回调函数自动调用, 在函数内部进行计算，该回调函数可以传递两个参数，newValue（修改后的值）和old（修改前的值，可以省略）
+			C. 举例：
+				watch: {
+				  firstName: function (newValue, oldValue) {
+					  console.log(this)
+					  this.fullName2 = newValue + ' ' + this.lastName
+				  }
+				}
+				vm.$watch('lastName', function (value) {
+				  this.fullName2 = this.firstName + ' ' + value
+				})
+		③ 计算属性高级
+			A. 通过getter/setter 实现对属性数据的显示和监视
+			B. 计算属性存在缓存, 多次读取只执行一次getter 计算
+			C. getter：当需要读取当前属性值时回调，根据相关的数据计算并返回当前属性的值
+			D. setter：监视当前属性值的变化，当属性值发生改变时回调，更新相关的属性数据
+		④ 编码：
+			<div id="demo">
+			  姓: <input type="text" placeholder="First Name" v-model="firstName"><br>
+			  名: <input type="text" placeholder="Last Name" v-model="lastName"><br>
+			  <!--fullName1是根据fistName和lastName计算产生-->
+			  姓名1(单向): <input type="text" placeholder="Full Name1" v-model="fullName1"><br>
+			  姓名2(单向): <input type="text" placeholder="Full Name2" v-model="fullName2"><br>
+			  姓名3(双向): <input type="text" placeholder="Full Name3" v-model="fullName3"><br>
+
+			  <p>{{fullName1}}</p>
+			  <p>{{fullName1}}</p>
+			  <p>{{fullName1}}</p>
+			</div>
+
+			<script type="text/javascript" src="../js/vue.js"></script>
+			<script type="text/javascript">
+			  const vm = new Vue({
+				  el: '#demo',
+				  data: {
+					  firstName: 'Li',
+					  lastName: 'XL',
+					  fullName2: 'Li XL'
+				  },
+				  computed: {
+					  // 计算属性中的一个方法，方法的返回值作为属性值
+					  fullName1 () {
+						  // 什么时候执行：初始化显示/相关的data属性数据发生变化
+						  console.log("fullName1 ()")
+						  return this.firstName + " " + this.lastName
+					  },
+					  fullName3: {
+						  // 回调函数，计算并返回当前属性的值
+						  // 回调函数需要满足是三个条件：自己定义的，自己没有定义，最终它执行了
+						  // 回调函数两个重要作用：什么时候调用（当需要读取当前属性值时），用来做什么（根据相关数据计算并返回当前属性的值）
+						  get() {
+							return this.firstName + " " + this.lastName
+						  },
+						  // 监视当前属性值的变化，当属性值发生改变时回调，更新相关的属性数据
+						  set(value) {
+							const names = value.split(' ')
+							this.firstName = names[0]
+							this.lastName = names[1]
+						  }
+					  }
+				  }, 
+				  watch: {
+					  firstName: function (newValue, oldValue) {
+						  console.log(this)
+						  this.fullName2 = newValue + ' ' + this.lastName
+					  }
+				  }
+			  })
+
+			  vm.$watch('lastName', function (value) {
+				  this.fullName2 = this.firstName + ' ' + value
+			  })
+			</script>
+	4. class 与style 绑定
+		① 理解
+			A. 在应用界面中, 某个(些)元素的样式是变化的
+			B. class/style 绑定就是专门用来实现动态样式效果的技术
+		② class 绑定
+			A. 语法：:class='xxx'
+			B. 表达式是字符串: 'classA'
+			C. 表达式是对象: {classA: isA, classB: isB}
+			D. 表达式是数组: ['classA', 'classB']
+		③ style 绑定
+			A. :style="{ color: activeColor, fontSize: fontSize + 'px' }"
+			B. 其中activeColor/fontSize 是data 属性
+		④ 编码：
+			<style>
+				.classA {
+				  color: red;
+				}
+				.classB {
+				  color: blue;
+				}
+				.classC {
+				  font-size: 20px;
+				}
+			</style>
+			<div id="demo">
+			  <h2>1. class绑定: :class='xxx'</h2>
+			  <p :class="myClass">xxx是字符串</p>
+			  <p :class="{classA: hasClassA, classB: hasClassB}">xxx是对象</p>
+			  <p :class="['classA', 'classB']">xxx是数组</p>
+
+			  <h2>2. style绑定</h2>
+			  <p :style="{color: activeColor, fontSize: fontSize + 'px'}">:style="{ color: activeColor, fontSize: fontSize + 'px' }"</p>
+
+			  <button @click="update">更新</button>
+
+			</div>
+
+			<script type="text/javascript" src="../js/vue.js"></script>
+			<script type="text/javascript">
+			  new Vue({
+				  el: '#demo',
+				  data: {
+					  myClass: 'classA',
+					  hasClassA: true,
+					  hasClassB: false,
+					  activeColor: 'red',
+					  fontSize: 20
+				  },
+				  methods: {
+					  update() {
+						  this.myClass = "classB"
+						  this.hasClassA = !this.hasClassA
+						  this.hasClassB = !this.hasClassB
+						  this.activeColor = 'blue'
+						  this.fontSize = 30
+					  }
+				  }
+			  })
+			</script>
+	6. 条件渲染
+		① 条件渲染指令
+			A. v-if 与v-else
+			B. v-show
+		② 比较v-if 与v-show	
+			A. 如果需要频繁切换v-show 较好
+			B. 当条件不成立时, v-if 的所有子节点不会解析(项目中使用)
+		③ 编码
+			<div id="demo">
+			  <p v-if="ok">success</p>
+			  <p v-else>fail</p>
+
+			  <p v-show="ok">success</p>
+			  <p v-show="!ok">fail</p>
+			  <button @click="ok=!ok">切换</button>
+			</div>
+
+			<script type="text/javascript" src="../js/vue.js"></script>
+			<script type="text/javascript">
+			  new Vue({
+				  el: '#demo',
+				  data: {
+					  ok: true
+				  }
+			  })
+			</script>
+	7. 列表渲染
+		① 遍历数组
+			A. 语法：v-for(obj, index) in objs，obj代表objs的每一个对象，index代表对象的索引，objs代表对象数组
+			B. vue本身只是监视了persons的改变，没有监视数组内部数据的改变
+			C. vue重写了数组中的一系列改变数组内部数据的方法（先调用原生，更新界面）
+			D. :key选取index
+		② 遍历对象
+			A. 语法：v-for(value, key) in obj，value代表obj的一个属性值，key代表obj的一个属性，obj代表一个对象
+			B. :key选取key
+		③ 列表过滤和列表排序
+			A. 使用对象数组过滤方法filter()和排序方法sort()
+		③ 编写：
+			<div id="demo">
+			  <h2>测试: v-for 遍历数组</h2>
+			  <ul>
+				<li v-for="(p, i) in persons" :key="i">
+				  {{i + 1}}. {{p.num}}: {{p.name}}
+				  <button @click="set(i, person)">update</button>
+				  <button @click="del(i)">delete</button>
+				</li>
+			  </ul>
+			  <h2>测试: v-for 遍历对象</h2>
+			  <ul>
+				<li v-for="(v, k) in persons[0]" :key="k">
+				  {{k}}: {{v}}
+				</li>
+			  </ul>
+			</div>
+
+			<script type="text/javascript" src="../js/vue.js"></script>
+			<script type="text/javascript">
+			  new Vue({
+				  el: '#demo',
+				  data: {
+					  persons: [
+						  {name: 'LiXC', num: 921127},
+						  {name: 'LiXY', num: 940906},
+						  {name: 'YuCX', num: 950829},
+						  {name: 'LiXL', num: 960504},
+						  {name: 'LiLX', num: 960730},
+					  ],
+					  person: {
+						  name: 'KeYD',
+						  num: 961122
+					  }
+				  },
+				  methods: {
+					  del(index) {
+						  this.persons.splice(index, 1)
+					  },
+					  set(index, person) {
+						  this.persons.splice(index, 1, person)
+					  }
+				  }
+			  })
+			</script>
+			
+			<div id="demo">
+			  <input type="text" v-model="searchText">
+			  <ul>
+				<li v-for="(item, index) in filterPersons" :key="index">
+				  {{index}}. {{item.name}}: {{item.num}}
+				</li>
+			  </ul>
+			  <div>
+				<button @click="orderType = 1">编号升序</button>
+				<button @click="orderType = 2">编号降序</button>
+				<button @click="orderType = 0">原本顺序</button>
+			  </div>
+			</div>
+
+			<script type="text/javascript" src="../js/vue.js"></script>
+			<script type="text/javascript">
+			  new Vue({
+				  el: '#demo',
+				  data: {
+					  searchText: '',
+					  orderType: 0,
+					  persons: [
+						  {name: 'LiXC', num: 921127},
+						  {name: 'LiXY', num: 940906},
+						  {name: 'YuCX', num: 950829},
+						  {name: 'LiXL', num: 960504},
+						  {name: 'LiLX', num: 960730},
+					  ]
+				  },
+				  computed: {
+					  filterPersons() {
+						  const {searchText, persons, orderType} = this
+						  let fPersons = persons.filter(p => p.name.indexOf(searchText) !==  -1)
+						  if(orderType !== 0) {
+							  fPersons.sort(function (p1, p2) {
+								  if(orderType == 2) {
+									  return p2.num - p1.num
+								  } else {
+									  return p1.num - p2.num
+								  }
+							  })
+						  }
+						  return fPersons
+					  }
+				  }
+			  })
+			</script>
+	8.事件处理
+		① 绑定监听
+			A. v-on:xxx="fun"
+			B. @xxx="fun"
+			C. @xxx="fun(参数)，事件函数上传参时，默认事件形参会无效，需要指定隐含属性对象"
+			D. 默认事件形参，回调函数上的参数: event
+			E. 隐含属性对象，事件函数上的参数: $event
+		② 事件修饰符
+			A. @xxx.prevent: 阻止事件的默认行为，等价于event.preventDefault()
+			B. @xxx.stop: 停止事件冒泡，等价于event.stopPropagation()
+		③ 按键修饰符
+			A. @xxx.keycode: 操作的是某个keycode 值的键
+			B. @xxx.keyName : 操作的某个按键名的键(少部分按键有按键名)
+			C. 等价于if(event.keyCode === keyCode)
+		④ 代码：
+			<div id="example">
+
+			  <h2>1. 绑定监听</h2>
+			  <button @click="test1">test1</button>
+			  <button @click="test2('LiXL')">test2</button>
+			  <button @click="test3">test3</button>
+			  <button @click="test4('LiXL', $event)">test4</button>
+
+			  <h2>2. 事件修饰符</h2>
+			  <div style="width: 200px; height: 200px; background-color: red" @click="test5">
+				<div style="width: 100px; height: 100px; background-color: blue" @click.stop="test6"></div>
+			  </div>
+			  <a href="https://www.baidu.com" @click.prevent="test7">去百度</a>
+
+			  <h2>3. 按键修饰符</h2>
+			  <!--<input type="text" @keyup.13="test8">-->
+			  <input type="text" @keyup.enter="test8">
+
+			</div>
+
+			<script type="text/javascript" src="../js/vue.js"></script>
+			<script type="text/javascript">
+			  new Vue({
+				  el: '#example',
+				  methods: {
+					  test1() {
+						  alert('test1')
+					  },
+					  test2(msg) {
+						  alert(msg)
+					  },
+					  test3(event) {
+						  alert(event.target.innerHTML)
+					  },
+					  test4(msg, $event) {
+						  alert(msg + ' ' + $event.target.innerHTML)
+					  },
+					  test5() {
+						  alert('test5')
+					  },
+					  test6(event) {
+						  // event.stopPropagation();
+						  alert('test6')
+					  },
+					  test7(event) {
+						  // event.preventDefault()
+						  alert('test7')
+					  },
+					  test8(event) {
+						  alert(event.target.value + ' ' + event.keyCode);
+						  /*if(event.keyCode === 13) {
+							  alert(event.target.value + ' ' + event.keyCode);
+						  }*/
+					  }
+				  }
+			  })
+			</script>
+			
+onmouseenter、onmouseleave和onmouseover、onmouseout事件的区别
+在一个外部div中嵌套一个内部div时，鼠标移入外部div时，会触发onmouseenter和onmouseover事件，当鼠标从外部div移入内部div时，会触发onmouseout
+事件，而鼠标重新进入外部div时会再次触发onmouseover事件，当鼠标移出外部div时，会触发onmouseleave和onmouseout事件
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+			  

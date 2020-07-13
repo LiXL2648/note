@@ -1,0 +1,146 @@
+一、事件
+	1. 事件绑定(2种)：
+		①eventName(function(){})
+			A. 绑定对应事件名的监听
+			B. click();//点击监听
+				$('.out').click(function(){
+					console.log("click out");
+				});
+			C. 鼠标移入和移出事件
+				//方式一mouseenter()/mouseleave()
+				$('.inner').mouseenter(function(){
+					console.log("enter inner");
+				})
+				.mouseleave(function(){
+					console.log("leave inner");
+				});
+				//方式二：hover(fn,fn)
+				$('.inner').hover(function(){
+					console.log("enter inner");
+				}, function(){
+					console.log("leave inner");
+				});
+		②on(eventName, funcion(){})
+			A. 通用的绑定事件监听
+			B. 例如：$('#div').on('click', function(){})
+		③优缺点:
+			A. eventName: 编码方便, 但只能加一个监听, 且有的事件监听不支持
+			B. on: 编码不方便, 可以添加多个监听, 且更通用
+	2. 事件解绑：off([eventName])
+		①如果不传参数，则默认解绑所有的事件
+			$('#btn1').click(function(){
+				$('.inner').off();
+			});
+		②如果传参，事件名为什么，则移除什么事件
+			$('#btn2').click(function(){
+				$('.inner').off('mouseenter');
+			});
+	3. 事件的坐标
+		①event.clientX, event.clientY：相对于窗口的左上角
+		②event.pageX, event.pageY：相对于页面的左上角
+		③event.offsetX, event.offsetY：相对于事件元素左上角
+		④举例：
+			$('#btn3').click(function(event){
+			console.log("offset:相对事件元素的坐标  " + "x = " + event.offsetX + " y = " + event.offsetY);
+			console.log("client:相对浏览器窗口的坐标  " + "x = " + event.clientX + " y = " + event.clientY);
+			console.log("page:相对页面的坐标  " + "x = " + event.pageX + " y = " + event.pageY);
+			});
+	4. 事件相关处理
+		①停止事件冒泡 : event.stopPropagation()
+			$('.inner').click(function(event){
+				console.log('click inner');
+				event.stopPropagation();
+			});
+		②阻止事件默认行为 : event.preventDefault()
+			$('.divBtn>a').click(function(event){
+				if(Date.now() % 2 ===0){
+					event.preventDefault();
+				}
+			});
+二、面试题
+	1. 区别mouseenter/mouseleave和mouseover/mouseout
+		①当父元素添加mouseover和mouseout事件时，在移入子元素时也会触发对应的事件
+		②当父元素添加mouseenter和mouseleave事件时，只有当鼠标移入当前元素时才会触发相应的事件
+		③hover(fn, fn)使用的也是mouseenter()/mouseleave()
+	2. 区别on(eventName, fn)和eventName(fn):
+		①eventName: 编码方便, 但只能加一个监听, 且有的事件监听不支持
+		②on: 编码不方便, 可以添加多个监听, 且更通用
+三、事件委托（委派/代理）：
+	1. 概念：
+		①将多个后代元素的事件监听委托到祖先元素上处理
+		②监听回调函数添加在祖先元素上
+		③当操作任何后代元素时，事件会冒泡到祖先元素上
+		④父元素不会直接处理事件，而是根据event.target得到事件的后代元素，通过后代元素去触发事件
+		⑤事件委派中的this，是触发事件的元素，而不是被委派的对象
+	2. 事件的委托双方
+		①委托方：后代元素
+		②被委托方：祖先元素
+	3. 使用事件代理的好处：
+		①添加的子元素，自动有事件响应处理
+		②减少事件监听的数量，n个监听事件变为一个
+	4. jQuery的事件委托API：
+		设置事件委托：delegate(selector, eventName, fn);
+			$('#btn1').click(function(){
+				$('ul').append('<li>新增的li</li>');
+			});
+			$('ul').delegate('li', 'click', function(){
+				this.style.backgroundColor = 'red';
+			});
+		移除事件委托：undeletage([eventName])
+			$('#btn2').click(function(){
+				$('ul').undelegate('click');
+			});
+四、动画效果
+	1. 淡入淡出：不断改变元素的透明度(opacity)来实现的
+		①fadeIn([speed],[eas],[fn]) : 带动画的显示
+		②fadeOut([speed],[eas],[fn]) : 带动画隐藏
+		④fadeToggle([speed,[eas],[fn]]) : 带动画切换显示/隐藏
+	2.滑动动画: 不断改变元素的高度实现
+		①slideDown([spe],[eas],[fn]) : 带动画的展开
+		②slideUp([speed,[easing],[fn]]) : 带动画的收缩
+		③slideToggle([speed],[easing],[fn]) : 带动画的切换展开/收缩
+	3. 显示隐藏，默认没有动画,不断改变元素的宽度、高度、高度实现(opacity/height/width)
+		①show([speed,[easing],[fn]]) : (不)带动画的显示
+		②hide([speed,[easing],[fn]]) : (不)带动画的隐藏
+		③toggle([speed],[easing],[fn]) : (不)带动画的切换显示/隐藏
+	4. 自定义：
+		①jQuery动画本质 : 在指定时间内不断改变元素样式值来实现的
+		②animate(param,[spe],[e],[fn]) ：自定义动画效果的动画，需要一个对象作为参数，该对象包含
+			动画发生需要的样式与样式值，如果在原样式的基础上改变样式值，可通过“样式："+=样式值"”的方式
+		③stop([cle],[jum]) ：停止动画，如果多次触发一个事件启动动画效果，会导致动画发生延迟的问题，
+			可以通过调用stop()方式将为完成的动画关闭，再启动动画
+	5. 参数：
+		①speed:三种预定速度之一的字符串("slow","normal", or "fast")或表示动画时长的毫秒数值(如：1000)
+		②easing:(Optional) 用来指定切换效果，默认是"swing"，可用参数"linear"
+		③fn:在动画完成时执行的函数，每个元素执行一次。
+五、多库共存
+	1. 问题 : 如果有2个库都有$, 就存在冲突
+	2. 解决 : jQuery库可以释放$的使用权, 让另一个库可以正常使用, 此时jQuery库只能使用jQuery了
+	3. API : jQuery.noConflict()
+六、区别: window.onload与 $(document).ready()（面试题）
+	1. window.onload
+		①包括页面的图片加载完后才会回调(晚)
+		②只能有一个监听回调
+	2. $(document).ready()
+		①等同于: $(function(){})
+		②页面加载完（图片加载完）就回调(早)
+		③可以有多个监听回调
+	3. 使用$(function(){})绑定页面加载完成监听，当获取图片的大小时无法正常获取，原因是图片还没加载完成
+		就已经调用回调函数，此时可以绑定一个“load”事件，来监听图片加载完成，该事件必须通过on来给图片绑定
+		$("img").on('load', funcion(){});
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	

@@ -1,0 +1,37 @@
+一、插件机制
+	1. jQuery.fn.extend(object)：扩展 jQuery 对象
+		①扩展 jQuery 对象来提供新的方法
+		②需要传递一个对象作为参数，该对象包含所有jQuery对象需要扩展的方法
+		③举例
+		$.fn.extend({
+			check: function() {//this指的是jQuery对象
+				return this.each(function() { 
+					this.checked = true; }//this指的是DOM元素
+				);
+			},
+			uncheck: function() {
+				return this.each(function() { this.checked = false; });
+			}
+		});
+	2. jQuery.extend(object)：扩展jQuery对象本身
+		①用来在jQuery命名空间上增加新函数
+		②需要传递一个对象作为参数，该对象包含所有jQuery对象本身需要扩展的方法
+		③举例：
+			$.extend({
+				min: function(a, b) { return a < b ? a : b; },
+				max: function(a, b) { return a > b ? a : b; }
+			});
+二、jQuery插件
+	1. 理解:
+		①基于jQuery编写的扩展库
+		②官网：http://plugins.jquery.com/
+	2. jquery-validation
+		①表单验证插件
+		②使用
+			A. 下载
+			B. 引入JS
+			C. 定义验证
+	3. jQueryUI
+		①用户界面插件(user interface)
+		②使用
+			A. 官网：http://jqueryui.com/
