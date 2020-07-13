@@ -1,4 +1,53 @@
-一、Vue 核心
+一、Vue简介
+	1. 官网
+		① 英文官网: https://vuejs.org/
+		② 中文官网: https://cn.vuejs.org/
+	2. 介绍描述
+		① 渐进式JavaScript 框架
+	3. Vue 的特点
+		① 遵循MVVM 模式
+		② 编码简洁, 体积小, 运行效率高, 适合移动/PC 端开发
+		③ 它本身只关注UI, 可以轻松引入vue 插件或其它第三库开发项目
+	4. 与其它前端JS 框架的关联
+		① 借鉴angular 的模板和数据绑定技术
+		② 借鉴react 的组件化和虚拟DOM 技术
+	5. Vue 扩展插件
+		① vue-cli: vue 脚手架
+		② vue-resource(axios): ajax 请求
+		③ vue-router: 路由
+		④ vuex: 状态管理
+		⑤ vue-lazyload: 图片懒加载
+		⑥ vue-scroller: 页面滑动相关
+		⑦ mint-ui: 基于vue 的UI 组件库(移动端)
+		⑧ element-ui: 基于vue 的UI 组件库(PC 端)
+	6. Vue技术栈：核心技术
+		① Vue模式：渐进式 + MVVM
+		② 模板语法与响应式
+			A. 插值语法
+			B. 强制数据绑定与事件绑定指令
+			C. 计算属性computed和侦听器watch
+			D. class与style绑定操作
+			E. 条件渲染与列表渲染
+			F. 表单输入绑定：v-model指令
+		③ 组件化：
+			A. 组件定义，注册与使用
+			B. 插槽：普通插槽，命名插槽，作用与插槽
+			C. 组件间通信：props，自定义事件，事件总线，插槽，PubSub，Vuex
+			D. 组件的生命周期钩子：11个生命周期，常用8个
+			E. 特殊属性使用：key，ref，is等
+			F. 内置组件使用：<transition>，<component>，<keep-alive>等。
+		④ 核心增强
+			A. 自定义过滤器
+			B. 自定义指令
+			C. 自定义Vue插件
+			D. 自定义全局事件总线
+			E. 自定义消息订阅与发布
+			F. 自定义基于webpack的Vue开发打包环境
+			G. Vue响应式数据与双向数据绑定原理源码分析
+			H. Vue虚拟DOM与DOM diff算法原理分析
+			I. 高级组件：动态组件，异步组件，递归组件，缓存组件
+			J. 自定义高可复用的组件：分页组件/轮播组件/图片放大镜等。
+二、Vue 核心
 	1. Vue 的基本使用
 		① 步骤：
 			A. 引入Vue.js
@@ -472,14 +521,480 @@
 				  }
 			  })
 			</script>
+	9. 表单输入绑定
+		① 使用v-model 对表单数据自动收集
+			A. text/textarea
+			B. checkbox
+			C. radio
+			D. select
+		② 编码：
+			<div id="demo">
+			  <form action="/xxx" @submit.prevent="myForm">
+				<span>用户名: </span>
+				<input type="text" v-model="username"><br>
+
+				<span>密码: </span>
+				<input type="password" v-model="password"><br>
+
+				<span>性别: </span>
+				<input type="radio" id="female" value="女" v-model="sex">
+				<label for="female">女</label>
+				<input type="radio" id="male" value="男" v-model="sex">
+				<label for="male">男</label><br>
+
+				<span>爱好: </span>
+				<input type="checkbox" id="basket" value="basket" v-model="likes">
+				<label for="basket">篮球</label>
+				<input type="checkbox" id="foot" value="foot" v-model="likes">
+				<label for="foot">足球</label>
+				<input type="checkbox" id="pingpang" value="pingpang" v-model="likes">
+				<label for="pingpang">乒乓</label><br>
+
+				<span>城市: </span>
+				<select v-model="city">
+				  <option value="">未选择</option>
+				  <option :value="city.id" v-for="(city, index) in cities" :key="index">{{city.name}}</option>
+				</select><br>
+				<span>介绍: </span>
+				<textarea rows="10" v-model="info"></textarea><br><br>
+
+				<input type="submit" value="注册">
+			  </form>
+			</div>
+
+			<script type="text/javascript" src="../js/vue.js"></script>
+			<script type="text/javascript">
+			  new Vue({
+				  el: '#demo',
+				  data: {
+					  username: '',
+					  password: '',
+					  sex: '女',
+					  likes: [],
+					  city: '',
+					  info: '',
+					  cities: [
+						  {id: 1, name: 'GuangZhou'},
+						  {id: 2, name: 'ShenZhen'},
+						  {id: 3, name: 'JieYang'}
+					  ]
+				  },
+				  methods: {
+					  myForm() {
+						  const {username, password, sex, likes, city, info} = this
+						  console.log(username, password, sex, likes, city, info)
+					  }
+				  }
+			  })
+			</script>
+	10. Vue 实例生命周期
+		① vue 生命周期分析
+			A. 初始化显示
+				a. beforeCreate()：数据模型未加载，方法未加载，html模板未加载
+				b. created()：数据模型已加载，方法已加载，html模板已加载，html模板未渲染
+				c. beforeMount()：html模板未渲染
+				d. mounted()：html模板已渲染
+			B. 更新状态: this.xxx = value
+				a. beforeUpdate()：数据模型已更新，html模板未更新
+				b. updated()：html模板已更新
+			C. 销毁vue实例: vm.$destory()
+				a. beforeDestory()
+				b. destoryed()
+		② 常用的生命周期方法
+			A. created()/mounted(): 发送ajax 请求, 启动定时器等异步任务
+			B. beforeDestory(): 做收尾工作, 如: 清除定时器
+		③ 编码
+			<div id="test">
+			  <button @click="destoryVue">destory vue</button>
+			  <p v-show="isShow">LiXL</p>
+			</div>
+
+			<script type="text/javascript" src="../js/vue.js"></script>
+			<script type="text/javascript">
+			  new Vue({
+				  el: '#test',
+				  data: {
+					  isShow: true
+				  },
+				  beforeCreate() {
+					  console.log("beforeCreate")
+				  },
+				  created() {
+					  console.log("created")
+				  },
+				  mounted() {
+					  this.intervalId = setInterval(() => {
+						  console.log('---------')
+						  this.isShow = !this.isShow
+					  }, 1000)
+				  },
+				  beforeUpdate() {
+					  console.log('beforeUpdate');
+				  },
+				  updated() {
+					  console.log('updated')
+				  },
+				  beforeDestroy() {
+					  clearInterval(this.intervalId)
+				  },
+				  destroyed() {
+					  console.log('destroyed')
+				  },
+				  methods: {
+					  destoryVue() {
+						  this.$destroy();
+					  }
+				  }
+			  })
+			</script>
+	11. 过渡&动画
+		① vue 动画的理解
+			A. 操作css 的trasition 或animation
+			B. vue 会给目标元素添加/移除特定的class
+			C. 过渡的相关类名
+				a. xxx-enter-active: 指定显示的transition
+				b. xxx-leave-active: 指定隐藏的transition
+				c. xxx-enter/xxx-leave-to: 指定隐藏时的样式
+									Enter												Leave
+				--------------				 	--------------		--------------					--------------
+				| Opacity: 0 | ---------------> | Opacity: 1 |		| Opacity: 1 | ---------------> | Opacity: 0 |
+				--------------					--------------		--------------					--------------
+					  |								  |					  |								   |
+					v-enter						  v-enter-to 		   v-leave						  v-leave-to 
+				|											 |		|											 |
+				----------------------------------------------		-----------------------------------------------
+									 |														|
+							  v-enter-active										 v-leave-active
+		② 基本过渡动画的编码
+			A. 在目标元素外包裹<transition name="xxx">
+			B. 定义class 样式
+				a. 指定过渡样式: transition
+				b. 指定隐藏时的样式: opacity/其它
+		③ 编码1
+			<style>
+				.test1-enter, .test1-leave-to {
+				  opacity: 0;
+				}
+				.test1-enter-active, .test1-leave-active {
+				  transition: opacity 1s;
+				}
+
+				.test2-enter, .test2-leave-to {
+				  opacity: 0;
+				  transform: translateX(20px);
+				}
+				.test2-enter-active{
+				  transition: all 5s;
+				}
+				.test2-leave-active{
+				  transition: all .5s;
+				}
+			</style>
 			
-onmouseenter、onmouseleave和onmouseover、onmouseout事件的区别
-在一个外部div中嵌套一个内部div时，鼠标移入外部div时，会触发onmouseenter和onmouseover事件，当鼠标从外部div移入内部div时，会触发onmouseout
-事件，而鼠标重新进入外部div时会再次触发onmouseover事件，当鼠标移出外部div时，会触发onmouseleave和onmouseout事件
+			<div id="test1">
+			  <button @click="isShow = !isShow">test1</button>
+			  <transition name="test1">
+				<p v-show="isShow">test1</p>
+			  </transition>
+			</div>
+
+			<div id="test2">
+			  <button @click="isShow = !isShow">test2</button>
+			  <transition name="test2">
+				<p v-show="isShow">test2</p>
+			  </transition>
+			</div>
+
+			<script type="text/javascript" src="../js/vue.js"></script>
+			<script type="text/javascript">
+			  new Vue({
+				  el: '#test1',
+				  data() {
+					  return {
+						  isShow: true
+					  }
+				  }
+			  })
+			  new Vue({
+				  el: '#test2',
+				  data() {
+					  return {
+						  isShow: true
+					  }
+				  }
+			  })
+			</script>
+		④ 编码2
+			<style>
+				.test3-enter-active {
+				  animation: bounce-in 1s;
+				}
+				.test3-leave-active {
+				  animation: bounce-in 1s reverse;
+				}
+				@keyframes bounce-in {
+				  0% {
+					transform: scale(0);
+				  }
+				  50% {
+					transform: scale(1.5);
+				  }
+				  100% {
+					transform: scale(1);
+				  }
+				}
+			</style>
+			
+			<div id="test3">
+			  <button @click="isShow=!isShow">test3</button><br>
+			  <transition name="test3">
+				<p v-show="isShow" style="display: inline-block">test3</p>
+			  </transition>
+			</div>
+
+			<script type="text/javascript" src="../js/vue.js"></script>
+			<script>
+			  new Vue({
+				  el: '#test3',
+				  data: {
+					  isShow: true
+				  }
+			  })
+			</script>
+	12. 过滤器
+		① 理解过滤器
+			A. 功能: 对要显示的数据进行特定格式化后再显示
+			B. 注意: 并没有改变原本的数据, 可是产生新的对应的数据
+		② 定义和使用过滤器
+			A. 定义过滤器
+				Vue.filter(filterName, function(value[,arg1,arg2,...]){ // value：需要过滤的数据
+					// 进行一定的数据处理
+					return newValue
+				})
+			B. 使用过滤器
+				<div>{{myData | filterName}}</div>
+				<div>{{myData | filterName(arg)}}</div>
+		③ 编码
+			<div id="test">
+			  {{time | myFilter}}<br>
+			  {{time | myFilter('YYYY-MM-DD')}}
+			  {{time | myFilter('HH:mm:ss')}}
+			</div>
+
+			<script type="text/javascript" src="../js/vue.js"></script>
+			<script src="https://cdn.bootcdn.net/ajax/libs/moment.js/2.27.0/moment.min.js"></script>
+			<script>
+				Vue.filter('myFilter', function (value, formate) {
+					return moment(value).format(formate || 'YYYY-MM-DD HH:mm:ss')
+				})
+				new Vue({
+					el: '#test',
+					data: {
+						time: new Date()
+					},
+					mounted() {
+						setInterval(() => {
+							this.time = new Date()
+						}, 1000)
+					}
+				})
+			</script>
+	13. 内置指令与自定义指令	
+		① 常用内置指令
+			A. v:text : 更新元素的textContent
+			B. v-html : 更新元素的innerHTML
+			C. v-if : 如果为true, 当前标签才会输出到页面
+			D. v-else: 如果为false, 当前标签才会输出到页面
+			E. v-show : 通过控制display 样式来控制显示/隐藏
+			F. v-for : 遍历数组/对象
+			G. v-on : 绑定事件监听, 一般简写为@
+			H. v-bind : 强制绑定解析表达式, 可以省略v-bind
+			I. v-model : 双向数据绑定
+			J. ref : 指定唯一标识, vue 对象通过$refs 属性访问这个元素对象
+			K. v-cloak : 防止闪现, 与css 配合: [v-cloak] { display: none }
+		② 自定义指令
+			A. 注册全局指令
+				Vue.directive('my-directive', function(el, binding){
+					el.innerHTML = binding.value.toupperCase()
+				})
+			B. 注册局部指令
+				directives : {
+					'my-directive' : {
+						bind (el, binding) {
+							el.innerHTML = binding.value.toupperCase()
+						}
+					}
+				}
+			C. 使用指令
+				v-my-directive='xxx'
+		③ 编码1(内置指令)
+			<div id="test">
+				<p v-text="content"></p>
+				<p v-html="content"></p>
+				<p ref="msg">hello</p>
+				<button @click="hint">提示</button>
+				<p v-cloak>{{msg}}</p>
+			</div>
+
+			<script src="../js/vue.js"></script>
+			<script>
+				alert("test")
+				new Vue({
+					el: '#test',
+					data: {
+						content: '<a href="https://www.baidu.com" target="_blank">去百度</a>',
+						msg: '闪现'
+					},
+					methods: {
+						hint() {
+							alert(this.$refs.msg.textContent)
+						}
+					}
+				})
+			</script>
+		④ 编码2(自定义指令)
+			<div id="test1">
+			  <p v-upper-text="msg"></p>
+			  <p v-lower-text="msg"></p>
+			</div>
+
+			<div id="test2">
+			  <p v-upper-text="msg"></p>
+			  <p v-lower-text="msg"></p>
+			</div>
+
+			<script type="text/javascript" src="../js/vue.js"></script>
+			<script type="text/javascript">
+			  // 注册一个全局指令
+			  // el: 指令所在的标签对象
+			  // binding: 包含指令相关数据的容器对象
+			  Vue.directive('upper-text', function (el, binding) {
+				  el.textContent = binding.value.toUpperCase()
+			  })
+			  new Vue({
+				  el: '#test1',
+				  data: {
+					  msg: "I am Li XL"
+				  }
+			  })
+
+			  new Vue({
+				  el: '#test2',
+				  data: {
+					  msg: "I am Li XL"
+				  },
+				  directives: {
+					  /*'lower-text': {
+						  bind(el, binding) {
+							  el.textContent = binding.value.toLowerCase()
+						  }
+					  }*/
+					  'lower-text'(el, binding) {
+						  console.log(el)
+						  console.log(binding)
+						  el.textContent = binding.value.toLowerCase()
+					  }
+				  }
+			  })
+			</script>
+	14. 自定义插件
+		① 说明
+			A. Vue 插件是一个包含install 方法的对象
+			B. 通过install 方法给Vue 或Vue 实例添加方法, 定义全局指令等
+		② 编码
+			A.  vue-myPlugin.js
+				(function (window) {
+				  const MyPlugin = {}
+				  MyPlugin.install = function (Vue, options) {
+					// 1. 添加全局方法或属性
+					Vue.myGlobalMethod = function () {
+					  console.log('Vue函数对象的myGlobalMethod()')
+					}
+
+					// 2. 添加全局资源
+					Vue.directive('my-directive',function (el, binding) {
+					  el.textContent = 'my-directive----'+binding.value
+					})
+
+					// 4. 添加实例方法
+					Vue.prototype.$myMethod = function () {
+					  console.log('vm $myMethod()')
+					}
+				  }
+				  window.MyPlugin = MyPlugin
+				})(window)
+			B.  vue组件
+				<div id="test">
+				  <p v-my-directive="msg"></p>
+				</div>
+
+				<script type="text/javascript" src="../js/vue.js"></script>
+				<script type="text/javascript" src="./vue-myPlugin1.js"></script>
+				<script type="text/javascript">
+				  // 声明使用插件(安装插件: 调用插件的install())
+				  Vue.use(MyPlugin)// 内部会调用插件对象的install()
+				  Vue.myGlobalMethod()
+				  const vm = new Vue({
+					  el: '#test',
+					  data: {
+						  msg: 'LiXL'
+					  }
+				  })
+				  vm.$myMethod()
+				</script>
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+扩展		
+	1. onmouseenter、onmouseleave和onmouseover、onmouseout事件的区别
+	在一个外部div中嵌套一个内部div时，鼠标移入外部div时，会触发onmouseenter和onmouseover事件，当鼠标从外部div移入内部div时，会触发onmouseout
+	事件，而鼠标重新进入外部div时会再次触发onmouseover事件，当鼠标移出外部div时，会触发onmouseleave和onmouseout事件
+
+	2. npm使用国内淘宝镜像的方法
+		① 命令配置
+			npm config set registry https://registry.npm.taobao.org
+		② 验证命令，如果返回https://registry.npm.taobao.org，说明镜像配置成功。
+			npm config get registry
 
 
 
