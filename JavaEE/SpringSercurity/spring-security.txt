@@ -1,0 +1,229 @@
+一. spring-security简介并与shiro对比
+	1. SpringSecurity 框架简介
+		① 官网：https://projects.spring.io/spring-security/
+		② 源代码: https://github.com/spring-projects/spring-security/
+		③ Spring Security 是强大的，且容易定制的，基于Spring开发的实现认证登录与资源授权的应用安全框架。
+		④ SpringSecurity 的核心功能：
+			A. Authentication：认证，用户登陆的验证（解决你是谁的问题）
+			B. Authorization：授权，授权系统资源的访问权限（解决你能干什么的问题）
+			C. 安全防护，防止跨站请求，session 攻击等
+	2. shiro与Spring Security的比较
+		① 目前在java web应用安全框架中，与Spring Security形成直接竞争的就是shiro，二者在核心功能上几乎差不多，但从使用的角度各有优缺点。
+		② 没有最好的，只有最合适的。
+		③ 用户量：从使用情况上看，二者都在逐步提高使用量。shiro的使用量一直高于spring security.
+		④ 使用的方便程度
+			A. 通常来说，shiro入门更加容易，使用起来也非常简单，这也是造成shiro的使用量一直高于Spring Security的主要原因
+			B. 在没有Spring Boot之前，Spring Security的大部分配置要通过XML实现，配置还是还是非常复杂的。但是有了 Spring Boot之后，这一情况已经得到显著改善。
+			C. Spring Security之所以看上去比shiro更复杂，其实是因为它引入了一些不常用的概念与规则。大家应该都知道2/8法则，这在Spring Security里面体现的特别明显，
+			如果你只学Spring Security最重要的那20%，这20%的复杂度和shiro基本是一致的。也就是说，不重要的那80%，恰恰是Spring Security比shiro的“复杂度”。
+			D. 也就是说，如果有人能帮你把Spring Security最重要的那20%摘出来，二者的入门门槛、复杂度其实是差不太多的。
+		⑤ 社区支持
+			A. Spring Security依托于Spring庞大的社区支持，这点自不必多说。shiro属于apache社区，因为它的广泛使用，文档也非常的全面。二者从社区支持来看，几乎不相上下。
+			B. 但是从社区发展的角度看，Spring Security明显更占优势，随着Spring Cloud、Spring Boot、Spring Social的长足进步，这种优势会越来越大。因为Spring Security
+			毕竟是Spring的亲儿子，Spring Security未来在于Spring系列框架集成的时候一定会有更好的融合性，前瞻性、兼容性！这也是为什么我们要学Spring Security的主要原因！
+		⑥ 功能丰富性：Spring Security因为它的复杂，所以从功能的丰富性的角度更胜一筹。其中比较典型的如
+			A. Spring Security默认含有对OAuth2.0的支持，与Spring Social一起使用完成社交媒体登录也比较方便。shiro在这方面只能靠自己写代码实现。
+			B. 还有一种普遍说法：Spring Security在网络安全的方面下的功夫更多
+		⑦ 总结：如果你只是想实现一个简单的web应用，shiro更加的轻量级，学习成本也更低。如果您正在开发一个分布式的、微服务的、或者与Spring Cloud系列框架深度集成的项目，
+		建议使用Spring Security。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
