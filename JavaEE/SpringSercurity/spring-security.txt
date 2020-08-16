@@ -1,75 +1,287 @@
-一. spring-security简介并与shiro对比
-	1. SpringSecurity 框架简介
-		① 官网：https://projects.spring.io/spring-security/
-		② 源代码: https://github.com/spring-projects/spring-security/
-		③ Spring Security 是强大的，且容易定制的，基于Spring开发的实现认证登录与资源授权的应用安全框架。
-		④ SpringSecurity 的核心功能：
-			A. Authentication：认证，用户登陆的验证（解决你是谁的问题）
-			B. Authorization：授权，授权系统资源的访问权限（解决你能干什么的问题）
-			C. 安全防护，防止跨站请求，session 攻击等
-	2. shiro与Spring Security的比较
-		① 目前在java web应用安全框架中，与Spring Security形成直接竞争的就是shiro，二者在核心功能上几乎差不多，但从使用的角度各有优缺点。
-		② 没有最好的，只有最合适的。
-		③ 用户量：从使用情况上看，二者都在逐步提高使用量。shiro的使用量一直高于spring security.
-		④ 使用的方便程度
-			A. 通常来说，shiro入门更加容易，使用起来也非常简单，这也是造成shiro的使用量一直高于Spring Security的主要原因
-			B. 在没有Spring Boot之前，Spring Security的大部分配置要通过XML实现，配置还是还是非常复杂的。但是有了 Spring Boot之后，这一情况已经得到显著改善。
-			C. Spring Security之所以看上去比shiro更复杂，其实是因为它引入了一些不常用的概念与规则。大家应该都知道2/8法则，这在Spring Security里面体现的特别明显，
-			如果你只学Spring Security最重要的那20%，这20%的复杂度和shiro基本是一致的。也就是说，不重要的那80%，恰恰是Spring Security比shiro的“复杂度”。
-			D. 也就是说，如果有人能帮你把Spring Security最重要的那20%摘出来，二者的入门门槛、复杂度其实是差不太多的。
-		⑤ 社区支持
-			A. Spring Security依托于Spring庞大的社区支持，这点自不必多说。shiro属于apache社区，因为它的广泛使用，文档也非常的全面。二者从社区支持来看，几乎不相上下。
-			B. 但是从社区发展的角度看，Spring Security明显更占优势，随着Spring Cloud、Spring Boot、Spring Social的长足进步，这种优势会越来越大。因为Spring Security
-			毕竟是Spring的亲儿子，Spring Security未来在于Spring系列框架集成的时候一定会有更好的融合性，前瞻性、兼容性！这也是为什么我们要学Spring Security的主要原因！
-		⑥ 功能丰富性：Spring Security因为它的复杂，所以从功能的丰富性的角度更胜一筹。其中比较典型的如
-			A. Spring Security默认含有对OAuth2.0的支持，与Spring Social一起使用完成社交媒体登录也比较方便。shiro在这方面只能靠自己写代码实现。
-			B. 还有一种普遍说法：Spring Security在网络安全的方面下的功夫更多
-		⑦ 总结：如果你只是想实现一个简单的web应用，shiro更加的轻量级，学习成本也更低。如果您正在开发一个分布式的、微服务的、或者与Spring Cloud系列框架深度集成的项目，
-		建议使用Spring Security。
+一. spring security基础篇
+	1. spring-security简介并与shiro对比
+		① SpringSecurity 框架简介
+			A. 官网：https://projects.spring.io/spring-security/
+			B. 源代码: https://github.com/spring-projects/spring-security/
+			C. Spring Security 是强大的，且容易定制的，基于Spring开发的实现认证登录与资源授权的应用安全框架。
+			D. SpringSecurity 的核心功能：
+				a. Authentication：认证，用户登陆的验证（解决你是谁的问题）
+				b. Authorization：授权，授权系统资源的访问权限（解决你能干什么的问题）
+				c. 安全防护，防止跨站请求，session 攻击等
+		② shiro与Spring Security的比较
+			A. 目前在java web应用安全框架中，与Spring Security形成直接竞争的就是shiro，二者在核心功能上几乎差不多，但从使用的角度各有优缺点。
+			B. 没有最好的，只有最合适的。
+			C. 用户量：从使用情况上看，二者都在逐步提高使用量。shiro的使用量一直高于spring security.
+			D. 使用的方便程度
+				a. 通常来说，shiro入门更加容易，使用起来也非常简单，这也是造成shiro的使用量一直高于Spring Security的主要原因
+				b. 在没有Spring Boot之前，Spring Security的大部分配置要通过XML实现，配置还是还是非常复杂的。但是有了 Spring Boot之后，这一情况已经得到显著改善。
+				c. Spring Security之所以看上去比shiro更复杂，其实是因为它引入了一些不常用的概念与规则。大家应该都知道2/8法则，这在Spring Security里面体现的特别明显，
+				如果你只学Spring Security最重要的那20%，这20%的复杂度和shiro基本是一致的。也就是说，不重要的那80%，恰恰是Spring Security比shiro的“复杂度”。
+				d. 也就是说，如果有人能帮你把Spring Security最重要的那20%摘出来，二者的入门门槛、复杂度其实是差不太多的。
+			E. 社区支持
+				a. Spring Security依托于Spring庞大的社区支持，这点自不必多说。shiro属于apache社区，因为它的广泛使用，文档也非常的全面。二者从社区支持来看，几乎不相上下。
+				b. 但是从社区发展的角度看，Spring Security明显更占优势，随着Spring Cloud、Spring Boot、Spring Social的长足进步，这种优势会越来越大。因为Spring Security
+				毕竟是Spring的亲儿子，Spring Security未来在于Spring系列框架集成的时候一定会有更好的融合性，前瞻性、兼容性！这也是为什么我们要学Spring Security的主要原因！
+			F. 功能丰富性：Spring Security因为它的复杂，所以从功能的丰富性的角度更胜一筹。其中比较典型的如
+				a. Spring Security默认含有对OAuth2.0的支持，与Spring Social一起使用完成社交媒体登录也比较方便。shiro在这方面只能靠自己写代码实现。
+				b. 还有一种普遍说法：Spring Security在网络安全的方面下的功夫更多
+			G. 总结：如果你只是想实现一个简单的web应用，shiro更加的轻量级，学习成本也更低。如果您正在开发一个分布式的、微服务的、或者与Spring Cloud系列框架深度集成的项目，
+			建议使用Spring Security。
+	2. 需求分析与基础环境准备	
+		① 需求分析
+			A. login.html登录页面，登录页面访问不受限制
+			B. 在登录页面登录之后，进入index.html首页（登录验证Authentication）
+			C. 首页可以看到syslog、sysuer、biz1、biz2四个页面选项
+			D. 我们希望syslog（日志管理）和sysuser(用户管理)只有admin管理员可以访问（权限管理Authorization）
+			E. biz1、biz2普通的操作用户auser就可以访问（权限管理Authorization）
+		② 环境准备	
+			A. 新建spring boot2.0版本的web应用springboot-security
+			B. 改POM
+				<properties>
+					<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+					<maven.compiler.source>1.8</maven.compiler.source>
+					<maven.compiler.target>1.8</maven.compiler.target>
+					<mysql.version>5.1.47</mysql.version>
+					<druid.version>1.1.16</druid.version>
+					<mybatis.spring.boot.version>1.3.0</mybatis.spring.boot.version>
+				</properties>
 
+				<parent>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-starter-parent</artifactId>
+					<version>2.2.2.RELEASE</version>
+				</parent>
 
+				<dependencies>
+					<dependency>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-starter-web</artifactId>
+					</dependency>
+					<dependency>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-starter-actuator</artifactId>
+					</dependency>
+					<dependency>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-starter-thymeleaf</artifactId>
+					</dependency>
 
+					<dependency>
+						<groupId>org.mybatis.spring.boot</groupId>
+						<artifactId>mybatis-spring-boot-starter</artifactId>
+						<version>${mybatis.spring.boot.version}</version>
+					</dependency>
+					<dependency>
+						<groupId>com.alibaba</groupId>
+						<artifactId>druid</artifactId>
+						<version>${druid.version}</version>
+					</dependency>
+					<dependency>
+						<groupId>mysql</groupId>
+						<artifactId>mysql-connector-java</artifactId>
+						<version>${mysql.version}</version>
+					</dependency>
 
+					<dependency>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-devtools</artifactId>
+						<scope>runtime</scope>
+						<optional>true</optional>
+					</dependency>
+					<dependency>
+						<groupId>org.projectlombok</groupId>
+						<artifactId>lombok</artifactId>
+						<optional>true</optional>
+					</dependency>
+					<dependency>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-starter-test</artifactId>
+						<scope>test</scope>
+					</dependency>
 
+					<dependency>
+						<groupId>org.webjars</groupId>
+						<artifactId>jquery</artifactId>
+						<version>3.5.1</version>
+					</dependency>
+					<dependency>
+						<groupId>org.webjars</groupId>
+						<artifactId>bootstrap</artifactId>
+						<version>4.5.0</version>
+					</dependency>
+				</dependencies>
 
+				<build>
+					<plugins>
+						<plugin>
+							<groupId>org.springframework.boot</groupId>
+							<artifactId>spring-boot-maven-plugin</artifactId>
+						</plugin>
 
+						<plugin>
+							<groupId>org.springframework.boot</groupId>
+							<artifactId>spring-boot-maven-plugin</artifactId>
+							<configuration>
+								<fork>true</fork>
+								<addResources>true</addResources>
+							</configuration>
+						</plugin>
+					</plugins>
+				</build>
+			C. 写YML
+				server:
+				  port: 8081
+				  servlet:
+					context-path: /springboot-security
+				spring:
+				  datasource:
+					username: root
+					password: 2648
+					url: jdbc:mysql://192.168.107.6:3306/test
+					driver-class-name: com.mysql.jdbc.Driver
+					type: com.alibaba.druid.pool.DruidDataSource
+				  thymeleaf:
+					cache: false
+				  application:
+					name: springboot-security
+			D. 主启动
+				@SpringBootApplication
+				@MapperScan("com.li.security.dao")
+				public class SpringBootSecurityMain {
 
+					public static void main(String[] args) {
+						SpringApplication.run(SpringBootSecurityMain.class, args);
+					}
+				}
+			E. 业务类
+				a. DruidConfig
+					@Configuration
+					public class DruidConfig {
 
+						@ConfigurationProperties(
+								prefix = "spring.datasource"
+						)
+						@Bean
+						public DataSource druid() {
+							return new DruidDataSource();
+						}
+					}
+				b. MyBatisConfig
+					@org.springframework.context.annotation.Configuration
+					public class MyBatisConfig {
 
+						@Bean
+						public ConfigurationCustomizer configurationCustomizer() {
+							return new ConfigurationCustomizer(){
 
+								@Override
+								public void customize(Configuration configuration) {
+									configuration.setMapUnderscoreToCamelCase(true);
+								}
+							};
+						}
+					}
+				c. WebConfig
+					@Configuration
+					public class WebConfig implements WebMvcConfigurer {
 
+						@Bean
+						public WebMvcConfigurer webMvcConfigurer() {
+							return new WebMvcConfigurer() {
+								@Override
+								public void addViewControllers(ViewControllerRegistry registry) {
+									registry.addViewController("/").setViewName("login");
+									registry.addViewController("/login.html").setViewName("login");
+								}
+							};
+						}
+					}
+				d. UserController
+					@Controller
+					public class UserController {
 
+						@ResponseBody
+						@GetMapping("/hello")
+						public String hello() {
+							return "hello world";
+						}
 
+						@PostMapping("/login")
+						public String index() {
+							return "index";
+						}
 
+						@GetMapping("/syslog")
+						public String syslog() {
+							return "syslog";
+						}
 
+						@GetMapping("/sysuser")
+						public String sysuser() {
+							return "sysuser";
+						}
 
+						@GetMapping("/biz1")
+						public String biz1() {
+							return "biz1";
+						}
 
+						@GetMapping("/biz2")
+						public String biz2() {
+							return "biz2";
+						}
 
+					}
+			F. templates
+				a. login.html
+				b. index.html
+				c. syslog.html
+				d. sysuser.html
+				e. biz1.html
+				f. biz2.html
+		③ 注：spring-boot 1.5与spring-boot 2.0的区别
+			A. spring-boot 2.0 弃用 server.context-path知道根路径，而改成server.servlet.context-path，根据前需要加上“/”
+			B. spring-boot 2.0 定制MVC时弃用了继承WebMvcConfigurerAdapyer的方式，而采用实现WebMvcConfigurer接口
+	3. HttpBasic模式登录认证
+		① HttpBasic登录验证模式是Spring Security实现登录验证最简单的一种方式，也可以说是最简陋的一种方式。它的目的并不是保障登录验证的绝对安全，而是提供一种“防君子不防小人”的登录验证。
+		② spring boot2.0整合Spring security
+			<dependency>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-starter-security</artifactId>
+			</dependency>
+		③ HttpBasic登录认证模式
+			A. 如果使用的Spring Boot版本为1.X版本,依赖的Security 4.X版本，那么就无需任何配置，启动项目访问则会弹出默认的httpbasic认证.
+			B. 我们现在使用的是spring boot2.0版本（依赖Security 5.X版本），HttpBasic不再是默认的验证模式，在spring security 5.x默认的验证模式已经是表单模式。所以我们要使用Basic模式，
+			需要自己调整一下。并且security.basic.enabled已经过时了，所以我们需要自己去编码实现。
+			C. 代码：
+				@Configuration
+				public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+					@Override
+					protected void configure(HttpSecurity http) throws Exception {
+						http.httpBasic() // 开启httpBasic认证
+								.and()
+								.authorizeRequests()
+								.anyRequest()
+								.authenticated(); // 所有请求都需要登录认证才能访问
+					}
+				}
+			D. 启动项目，在项目后台有以下这样的一串日志打印，冒号后面的就是默认密码
+				Using generated security password: 20716c77-3400-4a9f-985d-4804c85ad25c
+			E. 我们可以通过浏览器进行登录验证，默认的用户名是user.（下面的登录框不是我们开发的，是HttpBasic模式自带的）
+			F. 当然我们也可以通过application.yml指定配置用户名密码
+				spring:
+				  security:
+					user:
+					  name: admin
+					  password: admin
+		④ HttpBasic模式的原理说明
+			A. 首先，HttpBasic模式要求传输的用户名密码使用Base64模式进行加密。如果用户名是 "admin"  ，密码是“ admin”，则将字符串"admin:admin"使用Base64编码算法加密。加密结果可能是：YWtaW46YWRtaW4=。
+			B. 然后，在Http请求中使用Authorization作为一个Header，“Basic YWtaW46YWRtaW4=“作为Header的值，发送给服务端。（注意这里使用Basic+空格+加密串）
+			C. 服务器在收到这样的请求时，到达BasicAuthenticationFilter过滤器，将提取“ Authorization”的Header值，并使用用于验证用户身份的相同算法Base64进行解码。
+			D. 解码结果与登录验证的用户名密码匹配，匹配成功则可以继续过滤器后续的访问。
+			E. 所以，HttpBasic模式真的是非常简单又简陋的验证模式，Base64的加密算法是可逆的，你知道上面的原理，分分钟就破解掉。我们完全可以使用PostMan工具，或者浏览器开发工具中，发送Http请求进行登录验证
+			查看header参数即可获取用户名密码的Base64。
 
 
 
