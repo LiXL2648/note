@@ -372,65 +372,417 @@
 					web.ignoring() // 将项目中的静态资源路径开放出来
 							.antMatchers("/**/css/**", "/**/fonts/**", "/**/img/**", "/**/js/**");
 				}
+	5. 源码解析登录认证流程
+		① 登录认证基于过滤器链：
+			A. Spring Security的登录验证流程核心就是过滤器链。
+				a. 贯穿于整个过滤器链始终有一个上下文对象SecurityContext和一个Authentication对象（登录认证的主体）
+				b. 一旦某一个该主体通过其中某一个过滤器的认证，Authentication对象信息被填充，比如：isAuthenticated=true表示该主体通过验证。
+				c. 如果该主体通过了所有的过滤器，仍然没有被认证，在整个过滤器链的最后方有一个FilterSecurityInterceptor过滤器（虽然叫Interceptor，但它是名副其实的过滤器，不是拦截器）。判断Authentication对象
+				的认证状态，如果没有通过认证则抛出异常，通过认证则访问后端API。
+				d. 之后进入响应阶段，FilterSecurityInterceptor抛出的异常被ExceptionTransactionFilter对异常进行相应的处理。比如：用户名密码登录异常，会被引导到登录页重新登陆。
+				e. 如果是登陆成功，且没有任何异常，在SecurityContextPersistenceFilter中将SecurityContext放入session。下次再进行请求的时候，直接从SecurityContextPersistenceFilter的session中取出认证信息。
+				从而避免多次重复认证。
+			B. SpringSecurity提供了多种登录认证的方式，由多种Filter过滤器来实现，比如：
+				a. BasicAuthenticationFilter实现的是HttpBasic模式的登录认证
+				b. BasicAuthenticationFilter实现的是HttpBasic模式的登录认证
+				c. RememberMeAuthenticationFilter实现登录认证的“记住我”的功能
+				d. SmsCodeAuthenticationFilter实现短信验证码登录认证
+				e. SocialAuthenticationFilter实现社交媒体方式登录认证的处理，如：QQ、微信
+				f. Oauth2AuthenticationProcessingFilter和Oauth2ClientAuthenticationProcessingFilter实现Oauth2的鉴权方式
+			C. 根据我们不同的需求实现及配置，不同的Filter会被加载到应用中。
+		② 过滤器登录验证细节
+			A. 构建登录认证主体，如图所示，当用户登陆的时候首先被某一种认证方式的过滤器拦截（以用户名密码登录为例）。如：UsernamePasswordAuthenticationFilter会使用用户名和密码创建一个登录认证凭证：
+			UsernamePasswordAuthenticationToken，进而获取一个Authentication对象，该对象代表身份验证的主体，贯穿于用户认证流程始终。
+				public Authentication attemptAuthentication(HttpServletRequest request, HttpServletResponse response) throws AuthenticationException {
+					if (this.postOnly && !request.getMethod().equals("POST")) {
+						throw new AuthenticationServiceException("Authentication method not supported: " + request.getMethod());
+					} else {
+						String username = this.obtainUsername(request);
+						String password = this.obtainPassword(request);
+						if (username == null) {
+							username = "";
+						}
 
+						if (password == null) {
+							password = "";
+						}
 
+						username = username.trim();
+						UsernamePasswordAuthenticationToken authRequest = new UsernamePasswordAuthenticationToken(username, password);
+						this.setDetails(request, authRequest);
+						return this.getAuthenticationManager().authenticate(authRequest);
+					}
+				}
+			B. 多种认证方式的管理 ProviderManager，
+				a. 随后使用AuthenticationManager 接口对登录认证主体进行authenticate认证。
+				public interface AuthenticationManager {
+					Authentication authenticate(Authentication var1) throws AuthenticationException;
+				}
+				b. ProviderManager继承于AuthenticationManager是登录验证的核心类。
+					public class ProviderManager implements AuthenticationManager, MessageSourceAware, InitializingBean {
+						...
+						private List<AuthenticationProvider> providers;
+						...
+					}
+				c. ProviderManager保管了多个AuthenticationProvider，每一种登录认证方式都可以尝试对登录认证主体进行认证。只要有一种方式被认证成功，Authentication对象就成为被认可的主体。
+					a. 源码：
+						public interface AuthenticationProvider {
+							Authentication authenticate(Authentication var1) throws AuthenticationException;
 
+							boolean supports(Class<?> var1);
+						}
+					b. RememberMeAuthenticationProvider定义了“记住我”功能的登录验证逻辑
+					c. DaoAuthenticationProvider加载数据库用户信息，进行用户密码的登录验证
+			C. 数据库加载用户信息 DaoAuthenticationProvider
+				a. DaoAuthenticationProvider类：public class DaoAuthenticationProvider extends AbstractUserDetailsAuthenticationProvider
+				b. 从数据库获取用户信息
+					protected final UserDetails retrieveUser(String username, UsernamePasswordAuthenticationToken authentication) throws AuthenticationException {
+						this.prepareTimingAttackProtection();
 
+						try {
+							UserDetails loadedUser = this.getUserDetailsService().loadUserByUsername(username);
+							if (loadedUser == null) {
+								throw new InternalAuthenticationServiceException("UserDetailsService returned null, which is an interface contract violation");
+							} else {
+								return loadedUser;
+							}
+						} catch (UsernameNotFoundException var4) {
+							this.mitigateAgainstTimingAttack(authentication);
+							throw var4;
+						} catch (InternalAuthenticationServiceException var5) {
+							throw var5;
+						} catch (Exception var6) {
+							throw new InternalAuthenticationServiceException(var6.getMessage(), var6);
+						}
+					}
+				c. 所以当我们需要加载用户信息进行登录验证的时候，我们需要实现UserDetailsService接口，重写loadUserByUsername方法，参数是用户输入的用户名。返回值是UserDetails。
+			D. SecurityContext：完成登录认证之后，将认证完成的Authtication对象(authenticate: true, 有授权列表authority list, 和username信息)放入SecurityContext上下文里面。
+			后续的请求就直接从SecurityContextFilter中获得认证主体，从而访问资源。
+		③ 结合源码讲解登录验证流程			
+			A. UsernamePasswordAuthenticationFilter：
+				a. 该过滤器封装用户基本信息（用户名、密码），定义登录表单数据接收相关的信息。如：
+				b. 默认的表单用户名密码input框name是username、password
+				c. 默认的处理登录请求路径是/login、使用POST方法
+				d。 源码
+					public class UsernamePasswordAuthenticationFilter extends AbstractAuthenticationProcessingFilter {
+					// 默认的用户名和密码
+					public static final String SPRING_SECURITY_FORM_USERNAME_KEY = "username";
+					public static final String SPRING_SECURITY_FORM_PASSWORD_KEY = "password";
+					private String usernameParameter = "username";
+					private String passwordParameter = "password";
+					private boolean postOnly = true;
 
+					public UsernamePasswordAuthenticationFilter() {
+						// 请求的路径和方法
+						super(new AntPathRequestMatcher("/login", "POST"));
+					}
 
+					public Authentication attemptAuthentication(HttpServletRequest request, HttpServletResponse response) throws AuthenticationException {
+						if (this.postOnly && !request.getMethod().equals("POST")) {
+							throw new AuthenticationServiceException("Authentication method not supported: " + request.getMethod());
+						} else {
+							String username = this.obtainUsername(request);
+							String password = this.obtainPassword(request);
+							if (username == null) {
+								username = "";
+							}
 
+							if (password == null) {
+								password = "";
+							}
 
+							username = username.trim();
+							UsernamePasswordAuthenticationToken authRequest = new UsernamePasswordAuthenticationToken(username, password);
+							// 封装登录用户信息
+							this.setDetails(request, authRequest);
+							// 核心登录验证方法
+							return this.getAuthenticationManager().authenticate(authRequest);
+						}
+					}
+			B.  AbstractAuthenticationProcessingFilter的doFilter方法的验证过程
+				a. UsernamePasswordAuthenticationFilter继承自抽象类AbstractAuthenticationProcessingFilter，该抽象类定义了验证成功与验证失败的处理方法。
+				b. 源码
+					public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain) throws IOException, ServletException {
+						HttpServletRequest request = (HttpServletRequest)req;
+						HttpServletResponse response = (HttpServletResponse)res;
+						if (!this.requiresAuthentication(request, response)) {
+							chain.doFilter(request, response);
+						} else {
+							if (this.logger.isDebugEnabled()) {
+								this.logger.debug("Request is to process authentication");
+							}
 
+							Authentication authResult;
+							try {
+								authResult = this.attemptAuthentication(request, response);
+								if (authResult == null) {
+									return;
+								}
+								// 登录验证
+								this.sessionStrategy.onAuthentication(authResult, request, response);
+							} catch (InternalAuthenticationServiceException var8) {
+								this.logger.error("An internal error occurred while trying to authenticate the user.", var8);
+								// 验证失败
+								this.unsuccessfulAuthentication(request, response, var8);
+								return;
+							} catch (AuthenticationException var9) {
+								// 验证失败
+								this.unsuccessfulAuthentication(request, response, var9);
+								return;
+							}
 
+							if (this.continueChainBeforeSuccessfulAuthentication) {
+								chain.doFilter(request, response);
+							}
+							
+							// 验证成功
+							this.successfulAuthentication(request, response, chain, authResult);
+						}
+					}
+			C.  验证成功之后的Handler和验证失败之后的handler
+				a. private AuthenticationSuccessHandler successHandler = new SavedRequestAwareAuthenticationSuccessHandler();
+				b. private AuthenticationFailureHandler failureHandler = new SimpleUrlAuthenticationFailureHandler();
+				c. 也就是说当我们需要自定义验证成功或失败的处理方法时，要去实现AuthenticationSuccessHandler或AuthenticationfailureHandler接口
+	6. 自定义登录验证结果处理
+		① 需要自定义登录结果的场景
+			A. 当我们登录成功的时候，是由AuthenticationSuccessHandler进行登录结果处理，默认跳转到defaultSuccessUrl配置的路径对应的资源页面（一般是首页index.html）。
+			B. 当我们登录失败的时候，是由AuthenticationfailureHandler进行登录结果处理，默认跳转到failureUrl配置的路径对应的资源页面（一般是登录页login.html）。
+			C. 但是在web应用开发过程中需求是千变万化的，有时需要我们针对登录结果做个性化处理，比如：
+				a. 我们希望不同的人登陆之后，看到不同的首页
+				b. 我们应用是前后端分离的，验证响应结果是JSON格式数据，而不是页面跳转
+		② 自定义登陆成功的结果处理
+			A. AuthenticationSuccessHandler接口是Security提供的认证成功处理器接口，我们只需要去实现它即可。但是通常来说，我们不会直接去实现AuthenticationSuccessHandler接口，
+			而是继承SavedRequestAwareAuthenticationSuccessHandler 类，这个类会记住用户上一次请求的资源路径，比如：用户请求books.html，没有登陆所以被拦截到了登录页，
+			当你万成登陆之后会自动跳转到books.html，而不是主页面。
+			B. 代码：
+				@Component
+				public class MyAuthenticationSuccessHandler extends SavedRequestAwareAuthenticationSuccessHandler {
 
+					@Value("${spring.security.loginType}")
+					private String loginType;
 
+					private static ObjectMapper objectMapper = new ObjectMapper();
 
+					@Override
+					public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication)
+							throws ServletException, IOException {
 
+						if (loginType.equalsIgnoreCase("JSON")) {
+							response.setContentType("application/json;charset=UTF-8");
+							response.getWriter().write(objectMapper.writeValueAsString(
+									AjaxResponse.success("/index")
+							));
+						} else {
+							//跳转到登陆之前请求的页面
+							super.onAuthenticationSuccess(request, response, authentication);
+						}
 
+					}
+				}
+			C. 在上面的自定义登陆成功处理中，既适应JSON前后端分离的应用登录结果处理，也适用于模板页面跳转应用的登录结果处理
+			D. ObjectMapper 是Spring Boot默认集成的JSON数据处理类库Jackson中的类。
+			E. AjaxResponse是一个自定义的通用的JSON数据接口响应类。
+		③ 自定义登录失败的结果处理
+			A. 这里我们同样没有直接实现AuthenticationFailureHandler接口，而是继承SimpleUrlAuthenticationFailureHandler 类。该类中默认实现了登录验证失败的跳转逻辑，即登陆失败之后回到登录页面。
+			B. 代码：
+				@Component
+				public class MyAuthenticationFailureHandler extends SimpleUrlAuthenticationFailureHandler {
 
+					@Value("${spring.security.loginType}")
+					private String loginType;
 
+					private static ObjectMapper objectMapper = new ObjectMapper();
 
+					public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,  AuthenticationException exception)
+							throws IOException, ServletException {
 
+						String errorMsg = "用户名或者密码输入错误!";
+						if(exception instanceof SessionAuthenticationException){
+							errorMsg = exception.getMessage();
+						}
 
+						if(loginType.equalsIgnoreCase("JSON")){
+							response.setContentType("application/json;charset=UTF-8");
+							response.getWriter().write(objectMapper.writeValueAsString(
+									AjaxResponse.error(new CustomException(
+											CustomExceptionType.USER_INPUT_ERROR,
+											errorMsg))
+							));
+						}else{
+							//跳转到登陆页面
+							super.onAuthenticationFailure(request,response,exception);
+						}
 
+					}
+				}
+			C. 在上面的自定义登陆失败处理中，既适应JSON前后端分离的应用登录失败结果处理，也适用于模板页面跳转应用的登录失败结果处理
+			D. 登陆失败之后，将默认跳转到默认的failureUrl，即登录界面。
+		④ 配置SecurityConfig
+			A. 代码：
+				http.csrf().disable() //禁用跨站csrf攻击防御，后面的章节会专门讲解
+                .formLogin()
+                .loginPage("/login.html") // 用户未登录时，访问任何资源都转跳到该路径，即登录页
+                .loginProcessingUrl("/login") // 登录表单form中action的地址，也就是处理认证请求的路径
+                .usernameParameter("username") // 登录表单form中用户名输入框input的name名，不修改的话默认是username
+                .passwordParameter("password") // form中密码输入框input的name名，不修改的话默认是password
+                //.defaultSuccessUrl("/index") // 登录认证成功后默认转跳的路径
+                .successHandler(myAuthenticationSuccessHandler)
+                .failureHandler(myAuthenticationFailureHandler)
+                .and()
+                .authorizeRequests()
+                .antMatchers("/login.html", "/", "/login").permitAll() // 不需要通过登录验证就可以被访问的资源路径
+                .antMatchers("/biz1", "/biz2") // 需要对外暴露的资源路径
+                .hasAnyAuthority("ROLE_user", "ROLE_admin") // user 和 admin 角色可以访问的资源
+                // .antMatchers("/syslog", "/sysuser")
+                // .hasAnyRole("admin") // admin 角色可以访问的资源
+                // .hasAnyAuthority("ROLE_admin") // 角色是一种特殊的权限
+                .antMatchers("/syslog").hasAuthority("sys:log")
+                .antMatchers("/sysuser").hasAuthority("sys:user")
+                .anyRequest().authenticated();
+			B. 将自定义的AuthenticationSuccessHandler和AuthenticationFailureHandler注入到Spring Security配置类中
+			C. 使用fromlogin模式，配置successHandler和failureHandler。
+			D. 不要配置defaultSuccessUrl和failureUrl，否则自定义handler将失效。handler配置与URL配置只能二选一
+		⑤ JSON登录方式的测试
+			<form th:action="@{/login}" method="post">
+				<div class="form-group">
+					<label for="username">账号</label>
+					<input type="text" class="form-control" name="username" id="username" placeholder="请输入账号">
+				</div>
+				<div class="form-group">
+					<label for="password">密码</label>
+					<input type="password" class="form-control" name="password" id="password" placeholder="请输入密码">
+				</div>
+				<div class="checkbox">
+					<label>
+						<input type="checkbox"> 记住密码
+					</label>
+				</div>
+				<button class="btn btn-primary" type="submit" id="submit">登录</button>
+			</form>
+			
+			$('#submit').click(function () {
+				var username = $('#username').val();
+				var password = $('#password').val();
+				if (username == '' || password == '') {
+					alert("用户名或者密码不能为空")
+					return false;
+				}
+				$.ajax({
+					url: '/springboot-security/login',
+					type: 'post',
+					data: {
+						username: username,
+						password: password
+					},
+					success: function (res) {
+						if (res.isok) {
+							alert("success");
+							location.href = '/springboot-security' + res.data;
+						} else {
+							alert(JSON.stringify(res));
+						}
 
+					},
+					error: function (e) {
+						// alert(e)
+					}
+				});
+				return false;
+			});
+		⑥ 其他代码：
+			A. AjaxResponse
+				@Data
+				public class AjaxResponse {
 
+					private Boolean isok;
 
+					private Integer code;
 
+					private String Message;
 
+					private Object data;
 
+					private AjaxResponse() {}
 
+					public static AjaxResponse success() {
+						AjaxResponse result = new AjaxResponse();
+						result.setIsok(true);
+						result.setCode(200);
+						result.setMessage("success");
+						return result;
+					}
 
+					public static AjaxResponse success(Object data) {
+						AjaxResponse result = new AjaxResponse();
+						result.setIsok(true);
+						result.setCode(200);
+						result.setMessage("success");
+						result.setData(data);
+						return result;
+					}
 
+					public static AjaxResponse error(CustomException e) {
+						AjaxResponse result = new AjaxResponse();
+						result.setIsok(false);
+						result.setCode(e.getCode());
+						if (e.getCode() == CustomExceptionType.USER_INPUT_ERROR.getCode()) {
+							result.setMessage(e.getMessage());
+						} else if (e.getCode() == CustomExceptionType.SYSTEM_ERROR.getCode()) {
+							result.setMessage(e.getMessage() + "，系统出现异常");
+						} else {
+							result.setMessage(e.getMessage() + "，系统出现未知异常");
+						}
+						return  result;
+					}
+				}
+			B. CustomException
+				public class CustomException extends RuntimeException {
 
+					private Integer code;
 
+					private String message;
 
+					private CustomException() {
+					}
 
+					public CustomException(CustomExceptionType customExceptionType, String message) {
+						this.code = customExceptionType.getCode();
+						this.message = message;
+					}
 
+					public Integer getCode() {
+						return code;
+					}
 
+					@Override
+					public String getMessage() {
+						return message;
+					}
+				}
+			C. CustomExceptionType
+				public enum CustomExceptionType {
 
+					USER_INPUT_ERROR(400, "用户输入异常"),
+					SYSTEM_ERROR(500, "系统内部异常"),
+					OTHER_ERROR(999, "未知异常");
 
+					private Integer code;
 
+					private String typeDesc;
 
+					CustomExceptionType(Integer code, String typeDesc) {
+						this.code = code;
+						this.typeDesc = typeDesc;
+					}
 
+					public Integer getCode() {
+						return code;
+					}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+					public String getTypeDesc() {
+						return typeDesc;
+					}
+				}
 
 
 
