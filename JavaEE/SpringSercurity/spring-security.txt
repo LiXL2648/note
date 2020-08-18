@@ -783,27 +783,65 @@
 						return typeDesc;
 					}
 				}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+	7. session会话的管理
+		① Spring Security创建使用session的方法
+			A Spring Security提供4种方式精确的控制会话的创建：
+				a. always：如果当前请求没有session存在，Spring Security创建一个session。
+				b. ifRequired（默认）： Spring Security在需要时才创建session
+				c. never： Spring Security将永远不会主动创建session，但是如果session已经存在，它将使用该session
+				d. stateless：Spring Security不会创建或使用任何session。适合于接口型的无状态应用，该方式节省资源。
+			B. 在Spring Security配置中加入session创建的策略。继承WebSecurityConfigurerAdapter ，重写configure(HttpSecurity http) 方法
+				protected void configure(HttpSecurity http) throws Exception {
+					http.
+						...
+						.and()
+						.sessionManagement()
+						.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED);// Spring Security 精确的控制会话（默认）
+				}
+			C. 重要的是：该配置只能控制Spring Security如何创建与使用session，而不是控制整个应用程序。如果我们不明确指定，Spring Security
+			可能不会创建session，但是我们的应用程序可能会创建session（一般spring应用的session管理交由Spring Session进行）！
+		② 会话超时管理
+			A. 会话超时时间配置
+				a. 在Spring boot应用中有两种设置会话超时时间的方式，Spring Security对这两种方式完全兼容，即：当会话超时之后用户需要重新登录才能访问应用：
+					(1) server.servlet.session.timeout=15m
+					(2) spring.session.timeout = 15m
+				b. 第一种方式是springBoot应用自带的session超时配置，第二种方式是我们使用Spring Session之后，提供的session超时配置。第二种方式的优先级更高。
+				c. 注意：在Spring Boot中Session超时最短的时间是一分钟，当你的设置小于一分钟的时候，默认为一分钟。
+			B. 会话超时处理
+				a. 会话超时之后，我们通常希望应用跳转到一个指定的URL，显示会话超时信息。可以使用如下的配置的代码实现。
+		③ Spring Security的会话固化保护
+			A. session-fixation-protection 即session的固化保护功能，该功能的目的是一定程度上防止非法用户窃取用户session及cookies信息，进而模拟session的行为。
+			B. 默认情况下，Spring Security启用了migrationSession保护方式。即对于同一个cookies的SESSIONID用户，每次登录验证将创建一个新的HTTP会话，旧的HTTP会
+			话将无效，并且旧会话的属性将被复制。
+				protected void configure(HttpSecurity http) throws Exception {
+					http.
+						...
+						.sessionManagement()
+						...
+						.sessionFixation().migrateSession(); // session的固化保护功能
+				}
+			C. 可以使用其他两个选项：
+				a. 设置为“none”时，原始会话不会无效
+				b. 设置“newSession”后，将创建一个干净的会话，而不会复制旧会话中的任何属性
+		④ Cookie的安全
+			A. 提高Cookies的安全性，实际上就是提高session的安全性。在Spring Boot中可以通过配置方式来实现：
+			B. yml配置:
+				spring: 
+				  servlet: 
+				    session:
+					  timeout: 15s
+					  cookie:
+					    http-only: true
+					    secure: false
+			C. httpOnly：如果为true，则浏览器脚本将无法访问cookie
+			D. secure：如果为true，则仅通过HTTPS连接发送cookie，HTTP无法携带cookie。
+		⑤ 限制最大用户登录数量
+			A. 虽然固化保护的策略可以一定程度保护session复制、窃取，但是在我们绝大部分的应用需求中，都会限制一个用户只能占用一个session。就像我们经常使用QQ，
+			用户在别的地方登录，之前的登陆就会下线。使用Spring Security的配置我们可以轻松的实现这个功能。
+			B. 代码：
+			C. maximumSessions表示同一个用户最大的登录数量
+			D. maxSessionsPreventsLogin提供两种session保护策略：true表示已经登录就不予许再次登录，false表示允许再次登录但是之前的登录会下线。
+			E. expiredSessionStrategy表示自定义一个session被下线(超时)之后的处理策略。
 
 
 
