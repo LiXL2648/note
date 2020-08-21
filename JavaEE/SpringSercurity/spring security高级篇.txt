@@ -1,0 +1,536 @@
+二. 认证授权鉴权功能深入
+	1. RBAC权限管理模型
+		① 我们开发一个系统，必然面临权限控制的问题，即不同的用户具有不同的访问、操作、数据权限。形成理论的权限控制模型有：自主访问控制（DAC: Discretionary Access Control）、
+		强制访问控制（MAC: Mandatory Access Control）、基于属性的权限验证（ABAC: Attribute-Based Access Control）等。最常被开发者使用也是相对易用、通用的就是RBAC权限模型
+		（Role-Based Access Control），本文就将向大家介绍该权限模型。
+		② RBAC权限模型简介
+			A. RBAC权限模型（Role-Based Access Control）即：基于角色的权限控制。模型中有几个关键的术语：
+				a. 用户：系统接口及访问的操作者
+				b. 角色：具有一类相同操作权限的用户的总称
+				c. 权限：能够访问某接口或者做某操作的授权资格
+			B. RBAC权限模型核心授权逻辑如下：
+				a. 某用户是什么角色？
+				b. 某角色具有什么权限？
+				c. 通过角色的权限推导用户的权限
+		③ RBAC的演化进程
+			A. 用户与权限直接关联
+				a. 想到权限控制，人们最先想到的一定是用户与权限直接关联的模式，简单地说就是：某个用户具有某些权限。如图：
+					(1) 张三具有创建用户和删除用户的权限，所以他可能系统维护人员
+					(2) 李四具有产品记录管理和销售记录管理权限，所以他可能是一个业务销售人员
+				b. 这种模型能够清晰的表达用户与权限之间的关系，足够简单。但同时也存在问题：
+					(1) 现在用户是张三、李四，以后随着人员增加，每一个用户都需要重新授权
+					(2) 或者张三、李四离职，需要针对每一个用户进行多种权限的回收
+			B. 一个用户拥有一个角色
+				a. 在实际的团体业务中，都可以将用户分类。比如对于薪水管理系统，通常按照级别分类：经理、高级工程师、中级工程师、初级工程师。也就是按照一定的角色分类，
+				通常具有同一角色的用户具有相同的权限。这样改变之后，就可以将针对用户赋权转换为针对角色赋权。
+				b. 一个用户有一个角色
+				c. 一个角色有多个操作（菜单）权限
+				d. 一个操作权限可以属于多个角色
+			C. 一个用户一个或多个角色
+				a. 但是在实际的应用系统中，一个用户一个角色远远满足不了需求。如果我们希望一个用户既担任销售角色、又暂时担任副总角色。该怎么做呢？为了增加系统设计的适用性，
+				我们通常设计：
+					(1) 一个用户有一个或多个角色
+					(2) 一个角色包含多个用户
+					(3) 一个角色有多种权限
+					(4) 一个权限属于多个角色
+				b. 描述这样的关系。
+					(1) sys_user是用户信息表，用于存储用户的基本信息，如：用户名、密码
+					(2) sys_role是角色信息表，用于存储系统内所有的角色
+					(3) sys_menu是系统的菜单信息表，用于存储系统内所有的菜单。用id与父id的字段关系维护一个菜单树形结构。
+					(4) sys_user_role是用户角色多对多关系表，一条userid与roleid的关系记录表示该用户具有该角色，该角色包含该用户。
+					(5) sys_role_menu是角色菜单(权限)关系表，一条roleid与menuid的关系记录表示该角色由某菜单权限，该菜单权限可以被某角色访问。
+	2. 结合真实系统讲解RBAC实现
+		① 回顾RBAC权限模型
+			A. 用户与角色之间是多对多的关系，一个用户有多个角色，一个角色包含多个用户
+			B. 角色与权限之间是多对多关系，一个角色有多种权限，一个权限可以属于多个角色
+			C. User是用户表，存储用户基本信息
+			D. Role是角色表，存储角色相关信息
+			E. Menu(菜单)是权限表，存储系统包含哪些菜单及其属性
+			F. UserRole是用户和角色的关系表
+			G. RoleMenu是角色和权限的关系表
+		② 组织部门管理
+			A. 需求分析
+				a. 之所以先将部门管理提出来讲一下，是因为部门管理没有在我们上面的RBAC权限模型中进行体现。但是部门这样一个实体仍然是，后端管理系统的一个重要组成部分。
+				通常有如下的需求
+				b. 部门要能体现出上下级的结构（如上图中的红框）。在关系型数据库中。这就需要使用到部门id及上级部门id，来组合成一个树形结构。
+				c. 如果组织与用户之间是一对多的关系，就在用户表中加上一个org_id标识用户所属的组织。原则是：实体关系在多的那一边维护。
+				d. 如果组织与用户是多对多关系，这种情况现实需求也有可能存在。比如：某人在某单位既是生产部长，又是技术部长。所以他及归属于技术部。也归属于生产部。
+				对于这种情况有两种解决方案，把该人员放到公司级别，而不是放到部门级别。另外一种就是从数据库结构上创建User与Org组织之间的多对多关系。
+				e. 组织信息包含一些基本信息，如组织名称、组织状态、展现排序、创建时间
+				另外，要有基本的组织的增删改查功能
+			B. 组织部门表的CreateSQL
+				CREATE TABLE `sys_org` (
+				  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '系统组织结构表主键ID',
+				  `org_pid` int(11) DEFAULT NULL COMMENT '父节点ID',
+				  `org_pids` varchar(64) DEFAULT NULL COMMENT '所有父节点ID',
+				  `is_leaf` tinyint(1) NOT NULL COMMENT '是否是叶节点，0：否；1：是',
+				  `org_name` varchar(32) NOT NULL COMMENT '组织名',
+				  `address` varchar(64) DEFAULT NULL COMMENT '地址',
+				  `phone` varchar(20) DEFAULT NULL COMMENT '联系电话',
+				  `email` varchar(20) DEFAULT NULL COMMENT '联系邮箱',
+				  `sort` tinyint(1) NOT NULL COMMENT '相对于父节点的排序',
+				  `level` tinyint(1) NOT NULL COMMENT '对应的层级',
+				  `status` tinyint(1) NOT NULL COMMENT '是否可用，0：否；1：是',
+				  PRIMARY KEY (`id`)
+				) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4;
+			C. 注意：mysql没有oracle中的start with connect by的树形数据汇总SQL。所以通常需要为了方便管理组织之间的上下级树形关系，需要加上一些特殊字段，如：org_pids：
+			该组织所有上级组织id逗号分隔，即包括上级的上级；is_leaf是否是叶子结点；level组织所属的层级(1,2,3)。
+		③ 菜单权限管理
+			A. 需求分析
+				a. 菜单仍然是树形结构，所以数据库表必须有id与menu_pid字段
+				b. 必要字段：菜单跳转的url、是否启用、菜单排序、菜单的icon矢量图标等
+				c. 最重要的是菜单要有一个权限标志，具有唯一性。通常可以使用菜单跳转的url路径作为权限标志。此标志作为权限管理框架识别用户是否具有某个页面查看权限的重要标志
+				d. 需要具备菜单的增删改查基本功能
+				e. 如果希望将菜单权限和按钮超链接相关权限放到同一个表里面，可以新增一个字段。用户标志该权限记录是菜单访问权限还是按钮访问权限。
+			B. 菜单权限表的CreateSQL
+				CREATE TABLE `sys_menu` (
+				  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '菜单/权限表主键ID',
+				  `menu_pid` int(11) DEFAULT NULL COMMENT '父节点ID',
+				  `menu_pids` int(11) DEFAULT NULL COMMENT '所有父节点ID',
+				  `is_leaf` tinyint(1) NOT NULL COMMENT '是否是叶节点，0：否；1：是',
+				  `menu_name` varchar(32) NOT NULL COMMENT '菜单/权限名称',
+				  `url` varchar(64) DEFAULT NULL COMMENT '路由地址',
+				  `icon` varchar(32) DEFAULT NULL COMMENT '菜单字体图标',
+				  `icon_color` varchar(16) DEFAULT NULL COMMENT '菜单字体图标颜色',
+				  `sort` tinyint(1) NOT NULL COMMENT '相对于父节点的排序',
+				  `level` tinyint(1) NOT NULL COMMENT '对应的层级',
+				  `status` tinyint(1) NOT NULL COMMENT '是否可用，0：否；1：是',
+				  PRIMARY KEY (`id`)
+				) ENGINE=InnoDB AUTO_INCREMENT=24 DEFAULT CHARSET=utf8mb4;
+		④ 角色管理
+			A. 需求分析
+				① 角色本身的管理需要注意的点非常少，就是简单的增删改查。重点在于角色分配该如何做。
+				② 角色表包含角色id，角色名称，备注、排序顺序这些基本信息就足够了
+				③ 为角色分配权限：以角色为基础勾选菜单权限或者操作权限，然后先删除sys_role_menu表内该角色的所有记录，在将新勾选的权限数据逐条插入sys_role_menu表。
+				④ sys_role_menu的结构很简单，记录role_id与menu_id，一个角色拥有某一个权限就是一条记录。
+				⑤ 角色要有一个全局唯一的标识，因为角色本身也是一种权限。可以通过判断角色来判断某用户的操作是否合法。
+				⑥ 通常的需求：不会在角色管理界面为角色添加用户，而是在用户管理界面为用户分配角色。
+			B. 角色表的CreateSQL
+				CREATE TABLE `sys_role` (
+				  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '系统角色表主键ID',
+				  `role_name` varchar(32) NOT NULL COMMENT '角色名称(中文)',
+				  `role_code` varchar(32) NOT NULL COMMENT '角色名称(英文)',
+				  `role_desc` varchar(100) DEFAULT NULL COMMENT '角色描述',
+				  `sort` tinyint(1) NOT NULL COMMENT '角色顺序',
+				  `status` tinyint(1) NOT NULL COMMENT '是否可用，0：否；1：是',
+				  `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '角色的创建日期',
+				  PRIMARY KEY (`id`)
+				) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4;
+			C. 角色菜单权限关联表的CreateSQL
+				CREATE TABLE `role_menu` (
+				  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '角色权限表主键ID',
+				  `role_id` int(11) NOT NULL COMMENT '角色ID',
+				  `menu_id` int(11) NOT NULL COMMENT '权限ID',
+				  PRIMARY KEY (`id`)
+				) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4;
+		⑤ 用户管理
+			A. 需求分析
+				a. 上图中点击左侧的组织菜单树结点，要能显示出该组织下的所有人员（系统用户）。在组织与用户是一对多的关系中，需要在用户表加上org_id字段，用于查询某个
+				组织下的所有用户。
+				b. 用户表中要保存用户的用户名、加密后的密码。页面提供密码修改或重置的功能。
+				c. 角色分配:实际上为用户分配角色，与为角色分配权限的设计原则是一样的。所以可以参考。
+				d. 实现用户基本信息的增删改查功能
+			B. 用户信息表的CreateSQL
+				CREATE TABLE `sys_user` (
+				  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '用户信息表主键ID',
+				  `username` varchar(64) NOT NULL COMMENT '用户名',
+				  `password` varchar(64) NOT NULL COMMENT '密码',
+				  `phone` varchar(20) DEFAULT NULL COMMENT '联系电话',
+				  `email` varchar(20) DEFAULT NULL COMMENT '联系邮箱',
+				  `enabled` tinyint(1) NOT NULL COMMENT '是否可用，0：否；1：是',
+				  `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '用户创建时间',
+				  `org_id` int(11) NOT NULL COMMENT '组织id',
+				  PRIMARY KEY (`id`)
+				) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4;
+			C. 用户角色关系表的CreateSQL
+				CREATE TABLE `user_role` (
+				  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '用户角色表主键ID',
+				  `user_id` int(11) NOT NULL COMMENT '用户ID',
+				  `role_id` int(11) NOT NULL COMMENT '角色ID',
+				  PRIMARY KEY (`id`)
+				) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4;
+			D.  注意
+				a. 在用户的信息表中，体现了一些隐藏的需求。如：多次登录锁定与锁定到期时间的关系。账号有效期的设定规则等。
+				b. 当然用户表中，根据业务的不同还可能加更多的信息，比如：用户头像等等。但是通常在比较大型的业务系统开发中，业务模块中使用的用户表和在权限管理模块使用的
+				用户表通常不是一个，而是根据某些唯一字段弱关联，分开存放。这样做的好处在于：经常发生变化的业务需求，不会去影响不经常变化的权限模型。
+		⑥ 查询的SQL语句
+			A. 查询用户信息
+				SELECT username, PASSWORD, enabled FROM sys_user 
+				WHERE username = 'admin'
+			B. 查询用户的角色信息
+				SELECT role_code FROM sys_user u
+				LEFT JOIN user_role ur ON u.id = ur.user_id
+				LEFT JOIN sys_role r ON r.id = ur.role_id
+				WHERE u.username = 'admin'
+			C. 查询角色的权限信息
+				SELECT url FROM sys_role r
+				LEFT JOIN role_menu rm ON r.id = rm.role_id
+				LEFT JOIN sys_menu m ON m.id = rm.menu_id
+				WHERE role_code IN ('admin');
+	3. 加载动态数据进行登录与授权		
+		① 动态数据登录验证的基础知识	
+			A. 前面介绍了Spring Security的formLogin登录认证模式，RBAC的权限控制管理模型，并且针对Spring Security的登录认证逻辑源码进行了解析等等。我们所有的用户、角色、
+			权限信息都是在配置文件里面写死的，然而在实际的业务系统中，这些信息通常是存放在RBAC权限模型的数据库表中的。下面我们来回顾一下其中的核心概念：
+			B. RBAC的权限模型可以从用户获取为用户分配的一个或多个角色，从用户的角色又可以获取该角色的多种权限。通过关联查询可以获取某个用户的角色信息和权限信息。
+			C. 在源码解析的文章中，我们知道如果我们不希望用户、角色、权限信息写死在配置里面。我们应该实现UserDetails与UserDetailsService接口，从而从数据库或者其他的
+			存储上动态的加载这些信息。
+		② UserDetails与UserDetailsService接口
+			A. UserDetailsService接口有一个方法叫做loadUserByUsername，我们实现动态加载用户、角色、权限信息就是通过实现该方法。函数见名知义：通过用户名加载用户。该方法的
+			返回值就是UserDetails。
+			B. UserDetails就是用户信息，即：用户名、密码、该用户所具有的权限。
+			C. UserDetails接口有以下方法
+				public interface UserDetails extends Serializable {
+					Collection<? extends GrantedAuthority> getAuthorities();
+					
+					String getPassword();
+
+					String getUsername();
+
+					boolean isAccountNonExpired();
+
+					boolean isAccountNonLocked();
+
+					boolean isCredentialsNonExpired();
+
+					boolean isEnabled();
+				}
+			D. 只要我们把这些信息提供给Spring Security，Spring Security就知道怎么做登录验证了，根本不需要我们自己写Controller实现登录验证逻辑。
+		③ 实现UserDetails 接口
+			A. MyUserDetails:
+				public class MyUserDetails implements UserDetails {
+
+					private Collection<? extends GrantedAuthority> authorities; // //用户的权限集合
+
+					private String password; // 密码
+
+					private String username; // 用户名
+
+					private boolean enabled; // 账号是否可用
+
+					private boolean accountNonExpired; // 是否没过期
+
+					private boolean accountNonLocked; // 是否没被锁定
+
+					private boolean credentialsNonExpired; // 是否没过期
+					
+					//省略构造方法
+					//省略set方法
+					//省略get方法（即接口UserDetails的方法）
+				}
+			B. 我们就是写了一个适应于UserDetails的java POJO类，所谓的 UserDetails接口实现就是一些get方法。get方法由Spring Security调用，我们通过set方法或构造函数为 
+			Spring Security 提供UserDetails数据（从数据库查询）。
+			C. 注意：目前数据库表里面没有定义accountNonExpired、accountNonLocked、credentialsNonExpired这三个字段，所以其get方法，先直接返回true即可。
+		④ 实现UserDetailsService接口
+			A. 通常数据库表sys_user字段要和SysUser属性一一对应，比如username、password、enabled。但是比如accountNonLocked字段用于登录多次错误锁定，但我们一般不会在表里
+			存是否锁定，而是存一个锁定时间字段。通过锁定时间是否大于当前时间判断账号是否锁定，所以实现过程中可以灵活做判断并用好set方法，不必拘泥于一一对应的形式。
+			B. 角色是一种特殊的权限，在Spring Security我们可以使用hasRole(角色标识)表达式判断用户是否具有某个角色，决定他是否可以做某个操作;通过hasAuthority(权限标识)
+			表达式判断是否具有某个操作权限。
+			C. 代码：
+				@Component
+				public class MyUserDetailsService implements UserDetailsService {
+
+					@Autowired
+					private MyUserDetailsMapper myUserDetailsMapper;
+
+					@Override
+					public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+						// 1. 根据用户名查询用户信息
+						MyUserDetails myUserDetails = myUserDetailsMapper.findByUserName(username);
+
+						if (myUserDetails == null) {
+							throw new UsernameNotFoundException("该用户不存在");
+						}
+
+						// 2. 根据用户明显查询用户角色
+						List<String> roleCodes = myUserDetailsMapper.findRoleByUserName(username);
+
+						// 3. 根据用户角色查询用户权限
+						List<String> authorities = myUserDetailsMapper.findAuthorityByRoleCodes(roleCodes);
+
+						// 4. 角色是一种特殊的权限，并且角色是以ROLE_为前缀（Spring Security规范）
+						roleCodes = roleCodes.stream()
+								.map(role -> "ROLE_" + role)
+								.collect(Collectors.toList());
+
+						// 5. 将所有角色添加到权限集合中
+						authorities.addAll(roleCodes);
+
+						// 6. 转成用逗号分隔的字符串，为用户设置权限标识
+						myUserDetails.setAuthorities(
+								AuthorityUtils.commaSeparatedStringToAuthorityList(
+										String.join(",", authorities)
+								)
+						);
+						return myUserDetails;
+					}
+				}
+		⑤ 注册UserDetailsService
+			A. 重写WebSecurityConfigurerAdapter的 configure(AuthenticationManagerBuilder auth)方法
+			B. 代码：
+				@Override
+				protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+					auth.userDetailsService(myUserDetailsService).passwordEncoder(passwordEncoder());
+				}
+				
+				
+				
+				@Bean
+				public PasswordEncoder passwordEncoder() {
+					return new BCryptPasswordEncoder();
+				}
+			C. 使用BCryptPasswordEncoder，表示存储中（数据库）取出的密码必须是经过BCrypt加密算法加密的。
+			D. 这里需要注意的是，因为我们使用了BCryptPasswordEncoder加密解密，所以数据库表里面存的密码应该是加密之后的密码（造数据的过程），可以使用如下代码加密
+			（如密码是：123456）。将打印结果保存保存到密码字段。
+			E. 代码：
+				@Autowired
+				private PasswordEncoder passwordEncoder;
+				
+				@Test
+				public void contextLoads() {
+					System.out.println(passwordEncoder.encode("2648"));
+				}
+			F. 角色ID对应UserDetails中的权限集合中的元素，因此需要将资源路径与权限url对应后才具备对资源的访问权限
+				protected void configure(HttpSecurity http) throws Exception {
+					http.csrf().disable()
+					...
+					.antMatchers("/biz1", "/biz2") // 需要对外暴露的资源路径
+					.hasAnyAuthority("ROLE_user", "ROLE_admin") // user 和 admin 角色可以访问的资源
+					.antMatchers("/syslog").hasAuthority("/updUser")// 有该角色ID才能访问该资源
+					.antMatchers("/sysuser").hasAuthority("/delUser")
+					...
+				}
+		⑥ 最后说明
+			A. 至此，我们将系统里面的所有的用户、角色、权限信息都通过UserDetailsService和UserDetails告知了Spring Security。但是多数朋友可能仍然不知道该怎样实现登
+			录的功能，其实剩下的事情很简单了：
+				a. 写一个登录界面，写一个登录表单，表单使用post方法提交到默认的/login路径
+				b. 表单的用户名、密码字段名称默认是username、password。
+				c. 写一个登录成功之后的跳转页面，比如index.html
+			B. 然后把这些信息通过配置方式告知Spring Security ，以上的配置信息名称都可以灵活修改
+		⑦ Mybatis持久层数据接口
+			A. MyUserDetailsMapper
+				@Mapper
+				public interface MyUserDetailsMapper {
+
+					// 根据用户名查询用户信息
+					MyUserDetails findByUserName(String userName);
+
+					// 根据用户名查询用户角色
+					List<String> findRoleByUserName(String userName);
+
+					// 根据用户角色查询用户权限
+					List<String> findAuthorityByRoleCodes(@Param("roleCodes") List<String> roleCodes);
+
+				}
+			B. MyUserDetailsMapper.xml
+				<select id="findByUserName" resultType="com.li.security.config.auth.MyUserDetails">
+					SELECT username, password, enabled FROM sys_user WHERE username = #{username}
+				</select>
+
+				<select id="findRoleByUserName" resultType="string">
+					SELECT role_code FROM sys_user u
+					LEFT JOIN user_role ur ON u.id = ur.user_id
+					LEFT JOIN sys_role r ON r.id = ur.role_id
+					WHERE u.username = #{username}
+				</select>
+
+				<select id="findAuthorityByRoleCodes" resultType="string">
+					SELECT url FROM sys_role r
+					LEFT JOIN role_menu rm ON r.id = rm.role_id
+					LEFT JOIN sys_menu m ON m.id = rm.menu_id
+					<where>
+						<choose>
+							<when test="roleCodes == null || roleCodes.size() == 0">
+								role_code = ''
+							</when>
+							<otherwise>
+								role_code in
+								<foreach collection="roleCodes" item="roleCode" open="(" separator=", " close=")">
+									#{roleCode}
+								</foreach>
+							</otherwise>
+						</choose>
+					</where>
+			   </select>
+	4. 动态加载资源鉴权规则
+		① 已经实现了从RBAC数据库中加载用户的角色、权限信息。在我们的Spring Security配置类SecurityConfig中仍然有一部分内容是通过代码静态配置的，那就是：资源鉴权规则。
+		② 简单说“资源鉴权规则”就是：你有哪些权限？这些权限能够访问哪些资源？即：权限与资源的匹配关系。
+		③ 动态资源鉴权规则
+			A. 代码：
+				@Component("rbacService")
+				public class MyRBACService {
+
+					public boolean hasPermission(HttpServletRequest request, Authentication authentication) {
+						Object principal = authentication.getPrincipal();
+
+						if (principal instanceof UserDetails) {
+							UserDetails userDetails = (UserDetails) principal;
+							List<GrantedAuthority> grantedAuthorities =
+									AuthorityUtils.commaSeparatedStringToAuthorityList(request.getRequestURI());
+							return userDetails.getAuthorities().contains(grantedAuthorities.get(0));
+						}
+						return false;
+					}
+				}
+			B. 上述代码逻辑
+				a. 获取具有用户信息的UserDetails对象
+				b. 将用户访问的url转换为GrantedAuthority对象
+				c. 判断UserDetails对象的authoritie属性中是否包含请求的url，由于用户登陆时，UserDetails对象已经存在内存中，因此不需要再次从数据库中加载用户的权限列表
+				d. 用户每一次访问系统资源的时候，都会执行这个方法，判断该用户是否具有访问该资源的权限。
+		④ 权限规则表达式实现
+			A. 代码：
+				@Override
+				protected void configure(HttpSecurity http) throws Exception {
+					http.csrf().disable()
+					...
+					.authorizeRequests()
+					.antMatchers("/login.html", "/", "/login").permitAll() // 不需要通过登录验证就可以被访问的资源路径
+					.antMatchers("/index").authenticated() // 用户登录即可访问的页面，即不需要任何权限
+					.anyRequest().access("@rbacService.hasPermission(request, authentication)") //判断用户是否具备访问资源的权限
+					...
+				}
+			B. 资源鉴权规则完成之后的效果
+				a. 这部分内容将静态规则替换为动态从数据库加载
+				b. 登录页面“login.html”和登录认证处理路径“/login”需完全对外开发，不需任何鉴权就可以访问
+				c. 首页"/index"必须authenticated，即：登陆之后才能访问。不做其他额外鉴权规则控制
+				d. 最后，其他的资源的访问我们通过权限规则表达式实现，表达式规则中使用了rbacService，这个类我们自定义实现。该类服务hasPermission从内存(或数据库)动态加载
+				资源匹配规则，进行资源访问鉴权。
+				e. 表达式规则中hasPermission方法的参数必须是request和authentication，这是Spring Security的规范
+				
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

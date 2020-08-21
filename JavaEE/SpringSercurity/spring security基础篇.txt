@@ -839,40 +839,36 @@
 			A. 虽然固化保护的策略可以一定程度保护session复制、窃取，但是在我们绝大部分的应用需求中，都会限制一个用户只能占用一个session。就像我们经常使用QQ，
 			用户在别的地方登录，之前的登陆就会下线。使用Spring Security的配置我们可以轻松的实现这个功能。
 			B. 代码：
+				protected void configure(HttpSecurity http) throws Exception {
+					http.
+						...
+						.sessionManagement()
+						...
+						.maximumSessions(1) //表示同一个用户最大的登录数量
+						.maxSessionsPreventsLogin(false) // true表示已经登录就不予许再次登录，false表示允许再次登录但是之前的登录会下线。
+						.expiredSessionStrategy(customExpiredSessionStrategy); //session被下线(超时)之后的处理策略。
+				}
 			C. maximumSessions表示同一个用户最大的登录数量
 			D. maxSessionsPreventsLogin提供两种session保护策略：true表示已经登录就不予许再次登录，false表示允许再次登录但是之前的登录会下线。
 			E. expiredSessionStrategy表示自定义一个session被下线(超时)之后的处理策略。
+				@Component
+				public class CustomExpiredSessionStrategy implements SessionInformationExpiredStrategy {
 
+					private static ObjectMapper objectMapper = new ObjectMapper();
 
+					@Override
+					public void onExpiredSessionDetected(SessionInformationExpiredEvent event) throws IOException, ServletException {
+						Map<String, Object> map = new HashMap<>();
+						map.put("code", 0);
+						map.put("message", "你的账号在另一台设备上登录，请检查你的账号");
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+						event.getResponse().setContentType("application/json;charset=UTF-8");
+						event.getResponse().getWriter().write(objectMapper.writeValueAsString(map));
+					}
+				}
+			F. 测试方法：
+				打开两个浏览器、一个先登录、一个后登录。完成之后，刷新先登录的页面，显示：“您的登录已经超时或者已经在另一台机器登录，您被迫下线”。表示我们的配置正确。
+				然后关闭浏览器再次测试，我们设置maxSessionsPreventsLogin为true。先登录的用户可以登陆，但是再次登陆就无法登陆。
 
 
 
