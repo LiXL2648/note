@@ -395,123 +395,436 @@
 				d. 最后，其他的资源的访问我们通过权限规则表达式实现，表达式规则中使用了rbacService，这个类我们自定义实现。该类服务hasPermission从内存(或数据库)动态加载
 				资源匹配规则，进行资源访问鉴权。
 				e. 表达式规则中hasPermission方法的参数必须是request和authentication，这是Spring Security的规范
+	5. 权限表达式使用方法总结			
+		① SPEL表达式权限控制：
+			A. 从spring security 3.0开始已经可以使用spring Expression表达式来控制授权，允许在表达式中使用复杂的布尔逻辑来控制访问的权限。Spring Security
+			可用表达式对象的基类是SecurityExpressionRoot。
+			B. 表达式函数		
+				a. hasRole([role])：用户拥有指定的角色时返回true （Spring security默认会带有ROLE_前缀）,去除前缀参考Remove the ROLE_
+				b. hasAnyRole([role1,role2])：用户拥有任意一个指定的角色时返回true
+				c. hasAuthority([authority])：拥有某资源的访问权限时返回true
+				d. hasAnyAuthority([auth1,auth2])
+				e. permitAll：永远返回true
+				f. denyAll：永远返回false
+				g. anonymous：当前用户是anonymous时返回true
+				h. rememberMe：当前用户是rememberMe用户返回true
+				i. authentication：当前登录用户的authentication对象
+				j. fullAuthenticated：当前用户既不是anonymous也不是rememberMe用户时返回true
+				k. hasIpAddress('192.168.1.0/24')：请求发送的IP匹配时返回true
+			C. 可能会对Authority和Role有些混淆。Authority作为资源访问权限可大可小，可以是某按钮的访问权限（如资源ID：biz1），也可以是某类用户角色的访问权限（如资源ID：ADMIN）。
+			当Authority作为角色资源权限时，hasAuthority（'ROLE_ADMIN'）与hasRole（'ADMIN'）是一样的效果。
+		② SPEL在全局配置中的使用
+			A. 我们可以通过继承WebSecurityConfigurerAdapter，实现相关的配置方法，进行全局的安全配置。
+			B. 如何在全局配置中使用SPEL表达式
+				a. URL安全表达式
+					(1) 这里我们定义了应用/system/*URL的范围，只有拥有ADMIN或者USER权限的用户才能访问这些person资源。
+					(2) 代码：
+						config.antMatchers("/system/*").access("hasAuthority('ADMIN') or hasAuthority('USER')")
+							.anyRequest().authenticated();
+				b. 安全表达式中引用bean
+					(1) 这种方式，比较适合有复杂权限验证逻辑的情况，当Spring Security提供的默认表达式方法无法满足我们的需求的时候。
+					(2) 代码：
+						@Component("rbacService")
+						@Slf4j
+						public class RbacService {
+							//返回true表示验证通过
+							public boolean hasPermission(HttpServletRequest request, Authentication authentication) {
+								//验证逻辑代码
+								return true;
+							}
+							public boolean checkUserId(Authentication authentication, int id) {
+								//验证逻辑代码
+								return true;
+							}
+						}
+					(3) 对于"/person/{id}"对应的资源的访问，调用rbacService的bean的方法checkUserId进行权限验证，传递参数为authentication对象和person的id。该id为PathVariable，
+					以#开头表示。
+					(4) 代码：
+						config.antMatchers("/person/{id}").access("@rbacService.checkUserId(authentication,#id)")
+							.anyRequest().access("@rbacService.hasPermission(request,authentication)");
+		③ Method表达式安全控制
+			A. 如果我们想实现方法级别的安全配置，Spring Security提供了四种注解，分别是@PreAuthorize , @PreFilter , @PostAuthorize 和 @PostFilter
+			B. 开启方法级别注解的配置
+				a. 在Spring安全配置代码中，加上EnableGlobalMethodSecurity注解，开启方法级别安全配置功能。
+				b. 代码：
+					@Configuration
+					@EnableGlobalMethodSecurity(prePostEnabled = true)
+					public class MySecurityConfig extends WebSecurityConfigurerAdapter {
+			C. 使用PreAuthorize注解
+				a. @PreAuthorize 注解适合进入方法前的权限验证。只有拥有ADMIN角色才能访问findAll方法。
+				b. 如果当前登录用户没有PreAuthorize需要的权限，将抛出org.springframework.security.access.AccessDeniedException异常！
+				c. 代码：
+					@PreAuthorize("hasRole('admin')")
+					public List<PersonDemo> findAll(){
+						return null;
+					}
+			D. 使用PostAuthorize注解	
+				a. @PostAuthorize 在方法执行后再进行权限验证,适合根据返回值结果进行权限验证。Spring EL 提供返回对象能够在表达式语言中获取返回的对象returnObject。下文代码只有返回
+				值的name等于authentication对象的name（当前登录用户名）才能正确返回，否则抛出异常。
+				b. 代码：
+					@PostAuthorize("returnObject.name == authentication.name")
+					public PersonDemo findOne(){
+						String authName =
+								SecurityContextHolder.getContext().getAuthentication().getName();
+						System.out.println(authName);
+						return new PersonDemo("admin");
+					}
+			E. 使用PreFilter注解
+				a. PreFilter 针对参数进行过滤,下文代码表示针对ids参数进行过滤，只有id为偶数的元素才被作为参数传入函数。
+				b. 代码：
+					//当有多个对象是使用filterTarget进行标注
+					@PreFilter(filterTarget="ids", value="filterObject%2==0")
+					public void delete(List<Integer> ids, List<String> usernames) {
+
+					}
+			F. 使用PostFilter 注解
+				a. ostFilter 针对返回结果进行过滤，特别适用于集合类返回值，过滤集合中不符合表达式的对象。
+				b. 代码：
+					@PostFilter("filterObject.name == authentication.name")
+					public List<PersonDemo> findAllPD(){
+
+						List<PersonDemo> list = new ArrayList<>();
+						list.add(new PersonDemo("kobe"));
+						list.add(new PersonDemo("admin"));
+
+						return list;
+					}
+	6. RememberMe记住我功能
+		① 登录过程中经常使用的“记住我”功能，也就是我们经常会在各种网站登陆时见到的"两周内免登录"，“三天内免登录”的功能。该功能的作用就是：当我们登录成功之后，一定的周期内当我们再
+		次访问该网站，不需要重新登录。
+		② 最简实践
+			A. 其实实现这个功能非常简单，只需要我们在重写WebSecurityConfigurerAdapter 方法配置HttpSecurity 的时候增加rememberMe()方法。
+			B. 后端代码：
+				@Override
+				protected void configure(HttpSecurity http) throws Exception {
+					http.rememberMe()
+							.and().csrf().disable() //禁用跨站csrf攻击防御，后面的章节会专门讲解
+				}
+			C. 然后在登录表单中加入一个checkbox勾选框，name属性的值目前必须是“remember-me”（可定制）
+			D. 前端代码：
+				<div class="checkbox">
+					<label>
+						<input type="checkbox" id="rememberMe" name="remember-me"> 记住密码
+					</label>
+				</div>
+			E. 就是这么简单，我们就实现了记住我功能，默认效果是：2周内免登录。
+		③ 实现原理
+			A. RememberMe记住我功能的流程
+				a. 当我们登陆的时候，除了用户名、密码，我们还可以勾选remember-me。
+				b. 如果我们勾选了remember-me，当我们登录成功之后服务端会生成一个Cookie返回给浏览器，这个Cookie的名字默认是remember-me；值是一个token令牌。
+				c. 当我们在有效期内再次访问应用时，经过RememberMeAuthenticationFilter,读取Cookie中的token进行验证。验正通过不需要再次登录就可以进行应用访问。
+			B. RememberMeToken 的组成
+				a. RememberMeToken = username, expiryTime, signatureValue的Base64加密
+				b. signatureValue = username、expirationTime和passwod和一个预定义的key，并将他们经过MD5进行签名。
+				c. TokenBasedRememberMeServices中的源码
+					protected String makeTokenSignature(long tokenExpiryTime, String username, String password) {
+						String data = username + ":" + tokenExpiryTime + ":" + password + ":" + this.getKey();
+
+						MessageDigest digest;
+						try {
+							digest = MessageDigest.getInstance("MD5");
+						} catch (NoSuchAlgorithmException var8) {
+							throw new IllegalStateException("No MD5 algorithm available!");
+						}
+
+						return new String(Hex.encode(digest.digest(data.getBytes())));
+					}
+				d. 明显这样安全么，如果cookie被劫持，一定是不安全的，别人拿到了这个字符串在有效期内就可以访问你的应用。这就和你的钥匙token被盗了，你家肯定不安全是一个道理。 但是不存
+				在密码被破解为明文的可能性，MD5 hash是不可逆的。
+			C. RememberMeAuthenticationFilter在Spring Security过滤器链中处于整体偏后的位置，所以只有当各种传统的登录方式都无法完成验证的情况下，才走RememberMeAuthenticationFilter，
+			这也是符合实际需求的。
+		④ 个性化配置
+			A. 在实际的开发过程中，我们还可以根据需求做一些个性化的设置，如下：
+				http.rememberMe()
+					.rememberMeParameter("rememberMe")
+					.rememberMeCookieName("remember-me-cookie")
+					.tokenValiditySeconds(1 * 60)
+			B. 参数介绍
+				a. kenValiditySeconds用于设置token的有效期，即多长时间内可以免除重复登录，单位是秒。不修改配置情况下默认是2周。
+				b. 通过rememberMeParameter设置from表单“自动登录”勾选框的参数名称。如果这里改了，from表单中checkbox的name属性要对应的更改。如果不设置默认是remember-me。
+				c. rememberMeCookieName设置了保存在浏览器端的cookie的名称，如果不设置默认也是remember-me。如下图中查看浏览器的cookie。
+		⑤ token数据库存储方式
+			A. 上面我们讲的方式，就是最简单的实现“记住我-自动登录”功能的方式。这种方式的缺点在于：token与用户的对应关系是在内存中存储的，当我们重启应用之后所有的token都将消失，即：所
+			有的用户必须重新登陆。为此，Spring Security还给我们提供了一种将token存储到数据库中的方式，重启应用也不受影响。
+			B. 虽然数据库存储的token的确不再是用户名、密码MD5加密字符串了，而是一个随机序列号。但是一旦你的随机序列号cookie被劫持，效果是一样的。好比你家有把密码锁：你把钥匙丢了和你把
+			密码丢了，危害性是一样的。
+			C. token数据库存储方式的实现原理和验证过程
+				a. 首先，我们需要键一张数据库表persistent_logins:
+					CREATE TABLE `persistent_logins` (
+					  `username` varchar(64) NOT NULL COMMENT '用户名',
+					  `series` varchar(64) NOT NULL COMMENT '序列号',
+					  `token` varchar(64) NOT NULL COMMENT 'Token随机值',
+					  `last_used` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '过期时间',
+					  PRIMARY KEY (`series`)
+					) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+				b. 初始化一个PersistentTokenRepository类型的Spring bean，并将系统使用的DataSource注入到该bean中。（当然前提一定是你已经在Spring Boot的application.yml中配置好DataSource
+				相关的连接属性
+					@Autowired
+					private DataSource dataSource;
+					
+					@Bean
+					public PersistentTokenRepository persistentTokenRepository() {
+						JdbcTokenRepositoryImpl tokenRepository = new JdbcTokenRepositoryImpl();
+						tokenRepository.setDataSource(dataSource);
+						return tokenRepository;
+					}
+				c. 最后在Spring Security配置方法configure(HttpSecurity http)加上如下的个性化配置：
+					protected void configure(HttpSecurity http) throws Exception {
+						http.rememberMe()
+							.rememberMeParameter("rememberMe")
+							.rememberMeCookieName("remember-me-cookie")
+							.tokenValiditySeconds(7 * 24 * 60 * 60)
+							.tokenRepository(persistentTokenRepository())
+							...
+					}
+	7. 退出登录功能的实现
+		① logout最简及最佳实践
+			A. 其实使用Spring Security进行logout非常简单，只需要在spring Security配置类配置项上加上这样一行代码:http.logout()。
+			B. 后端代码：
+				@Override
+				protected void configure(HttpSecurity http) throws Exception {
+					http.logout()
+					...
+				}	
+			C. 加上logout配置之后，在你的“退出”按钮上使用/logtou作为请求登出的路径，默认的退出按钮的请求路径是/logout。
+			D. 后端代码：
+				<a href="/logout" >退出</a>
+		② 默认的logout做了什么？
+			A. 当前session失效，即：logout的核心需求，session失效就是访问权限的回收。
+			B. 删除当前用户的 remember-me“记住我”功能信息
+			C. clear清除当前的 SecurityContext
+			D. 重定向到登录页面，loginPage配置项指定的页面
+		③ 个性化配置
+			A. 虽然Spring Security默认使用了/logout作为退出处理请求路径，登录页面作为退出之后的跳转页面。这符合绝大多数的应用的开发逻辑，但有的时候我们需要一些个性化设置，如下：
+				@Override
+				protected void configure(HttpSecurity http) throws Exception {
+					http.logout() // 默认退出url为/logout
+						.logoutUrl("/logout")
+						.logoutSuccessUrl("/login.html")
+						.deleteCookies("JSESSIONID")
+				}	
+			B. 以上代码实现的功能：
+				a. 通过指定logoutUrl配置改变退出请求的默认路径，当然html退出按钮的请求url也要修改
+				b. 通过指定logoutSuccessUrl配置，来显式指定退出之后的跳转页面
+				c. 还可以使用deleteCookies删除指定的cookie，参数为cookie的名称
+		④ LogoutSuccessHandler
+			A. 如果上面的个性化配置，仍然满足不了您的应用需求。可能您的应用需要在logout的时候，做一些特殊动作，比如登录时长计算，清理业务相关的数据等等。你可以通过实现
+			LogoutSuccessHandler 接口来实现你的业务逻辑。
+			B. MyLogoutSuccessHandler
+				@Component
+				public class MyLogoutSuccessHandler implements LogoutSuccessHandler {
+
+					@Override
+					public void onLogoutSuccess(HttpServletRequest request, HttpServletResponse response,
+												Authentication authentication) throws IOException, ServletException {
+						response.sendRedirect("/login.html");
+					}
+				}
+			C. 然后进行配置使其生效，核心代码就是一行logoutSuccessHandler。注意logoutSuccessUrl不要与logoutSuccessHandler一起使用，否则logoutSuccessHandler将失效。
+				@Override
+				protected void configure(HttpSecurity http) throws Exception {
+					http.logout() // 默认退出url为/logout
+							.logoutUrl("/logout") // 指定退出的url，前端退出按钮需保持一致
+							//.logoutSuccessUrl("/login.html") // 退出后返回的页面
+							.logoutSuccessHandler(myLogoutSuccessHandler)
+							.deleteCookies("JSESSIONID") // 删除cookie
+							...
+				}
+	8. 多种图片验证码实现方案
+		① 验证码的组成部分：
+			A. 验证码实际上和谜语有点像，分为谜面和谜底。谜面通常是图片，谜底通常为文字。谜面用于展现，谜底用于校验。
+				a. 对于字符型验证码。比如：谜面是显示字符串"ABGH"的图片，谜底是字符串"ABGH"
+				b. 对于计算类验证码。比如：谜面是“1+1=”的图片，谜底是“2”
+				c. 对于拖拽类的验证码。比如：谜面是一个拖拽式的拼图，谜底是拼图位置的坐标
+			B. 总之，不管什么形式的谜面，最后用户的输入内容要和谜底进行验证。
+		② session存储验证码
+			A. 这是一种最典型的验证码实现方式，实现方式也比较简单。
+				a. 应用服务端随机的生成验证码文字
+				b. 将验证码文字存到session里面
+				c. 根据验证码文字生成验证码图片，响应给客户端
+				d. 检查用户输入的内容与验证码谜底是否一致
+			B. 这种实现方式的优点就是比较简单，缺点就是：因为一套应用部署一个session，当我们把应用部署多套如：A、B、C，他们各自有一个session并且不共享。导致的结果就是验证码
+			和图片由A生成，但是验证请求发送到了B，这样就不可能验证通过。
+			C. session存储验证码，不适用于集群应用
+		③ 共享session存储验证码
+			A. 在第二小节讲到的问题，实际上不是验证码的问题，而是如何保证session唯一性或共享性的问题。主要的解决方案有两种：
+				a.     通常我们实现负载均衡应用的前端都是使用nginx或者haproxy，二者都可以配置负载均衡策略。其中一种策略就是：你的客户端ip上一次请求的是A应用，你的下一次请求
+				还转发给A应用。这样就保证了session的唯一性。但是这种方式有可能会导致A、B、C应用其中一个或两个分配了大量的请求，而另外一个处理很少的请求，导致负载并不均衡。
+				b. 另外一种非常通用的方式就是将分布式应用的session统一管理，也就是说原来A、B、C各自的session都存在自己的内存中，现在更改为统一存储到一个地方，大家一起用。这样
+				就实现了session的唯一和共享，是实现分布式应用session管理的有效途径。在Spring框架内，最成熟的解决方案就是spring session + redis 。可自行参考实现。
+			B. 共享session存储验证码，适用于集群应用
+		④ 基于对称算法的验证码
+			A. 可能出于主机资源的考虑，可能出于系统架构的考量，有些应用是无状态的。
+				a. 什么是无状态应用：就是不保存用户状态的应用。
+				b. 什么是用户状态：比如当你登陆之后，在session中保存的用户的名称、组织等等信息。
+				c. 所以可以简单的理解，无状态应用就是无session应用。当然这并不完全准确。
+			B. 那么对于这些无状态的应用，我们就无法使用session，或者换个说法从团队开发规范上就不让使用session。那么我们的验证码该怎么做？
+				a. 同样，首先要生成随机的验证码（谜底），但是不做任何存储操作
+				b. 将谜底（验证码文字）加上时间串、应用信息等组成一个字符串进行加密。必须是对称加密，也就是说可以解密的加密算法。
+				c. 生成验证码图片，并与加密后的密文，通过cookies一并返回给客户端。
+				d. 当用户输入验证码提交登录之后，服务端解密cookies中的密文（主要是验证码文字），与用户的输入进行验证比对。
+			C. 这种做法的缺陷是显而易见的：实际上就是将验证码文字在客户端服务端之间走了一遍。虽然是加密后的验证码文字，但是有加密就必须有解密，否则无法验证。所以更为稳妥的做法
+			是为每一个用户生成密钥，并将密钥保存到数据库里面，在对应的阶段内调用密钥进行加密或者解密。
+			D. 从密码学的角度讲，没有一种对称的加密算法是绝对安全的。所以更重要的是保护好你的密钥。正如没有一把锁头是绝对安全的，更重要的是保护好你的钥匙。
+	9. 基于session的图片验证码实现
+		① 图片验证码实现是基于google开源的验证码实现类库kaptcha，作为验证码工具实现验证码功能开发。验证码工具类通常要具有以下三种功能方法：
+			A. 生成验证码文字或其他用于校验的数据形式（即谜底）
+			B. 生成验证码前端显示图片或拼图等（即谜面）
+			C. 用于校验用户输入与谜底的校验方法（如果是纯文字，就自己比对以下就可以。如果是基于物理图形拖拽、旋转等方式，需要专用的校验方法）
+		② 这种验证码类库有很多，但是都是基于以上逻辑，我们只需要把kaptcha当做工具类，也可以使用其他的验证码工具类，基于session的验证码实现原理是一致的。
+		③ 验证码生成之配置使用kaptcha
+			A. 通过maven坐标引入kaptcha
+				<dependency>
+				   <groupId>com.github.penggle</groupId>
+				   <artifactId>kaptcha</artifactId>
+				   <version>2.3.2</version>
+				   <exclusions>
+					  <exclusion>
+						 <artifactId>javax.servlet-api</artifactId>
+						 <groupId>javax.servlet</groupId>
+					  </exclusion>
+				   </exclusions>
+				</dependency>
+			B. 假设我们的配置文件是application.yml，新建一个单独的文件叫做kaptcha.properties。因为kaptcha的配置不符合yaml的规范格式,所以只能采用properties。需配合注解
+			PropertySourc使用。
+			C. 假设我们的配置文件是application.properties，将下面这段代码加入进去即可，不用单独建立文件。
+			D. 下面的验证码配置，从英文单词的角度很容易理解，当我们需要调整验证码的边框、颜色、大小、字体等属性的时候，可以修改这些配置。
+				kaptcha.border=no
+				kaptcha.border.color=105,179,90
+				kaptcha.image.width=100
+				kaptcha.image.height=45
+				kaptcha.textproducer.font.color=blue
+				kaptcha.textproducer.font.size=35
+				kaptcha.textproducer.char.length=4
+				kaptcha.textproducer.font.names=宋体,楷体,微软雅黑
+			E. 下面的代码加载了配置文件中的kaptcha配置（参考Spring Boot的配置加载），如果是独立的properties文件，需加上PropertySource注解说明。
+			F. 另外，我们通过加载完成的配置，初始化captchaProducer的Spring Bean，用于生成验证码。
+				@Configuration
+				@PropertySource(value = { "classpath:kaptcha.properties" })
+				public class CaptchaConfig {
+
+					@Value("${kaptcha.border}")
+					private String border;
+					@Value("${kaptcha.border.color}")
+					private String borderColor;
+					@Value("${kaptcha.textproducer.font.color}")
+					private String fontColor;
+					@Value("${kaptcha.image.width}")
+					private String imageWidth;
+					@Value("${kaptcha.image.height}")
+					private String imageHeight;
+					@Value("${kaptcha.session.key}")
+					private String sessionKey;
+					@Value("${kaptcha.textproducer.char.length}")
+					private String charLength;
+					@Value("${kaptcha.textproducer.font.names}")
+					private String fontNames;
+					@Value("${kaptcha.textproducer.font.size}")
+					private String fontSize;
+
+					@Bean("captchaProducer")
+					public DefaultKaptcha getKaptchaBean() {
+						DefaultKaptcha defaultKaptcha = new DefaultKaptcha();
+
+						Properties properties = new Properties();
+						properties.setProperty("kaptcha.border", border);
+						properties.setProperty("kaptcha.border.color", borderColor);
+						properties.setProperty("kaptcha.textproducer.font.color", fontColor);
+						properties.setProperty("kaptcha.image.width", imageWidth);
+						properties.setProperty("kaptcha.image.height", imageHeight);
+						properties.setProperty("kaptcha.session.key", sessionKey);
+						properties.setProperty("kaptcha.textproducer.char.length", charLength);
+						properties.setProperty("kaptcha.textproducer.font.names", fontNames);
+						properties.setProperty("kaptcha.textproducer.font.size",fontSize);
+
+						defaultKaptcha.setConfig(new Config(properties));
+						return defaultKaptcha;
+					}
+				}
+			G. 至此，Kaptcha开源验证码软件的配置我们就完成了，如果发现IDEA环境下配置文件读取中文乱码，修改如下配置。
+		④ 验证码生成之session保存
+			A. 生成验证码的Controller。同时需要开放路径"/kaptcha"的访问权限，配置成不需登录也无需任何权限即可访问的路径。
 				
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+				a. 通过captchaProducer.createText()生成验证码文字，并和失效时间一起保存到CaptchaImageVO中。
+				b. 将CaptchaImageVO验证码信息类对象，保存到session中。（这个类的代码后文有介绍）
+				c. 通过captchaProducer.createImage(capText)生成验证码图片，并通过ServletOutputStream返回给前端
+				d. 我们要把CaptchaImageVO保存到session里面。所以该类中不要加图片，只保存验证码文字和失效时间，用于后续验证即可。把验证码图片保存起来既没有用处，又浪费内存。
+			B. 代码：
+				@RestController
+				public class CaptchaController {
+
+					@Autowired
+					private DefaultKaptcha captchaProducer;
+
+					@GetMapping("/kaptcha")
+					public void kaptcha(HttpSession session, HttpServletResponse response) throws IOException {
+
+						// 设置浏览器不要缓存等
+						response.setDateHeader("Expires", 0);
+						response.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+						response.addHeader("Cache-Control", "post-check=0, pre-check=0");
+						response.setHeader("Pragma", "no-cache");
+						response.setContentType("image/jpeg");
+
+						// 将验证码保存到session中，并设置过期时间为两分钟
+						String captchaText = captchaProducer.createText();
+						session.setAttribute("captchaText", new CaptchaImageVO(captchaText, 2 * 60));
+
+						// 将验证码图片返回到前端
+						try(ServletOutputStream out = response.getOutputStream();) {
+							BufferedImage image = captchaProducer.createImage(captchaText);
+							ImageIO.write(image, "jpg", out);
+							out.flush();
+						} //使用try-with-resources不用手动关闭流
+					}
+				}
+				
+				public class CaptchaImageVO {
+
+					private String code;
+
+					private LocalDateTime expireTime;
+
+					public CaptchaImageVO(String code,  int expireAfterSeconds) {
+						this.code = code;
+						this.expireTime = LocalDateTime.now().plusSeconds(expireAfterSeconds);
+					}
+
+					public boolean isExpire() {
+						return LocalDateTime.now().isAfter(this.expireTime);
+					}
+
+					public String getCode() {
+						return code;
+					}
+				}
+				
+				@Override
+				protected void configure(HttpSecurity http) throws Exception {
+					.http
+					...
+					.authorizeRequests()
+					.antMatchers("/login.html", "/", "/login", "/kaptcha").permitAll() // 不需要通过登录验证就可以被访问的资源路径
+					...
+				}
+		⑤ 验证码用户访问
+			A. 实现的效果是，页面初始化即加载验证码。以后每一次点击，都会更新验证码。
+			B. 注意：一定设置width和height，否则图片无法显示。
+			C. 需要为“/kaptcha”配置permitAll公开访问权限，否则无法访问到
+			D. 代码
+				<div class="form-group">
+					<label for="password">验证码</label>
+					<input type="text" class="form-control" name="captcha" id="captcha" placeholder="请输入验证码">
+					<img th:src="@{/kaptcha}" id="kaptcha" width="100px" height="38px">
+				</div>
+			
+				$(function () {
+					$('#kaptcha').click(function () {
+						var timeMilli = new Date().getTime();
+						var src = $(this).attr('src');
+						$(this).attr('src', src + "?" + timeMilli);
+					})
+				});
 
 
 
