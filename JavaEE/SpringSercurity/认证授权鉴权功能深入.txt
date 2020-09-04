@@ -701,7 +701,7 @@
 			F. 另外，我们通过加载完成的配置，初始化captchaProducer的Spring Bean，用于生成验证码。
 				@Configuration
 				@PropertySource(value = { "classpath:kaptcha.properties" })
-				public class CaptchaConfig {
+				public class CaptchaCodeConfig {
 
 					@Value("${kaptcha.border}")
 					private String border;
@@ -751,7 +751,7 @@
 				d. 我们要把CaptchaImageVO保存到session里面。所以该类中不要加图片，只保存验证码文字和失效时间，用于后续验证即可。把验证码图片保存起来既没有用处，又浪费内存。
 			B. 代码：
 				@RestController
-				public class CaptchaController {
+				public class CaptchaCodeController {
 
 					@Autowired
 					private DefaultKaptcha captchaProducer;
@@ -779,7 +779,7 @@
 					}
 				}
 				
-				public class CaptchaImageVO {
+				public class CaptchaCodeVO {
 
 					private String code;
 
@@ -825,25 +825,445 @@
 						$(this).attr('src', src + "?" + timeMilli);
 					})
 				});
+		⑥ 验证码之安全校验
+			A. 编写我们的自定义图片验证码过滤器CaptchaCodeFilter，过滤器中拦截登录请求
+			B. CaptchaCodeFilter过滤器中从seesion获取验证码文字与用户输入比对，比对通过执行其他过滤器链
+			C. 比对不通过，抛出SessionAuthenticationException异常，交给AuthenticationFailureHandler处理
+			D. 最后将CaptchaCodeFilter放在UsernamePasswordAuthenticationFilter表单过滤器之前执行。
+			E. CaptchaFilter
+				@Component
+				public class CaptchaCodeFilter extends OncePerRequestFilter {
+
+					@Autowired
+					private MyAuthenticationFailureHandler myAuthenticationFailureHandler;
+
+					@Override
+					protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
+													FilterChain filterChain) throws ServletException, IOException {
+						// 1. 必须是登录的post请求才能进行验证，其他的直接放行
+						if ("/login".equals(request.getRequestURI()) && "POST".equalsIgnoreCase(request.getMethod())) {
+							try {
+								// 2.验证谜底与用户输入是否匹配
+								validate(request);
+							} catch (AuthenticationException e) {
+								// 3.捕获步骤1中校验出现异常，交给失败处理类进行进行处理
+								myAuthenticationFailureHandler.onAuthenticationFailure(request, response, e);
+								return;
+							}
+						}
+						filterChain.doFilter(request, response);
+					}
+
+					private void validate(HttpServletRequest request) {
+						String captchaCode = request.getParameter("captchaCode");
+						if (captchaCode == null || captchaCode.isEmpty()) {
+							throw new SessionAuthenticationException("请输入验证码");
+						}
+
+						CaptchaImageVO captchaImageVO = (CaptchaImageVO) request.getSession().getAttribute(MyConstants.CAPTCHA_SESSION_KEY);
+						if (captchaImageVO == null) {
+							throw new SessionAuthenticationException("验证码不存在，请重新加载");
+						}
+
+						if (captchaImageVO.isExpire()) {
+							throw new SessionAuthenticationException("验证码已过期");
+						}
+
+						if (!captchaImageVO.getCode().equalsIgnoreCase(captchaCode)) {
+							throw new SessionAuthenticationException("验证码不匹配");
+						}
+						
+						session.removeAttribute(MyConstants.CAPTCHA_SESSION_KEY);
+					}
+				}
+			F. 上面代码中之所以抛出SessionAuthenticationException异常，因为该异常是AuthenticationException的子类，同时也是针对Session数据校验的异常。可以在doFilterInternal
+			中被捕获，交给MyAuthenticationFailureHandler处理。MyAuthenticationFailureHandler 只认识AuthenticationException及其子类。
+			G. codeInRequest是用户请求输入的验证码
+			H. codeInSession是用户请求验证码图片时，保存在session中的验证码谜底。验证通过后可以将session中的captchaImageVO对象删除，减少内存的占用
+			I. 在MyAuthenticationFailureHandler将异常的message转换为：用户响应的message。即上文异常中定义的
+				a. 验证码不能为空
+				b. 验证码不存在
+				c. 验证码已经过期
+				d. 验证码不匹配
+			J. MyAuthenticationFailureHandler
+				@Component
+				public class MyAuthenticationFailureHandler extends SimpleUrlAuthenticationFailureHandler {
+
+					@Value("${spring.security.loginType}")
+					private String loginType;
+
+					private static ObjectMapper objectMapper = new ObjectMapper();
+
+					public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
+														AuthenticationException exception) throws IOException, ServletException {
+
+						String errorMsg = "用户名或者密码输入错误!";
+						if(exception instanceof SessionAuthenticationException){
+							errorMsg = exception.getMessage();
+						}
+
+						if(loginType.equalsIgnoreCase("JSON")){
+							response.setContentType("application/json;charset=UTF-8");
+							response.getWriter().write(objectMapper.writeValueAsString(
+									AjaxResponse.error(new CustomException(
+											CustomExceptionType.USER_INPUT_ERROR,
+											errorMsg))
+							));
+						}else{
+							//跳转到登陆页面
+							super.onAuthenticationFailure(request,response,exception);
+						}
+
+					}
+				}
+			K. 最后将CaptchaCodeFilter过滤器放到用户名密码登录过滤器之前执行。login.html登录请求中要传递参数：captchaCode
+				@Autowired
+				private CaptchaCodeFilter captchaFilter;
+				
+				protected void configure(HttpSecurity http) throws Exception {
+					http.addFilterBefore(captchaFilter, UsernamePasswordAuthenticationFilter.class)
+					....
+				}
+	10. 短信验证码登录功能
+		① 需求说明
+			A. 输入手机号码，点击获取按钮，服务端接受请求发送短信
+			B. 用户输入验证码点击登录
+			C. 手机号码必须属于系统的注册用户，并且唯一
+			D. 手机号与验证码正确性及其关系必须经过校验
+			E. 登录后用户具有手机号对应的用户的角色及权限
+		② 实现步骤
+			A. 获取短信验证码
+			B. 短信验证码校验过滤器
+			C. 短信验证码登录认证过滤器
+			D. 综合配置
+		③ 获取短信验证码
+			A. SmsCodeController用于接收用户的获取验证码请求。注意：一定要为“/smscode”访问路径配置为permitAll访问权限。
+				a. 代码中只做了短信验证码接口调用的模拟，没有真正的向手机发送验证码。此部分接口请结合短信发送服务提供商接口实现。
+				b. 短信验证码发送之后，将验证码“谜底”保存在session中。
+				c. 代码：
+					@Slf4j
+					@RestController
+					public class SmsCodeController {
+
+						@Autowired
+						private MyUserDetailsMapper myUserDetailsMapper;
+
+						@PostMapping("/smsCode")
+						public AjaxResponse getSmsCode(@RequestParam(value = "phoneNum", required = true) String phoneNum,
+													   HttpSession session) {
+
+							MyUserDetails myUserDetails = myUserDetailsMapper.findByUserName(phoneNum);
+							if (myUserDetails == null || !myUserDetails.isEnabled()) {
+								return AjaxResponse.error(new CustomException(CustomExceptionType.USER_INPUT_ERROR, "您输入的手机号未注册"));
+							}
+
+							// 构造smsCodeVo
+							SmsCodeVo smsCodeVo = new SmsCodeVo(RandomStringUtils.randomNumeric(6), 120, phoneNum);
+
+							// 调用短信服务提供商的接口发送短信
+							log.info(smsCodeVo.getCode() + " -> " + phoneNum);
+
+							session.setAttribute(MyConstants.SMS_SESSION_KEY, smsCodeVo);
+
+							return AjaxResponse.success("短信验证码已经发送");
+						}
+					}
+			B. 使用SmsCode封装短信验证码的谜底，用于后续登录过程中进行校验。 
+				public class SmsCodeVo {
+
+					private String code; // 短信验证码
+
+					private LocalDateTime expireTime; // 过期时间
+
+					private String phoneNum;
+
+					public SmsCodeVo(String code, int expireAfterSeconds, String phoneNum) {
+						this.code = code;
+						this.expireTime = LocalDateTime.now().plusSeconds(expireAfterSeconds);
+						this.phoneNum = phoneNum;
+					}
+
+					public boolean isExpire() {
+						return LocalDateTime.now().isAfter(this.expireTime);
+					}
+
+					public String getCode() {
+						return code;
+					}
+
+					public String getPhoneNum() {
+						return phoneNum;
+					}
+				}
+			C. MyUserDetailsMapper查询用户和角色时，支持使用手机号码查询
+				select username, password, enabled
+				from sys_user
+				where username = #{username} or phone = #{username}
+	
+				select role_code
+				from sys_user u
+				left join user_role ur on u.id = ur.user_id
+				left join sys_role r on r.id = ur.role_id
+				where u.username = #{username} or u.phone = #{username}
+			D. 前端初始化短信登录界面
+		④ 短信验证码校验过滤器
+			A. 短信验证码的校验过滤器，和图片验证码的验证实现原理是一致的。都是通过继承OncePerRequestFilter实现一个Spring环境下的过滤器。其核心校验规则如下：
+				a. 用户登录时手机号不能为空
+				b. 用户登录时短信验证码不能为空
+				c. 用户登陆时在session中必须存在对应的校验谜底（获取验证码时存放的）
+				d. 用户登录时输入的短信验证码必须和“谜底”中的验证码一致
+				e. 用户登录时输入的手机号必须和“谜底”中保存的手机号一致
+				f. 用户登录时输入的手机号必须是系统注册用户的手机号，并且唯一（不需要判断，在获取短信验证码时已经验证过了）
+				g. 为"/smslogin"访问路径配置为permitAll访问权限
+				h. OncePerRequestFilter
+					public class SmsCodeFilter extends OncePerRequestFilter {
+
+						@Autowired
+						private MyAuthenticationFailureHandler myAuthenticationFailureHandler;
+
+						@Override
+						protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
+														FilterChain filterChain) throws ServletException, IOException {
+
+							// 拦截短信登录请求 /ssmLogin，并且请求方式为POST
+							if (StringUtils.equals("/ssmLogin", request.getRequestURI())
+									&& StringUtils.equalsIgnoreCase("POST", request.getMethod())) {
+
+								try {
+									validate(request);
+								} catch (AuthenticationException e) {
+									myAuthenticationFailureHandler.onAuthenticationFailure(request, response, e);
+								}
+							}
+							filterChain.doFilter(request, response);
+						}
+
+						// 验证规则
+						private void validate(HttpServletRequest request) {
+
+							HttpSession session = request.getSession();
+							SmsCodeVo smsCodeVo = (SmsCodeVo) session.getAttribute(MyConstants.SMS_SESSION_KEY);
+							String phoneNum = (String) request.getAttribute("phoneNum");
+							String smsCode = (String) request.getAttribute("smsCode");
+
+							if (StringUtils.isEmpty(phoneNum)) {
+								throw new SessionAuthenticationException("手机号码不能为空");
+							}
+
+							if (StringUtils.isEmpty(smsCode)) {
+								throw new SessionAuthenticationException("短信验证码不能为空");
+							}
+
+							if (Objects.isNull(smsCodeVo)) {
+								throw new SessionAuthenticationException("短信验证码不存在，请重新获取");
+							}
+
+							if (smsCodeVo.isExpire()) {
+								session.removeAttribute(MyConstants.SMS_SESSION_KEY);
+								throw new SessionAuthenticationException("短信验证码已过期，请重新获取");
+							}
+
+							if (!StringUtils.equals(smsCodeVo.getCode(), smsCode)) {
+								throw new SessionAuthenticationException("短信验证码输入不正确");
+							}
+
+							if (!StringUtils.equals(smsCodeVo.getPhoneNum(), phoneNum)) {
+								throw new SessionAuthenticationException("短信发送目标与手机号码不一致");
+							}
+
+							session.removeAttribute(MyConstants.SMS_SESSION_KEY);
+						}
+					}
+			B. 整体的短信验证登录流程
+				a. 首先用户发起“获取短信验证码”请求，SmsCodeController中调用短信服务商接口发送短信，并将短信发送的“谜底”保存在session中。
+				b. 当用户发起登录请求，首先要经过SmsCodeValidateFilter对谜底和用户输入进行比对，比对失败则返回短信验证码校验失败
+				c. 当短信验证码校验成功，继续执行过滤器链中的SmsCodeAuthenticationFilter对用户进行认证授权。
+		⑤ 短信验证码登录认证
+			A. 短信验证码的登录认证逻辑和用户密码的登录认证流程是一样的。所以：
+				a. SmsCodeAuthenticationFilter仿造UsernamePasswordAuthenticationFilter进行开发
+				b. SmsCodeAuthenticationProvider仿造DaoAuthenticationProvider进行开发。
+			B. 模拟实现：只不过将用户名、密码换成手机号进行认证，短信验证码在此部分已经没有用了，因为我们在SmsCodeValidateFilter已经验证过了。
+				a. SmsCodeAuthenticationFilter
+					public class SmsCodeAuthenticationFilter extends AbstractAuthenticationProcessingFilter {
+
+						public static final String SPRING_SECURITY_FORM_PHONENUM_KEY = "phoneNum";
+
+						private String phoneNumParameter = SPRING_SECURITY_FORM_PHONENUM_KEY;
+						private boolean postOnly = true;
+
+						public SmsCodeAuthenticationFilter() {
+							super(new AntPathRequestMatcher("/smsLogin", "POST"));
+						}
+
+						public Authentication attemptAuthentication(HttpServletRequest request, HttpServletResponse response) throws AuthenticationException {
+							if (this.postOnly && !request.getMethod().equals("POST")) {
+								throw new AuthenticationServiceException("Authentication method not supported: " + request.getMethod());
+							} else {
+								String phoneNum = this.obtainPhoneNum(request);
+
+								if (phoneNum == null) {
+									phoneNum = "";
+								}
 
 
+								phoneNum = phoneNum.trim();
+								SmsCodeAuthenticationToken authRequest = new SmsCodeAuthenticationToken(phoneNum);
+								this.setDetails(request, authRequest);
+								return this.getAuthenticationManager().authenticate(authRequest);
+							}
+						}
 
+						@Nullable
+						protected String obtainPhoneNum(HttpServletRequest request) {
+							return request.getParameter(this.phoneNumParameter);
+						}
 
+						protected void setDetails(HttpServletRequest request, SmsCodeAuthenticationToken authRequest) {
+							authRequest.setDetails(this.authenticationDetailsSource.buildDetails(request));
+						}
 
+						public void setPhoneNumParameter(String phoneNumParameter) {
+							Assert.hasText(phoneNumParameter, "Username parameter must not be empty or null");
+							this.phoneNumParameter = phoneNumParameter;
+						}
 
+						public void setPostOnly(boolean postOnly) {
+							this.postOnly = postOnly;
+						}
 
+						public final String getPhoneNumParameter() {
+							return this.phoneNumParameter;
+						}
 
+					}
+				b. SmsCodeAuthenticationProvider
+					public class SmsCodeAuthenticationProvider implements AuthenticationProvider {
+						private UserDetailsService userDetailsService;
 
+						public void setUserDetailsService(UserDetailsService userDetailsService) {
+							this.userDetailsService = userDetailsService;
+						}
 
+						protected UserDetailsService getUserDetailsService() {
+							return this.userDetailsService;
+						}
 
+						/**
+						 * 进行身份认证的逻辑
+						 * @param authentication    就是我们传入的Token
+						 * @return
+						 * @throws AuthenticationException
+						 */
+						@Override
+						public Authentication authenticate(Authentication authentication) throws AuthenticationException {
+							//利用UserDetailsService获取用户信息，拿到用户信息后重新组装一个已认证的Authentication
+							SmsCodeAuthenticationToken authenticationToken = (SmsCodeAuthenticationToken) authentication;
+							//根据手机号码拿到用户信息
+							UserDetails userDetails = userDetailsService.loadUserByUsername((String) authenticationToken.getPrincipal());
+							if (Objects.isNull(userDetails)) {
+								throw new InternalAuthenticationServiceException("无法根据手机号获取用户信息");
+							}
+							SmsCodeAuthenticationToken result = new SmsCodeAuthenticationToken(userDetails, userDetails.getAuthorities());
+							result.setDetails(authenticationToken.getDetails());
+							return result;
+						}
 
+						/**
+						 * AuthenticationManager挑选一个AuthenticationProvider
+						 * 来处理传入进来的Token就是根据supports方法来判断的
+						 * @param aClass
+						 * @return
+						 */
+						@Override
+						public boolean supports(Class<?> aClass) {
+							return SmsCodeAuthenticationToken.class.isAssignableFrom(aClass);
+						}
+					}
+			C. 此时登录认证逻辑中的userDetailsService.loadUserByUsername的username就是手机号。我们在上文中已经支持了使用手机号去查询用户、角色、权限信息。
+				a. 在模拟实现的过程中，还需要模拟SmsCodeAuthenticationToken，参考UsernamePasswordAuthenticationToken实现。
+				b. SmsCodeAuthenticationToken
+					public class SmsCodeAuthenticationToken extends AbstractAuthenticationToken {
+						private static final long serialVersionUID = 520L;
 
+						// 存放认证信息，认证之前是手机号，认证之后是userDetails
+						private final Object principal;
 
+						public SmsCodeAuthenticationToken(Object principal) {
+							super((Collection)null);
+							this.principal = principal;
+							this.setAuthenticated(false);
+						}
 
+						public SmsCodeAuthenticationToken(Object principal, Collection<? extends GrantedAuthority> authorities) {
+							super(authorities);
+							this.principal = principal;
+							super.setAuthenticated(true);
+						}
 
+						public Object getCredentials() {
+							return null;
+						}
 
+						public Object getPrincipal() {
+							return this.principal;
+						}
 
+						public void setAuthenticated(boolean isAuthenticated) throws IllegalArgumentException {
+							if (isAuthenticated) {
+								throw new IllegalArgumentException("Cannot set this token to trusted - use constructor which takes a GrantedAuthority list instead");
+							} else {
+								super.setAuthenticated(false);
+							}
+						}
 
+						public void eraseCredentials() {
+							super.eraseCredentials();
+						}
+					}
+		⑥ 综合配置
+			A. 最后我们将以上实现进行组装，并将以上接口实现以配置的方式告知Spring Security。因为配置代码比较多，所以我们单独抽取一个关于短信验证码的配置类
+			SmsCodeSecurityConfig，继承自SecurityConfigurerAdapter。
+			B. SmsCodeSecurityConfig
+				@Component
+				public class SmsCodeSecurityConfig extends SecurityConfigurerAdapter<DefaultSecurityFilterChain, HttpSecurity> {
 
+					@Autowired
+					private MyAuthenticationSuccessHandler myAuthenticationSuccessHandler;
 
+					@Autowired
+					private MyAuthenticationFailureHandler myAuthenticationFailureHandler;
 
+					@Autowired
+					private MyUserDetailsService myUserDetailsService;
+
+					@Autowired
+					private SmsCodeValidateFilter smsCodeValidateFilter;
+
+					@Override
+					public void configure(HttpSecurity http) throws Exception {
+						SmsCodeAuthenticationFilter smsCodeAuthenticationFilter = new SmsCodeAuthenticationFilter();
+						smsCodeAuthenticationFilter.setAuthenticationManager(http.getSharedObject(AuthenticationManager.class));
+						smsCodeAuthenticationFilter.setAuthenticationSuccessHandler(myAuthenticationSuccessHandler);
+						smsCodeAuthenticationFilter.setAuthenticationFailureHandler(myAuthenticationFailureHandler);
+
+						// 获取验证码提供者
+						SmsCodeAuthenticationProvider smsCodeAuthenticationProvider = new SmsCodeAuthenticationProvider();
+						smsCodeAuthenticationProvider.setUserDetailsService(myUserDetailsService);
+
+						// 在用户密码过滤器前面加入短信验证码校验过滤器
+						http.addFilterBefore(smsCodeValidateFilter, UsernamePasswordAuthenticationFilter.class);
+						//在用户密码过滤器后面加入短信验证码认证授权过滤器
+						http.authenticationProvider(smsCodeAuthenticationProvider)
+								.addFilterAfter(smsCodeAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+					}
+				}
+			C. 该配置类可以用以下代码，集成到SecurityConfig中。
+				@Autowired
+				private SmsCodeSecurityConfig smsCodeSecurityConfig;
+				
+				protected void configure(HttpSecurity http) throws Exception {
+					http
+					....
+					.apply(smsCodeSecurityConfig)
+					....
+				}

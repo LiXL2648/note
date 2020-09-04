@@ -1,0 +1,551 @@
+三. 前后端分离的应用认证
+	1. 详述JWT使用场景及结构安全
+		① 基于Session的应用开发的缺陷
+			A. 在我们传统的B\S应用开发方式中，都是使用session进行状态管理的，比如说：保存登录、用户、权限等状态信息。这种方式的原理大致如下：
+			    a. 用户登陆之后，将状态信息保存到session里面。服务端自动维护sessionid，即将sessionid写入cookie。
+				b. cookie随着HTTP响应，被自动保存到浏览器端。
+				c. 当用户再次发送HTTP请求，sessionid随着cookies被带回服务器端
+				d. 服务器端根据sessionid，可以找回该用户之前保存在session里面的数据。
+			B. 当然，这整个过程中，cookies和sessionid都是服务端和浏览器端自动维护的。所以从编码层面是感知不到的，程序员只能感知到session数据
+			的存取。但是，这种方式在有些情况下，是不适用的。
+				a. 非浏览器的客户端、手机移动端等等，因为他们没有浏览器自动维护cookies的功能。
+				b. 比如：集群应用，同一个应用部署甲、乙、丙三个主机上，实现负载均衡应用，其中一个挂掉了其他的还能负载工作。要知道session是保存在
+				服务器内存里面的，三个主机一定是不同的内存。那么你登录的时候访问甲，而获取接口数据的时候访问乙，就无法保证session的唯一性和共享性。
+			C. 当然以上的这些情况我们都有方案(如redis共享session等)，可以继续使用session来保存状态。但是还有另外一种做法就是不用session了，即开发
+			一个无状态的应用，JWT就是这样的一种方案。
+		② JWT是什么？
+			A. 可以认为JWT是一个加密后的接口访问密码，并且该密码里面包含用户名信息
+				a. 首先，客户端需要向服务端申请JWT令牌，这个过程通常是登录功能。即：由用户名和密码换取JWT令牌。
+				b. 当你访问系统其他的接口时，在HTTP的header中携带JWT令牌。header的名称可以自定义，前后端对应上即可。
+				c. 服务端解签验证JWT中的用户标识，根据用户标识从数据库中加载访问权限、用户信息等状态信息。
+			B. 这就是JWT，以及JWT在应用服务开发中的使用方法。
+		③ JWT结构分析
+			A. Header，这个部分通常是用来说明JWT使用的算法信息
+			B. payload，这个部分通常用于携带一些自定义的状态附加信息（重要的是用户标识）。但是注意这部分是可以明文解码的，所以注意是用户标识，而不
+			应该是用户名或者其他用户信息。
+			C. signature，这部分是对前两部分数据的签名，防止前两部分数据被篡改。这里需要指定一个密钥secret，进行签名和解签。
+		④ JWT安全性
+			A. 说明：
+				a. 其实和使用session管理状态是一样的，一旦网络或浏览器被劫持了，肯定不安全。
+				b. signature通常被叫做签名，而不是密码。
+				c. JWT服务端也保存了一把钥匙，就是暗号secret。用来数据的签名和解签，secret一旦丢失，所有用户都是不安全的。所以更重要的是保护secret的安全。
+			B. 如何加强JWT的安全性？
+				a. 避免网络劫持，因为使用HTTP的header传递JWT，所以使用HTTPS传输更加安全。这样在网络层面避免了JWT的泄露。
+				b. secret是存放在服务器端的，所以只要应用服务器不被攻破，理论上JWT是安全的。因此要保证服务器的安全。
+				c. 对于JWT常用的算法要想攻破，目前已知的方法只能是暴力破解，白话说就是"试密码"，所以要定期更换secret并且保正secret的复杂度。
+	2. Spring Security-JWT实现原理
+		① 回顾JWT的认证及鉴权流程
+			A. 认证：使用可信用户信息（用户名密码、短信登录）换取带有签名的JWT令牌
+			B. 鉴权：解签JWT令牌，校验用户权限。具有某个接口访问权限，开放该接口访问。
+			C. JWT结合Spring Security认证细节说明
+		② JWT结合Spring Security认证细节说明
+			A. 认证流程细节：
+				a. 当客户端发送“/authentication”请求的时候，实际上是请求JwtAuthenticationController。该Controller的功能是：一是用户登录功能的实现，二是如果登
+				录成功，生成JWT令牌。在使用JWT的情况下，这个类需要我们自己来实现。
+				b. 具体到用户登录，就需要结合Spring Security实现。通过向Spring Security提供的AuthenticationManager的authenticate()方法传递用户名密码，由spring 
+				Security帮我们实现用户登录认证功能。
+				c. 如果登陆成功，我们就要为该用户生成JWT令牌了。通常此时我们需要使用UserDetailsService的loadUserByUsername方法加载用户信息，然后根据信息生成JWT令牌，
+				JWT令牌生成之后返回给客户端。
+				d. 另外，我们需要写一个工具类JwtTokenUtil，该工具类的主要功能就是根据用户信息生成JWT，解签JWT获取用户信息，校验令牌是否过期，刷新令牌等。
+			B. 接口鉴权细节：
+				a. 当客户端获取到JWT之后，他就可以使用JWT请求接口资源服务了。大家可以看到在“授权流程细节”的时序图中，有一个Filter过滤器我们没有讲到，其实它和授权认
+				证的流程关系不大，它是用来进行接口鉴权的。因为授权认证就只有一个接口即可，但是服务资源接口却有很多，所以我们不可能在每一个Controller方法中都进行鉴权，
+				所以在到达Controller之前通过Filter过滤器进行JWT解签和权限校验。
+				b. 假如我们有一个接口资源“/hello”定义在HelloWorldcontroller中，鉴权流程是如何进行的？
+					(1) 当客户端请求“/hello”资源的时候，他应该在HTTP请求的Header带上JWT字符串。Header的名称前后端服务自己定义，但是要统一。
+					(2) 服务端需要自定义JwtRequestFilter，拦截HTTP请求，并判断请求Header中是否有JWT令牌。如果没有，就执行后续的过滤器。因为Spring Security是有完成的鉴
+					权体系的，你没赋权该请求就是非法的，后续的过滤器链会将该请求拦截，最终返回无权限访问的结果。
+					(3) 如果在HTTP中解析到JWT令牌，就调用JwtTokenUtil对令牌的有效期及合法性进行判定。如果是伪造的或者过期的，同样返回无权限访问的结果。
+					(4) 如果JWT令牌在有效期内并且校验通过，我们仍然要通过UserDetailsService加载该用户的权限信息，并将这些信息交给Spring Security。只有这样，该请求才能
+					顺利通过Spring Security一系列过滤器的关卡，顺利到达HelloWorldcontroller并访问“/hello”接口。
+		③ 其他的细节问题
+			A. 一旦发现用户的JWT令牌被劫持，或者被个人泄露该怎么办？JWT令牌有一个缺点就是一旦发放，在有效期内都是可用的，那怎么回收令牌？我们可以通过设置黑名单ip、用户，
+			或者为每一个用户JWT令牌使用一个secret密钥，可以通过修改secret密钥让该用户的JWT令牌失效。
+			B. 如何刷新令牌？为了提高安全性，我们的令牌有效期通常时间不会太长。那么，我们不希望用户正在使用app的时候令牌过期了，用户必须重新登陆，很影响用户体验。这怎么办？
+			这就需要在客户端根据业务选择合适的时机或者定时的刷新JWT令牌。所谓的刷新令牌就是用有效期内，用旧的合法的JWT换取新的JWT。
+	3. 编码实现JWT认证鉴权
+		① 环境准备工作
+			A. 建立Spring Boot项目并集成了Spring Security，项目可以正常启动
+			B. 通过controller写一个HTTP的GET方法服务接口，比如：“/hello”
+			C. 实现最基本的动态数据验证及权限分配，即实现UserDetailsService接口和UserDetails接口。这两个接口都是向Spring Security提供用户、角色、权限等校验信息的接口
+			D. 如果你学习过Spring Security的formLogin登录模式，请将HttpSecurity配置中的formLogin()配置段全部去掉。因为JWT完全使用JSON接口，没有from表单提交。
+			E. HttpSecurity配置中一定要加上csrf().disable()，即暂时关掉跨站攻击CSRF的防御。这样是不安全的，我们后续章节再做处理。
+		② 开发JWT工具类
+			A. 通过maven坐标引入JWT工具包jjwt
+				<dependency>
+					<groupId>io.jsonwebtoken</groupId>
+					<artifactId>jjwt</artifactId>
+					<version>0.9.0</version>
+				</dependency>
+			B. 在application.yml中加入如下自定义一些关于JWT的配置
+				a. 配置
+					jwt:
+					  secret: Qwce344FDlfjd
+					  expiration: 86400000
+					  header: JWTHeader
+				b. 其中header是携带JWT令牌的HTTP的Header的名称。虽然我这里叫做JWTHeaderName，但是在实际生产中可读性越差越安全。
+				c. secret是用来为JWT基础信息加密和解密的密钥。虽然我在配置文件写死了，但是在实际生产中通常不直接写在配置文件里面。而是通过应用的启动参数传递，并且需要定期修改。
+				d. expiration是JWT令牌的有效时间。
+			C. Spring Boot配置自动加载的工具类。	
+				@Data
+				@Component
+				@ConfigurationProperties(prefix = "jwt")
+				public class JwtTokenUtil {
+
+					private String secret;
+					private Long expiration;
+					private String header;
+
+					/**
+					 * 获取Token令牌
+					 *
+					 * @param myUserDetails 封装了用户信息
+					 * @return Token令牌
+					 */
+					public String generateToken(MyUserDetails myUserDetails) {
+						Map<String, Object> claims = new HashMap<>();
+						claims.put("sub", myUserDetails.getUsername());
+						claims.put("created", new Date());
+						claims.put("userId", myUserDetails.getUserId());
+
+						return generateToken(claims);
+					}
+
+					/**
+					 * 从令牌中获取用户名
+					 *
+					 * @param token 判断令牌是否过期
+					 * @return 用户名
+					 */
+					public String getUsernameFromToken(String token) {
+						Claims claims = getClaimsFromToken(token);
+						if (claims != null) {
+							return claims.getSubject();
+						}
+						return null;
+					}
+
+					/**
+					 * 从令牌中获取用户Id
+					 * @param token
+					 * @return
+					 */
+					public Integer getUserIdFromToken(String token) {
+						Claims claims = getClaimsFromToken(token);
+						if (claims != null) {
+							return (Integer) claims.get("userId");
+						}
+						return null;
+					}
+
+					/**
+					 * 判断令牌是否过期
+					 *
+					 * @param token 判断令牌是否过期
+					 * @returns 是否过期
+					 */
+					public Boolean isTokenExpired(String token) {
+						Claims claims = getClaimsFromToken(token);
+						if (claims != null) {
+							return claims.getExpiration().before(new Date());
+						}
+						return false;
+					}
+
+					/**
+					 * 刷新令牌
+					 *
+					 * @param token 原Token令牌
+					 * @return 新Token令牌
+					 */
+					public String refreshToken(String token) {
+						Claims claims = getClaimsFromToken(token);
+						if (claims != null) {
+							claims.put("created", new Date());
+							return generateToken(claims);
+						}
+						return null;
+					}
+
+					/**
+					 * 验证Token
+					 * @param token Token令牌
+					 * @param userDetails 用户userDetails
+					 * @return
+					 */
+					public Boolean validateToken(String token, UserDetails userDetails) {
+						String username = getUsernameFromToken(token);
+						return userDetails.getUsername().equals(username) && !isTokenExpired(token);
+					}
+
+					/**
+					 * 从claims生成令牌
+					 *
+					 * @param claims 数据声明:用户名和创建时间
+					 * @return 生成Token令牌
+					 */
+					private String generateToken(Map<String, Object> claims) {
+						Date expirationDate = new Date(System.currentTimeMillis() + expiration);
+						return Jwts.builder().setClaims(claims)
+								.setExpiration(expirationDate)
+								.signWith(SignatureAlgorithm.HS512, secret)
+								.compact();
+					}
+
+					/**
+					 * 从令牌中获取数据声明
+					 *
+					 * @param token
+					 * @return
+					 */
+					private Claims getClaimsFromToken(String token) {
+						Claims claims = null;
+						try {
+							claims = Jwts.parser().setSigningKey(secret).parseClaimsJws(token).getBody();
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+						return claims;
+					}
+				}
+		③ 开发登录接口
+			A. 获取Token的接口
+				a. "/authentication"接口用于登录验证，并且生成JWT返回给客户端
+				b. "/refreshtoken"接口用于刷新JWT，更新JWT令牌的有效期
+				c. 代码：
+					@RestController
+					public class JwtAuthController {
+
+						@Resource
+						private JwtAuthService jwtAuthService;
+
+						@PostMapping(value = "/authentication")
+						public AjaxResponse login(@RequestBody Map<String, String> map) {
+							String username = map.get("username");
+							String password = map.get("password");
+							if (StringUtils.isEmpty(username) || StringUtils.isEmpty(password)) {
+								return AjaxResponse.error(
+										new CustomException(
+												CustomExceptionType.USER_INPUT_ERROR,"用户名密码不能为空"));
+							}
+							try{
+								return AjaxResponse.success(jwtAuthService.login(username, password));
+							}catch(CustomException e){
+								return AjaxResponse.error(e);
+							}
+						}
+
+						@PostMapping(value = "/refreshtoken")
+						public AjaxResponse refresh(@RequestHeader("${jwt.header}") String token) {
+							return AjaxResponse.success(jwtAuthService.refreshToken(token));
+						}
+
+					}
+			B. 核心的token业务逻辑
+				a. login方法中首先使用用户名、密码进行登录验证。如果验证失败抛出AuthenticationException 异常。如果验证成功，程序继续向下走，生成JWT响应给前端
+				b. refreshToken方法只有在JWT token没有过期的情况下才能刷新，过期了就不能刷新了。需要重新登录。
+				c. 代码：
+					@Service
+					public class JwtAuthService {
+
+						@Resource
+						private AuthenticationManager authenticationManager;
+						@Resource
+						private UserDetailsService userDetailsService;
+						@Resource
+						private JwtTokenUtil jwtTokenUtil;
+
+						public String login(String username, String password) throws CustomException {
+							try{
+								//使用用户名密码进行登录验证
+								UsernamePasswordAuthenticationToken upToken =
+										new UsernamePasswordAuthenticationToken( username, password );
+								Authentication authentication = authenticationManager.authenticate(upToken);
+								SecurityContextHolder.getContext().setAuthentication(authentication);
+							}catch(AuthenticationException e){
+								throw new CustomException(CustomExceptionType.USER_INPUT_ERROR,
+										"用户名或密码不正确");
+							}
+
+							//生成JWT
+							UserDetails userDetails = userDetailsService.loadUserByUsername( username );
+							return jwtTokenUtil.generateToken(userDetails);
+						}
+
+						public String refreshToken(String oldToken) {
+							if (!jwtTokenUtil.isTokenExpired(oldToken)) {
+								return jwtTokenUtil.refreshToken(oldToken);
+							}
+							return null;
+						}
+					}
+				d. 因为使用到了AuthenticationManager ,所以在继承WebSecurityConfigurerAdapter的SpringSecurity配置实现类中，将AuthenticationManager 声明为一个Bean。
+				并将"/authentication"和 "/refreshtoken"开放访问权限，如何开放访问权限，我们之前的文章已经讲过了。
+					@Bean(name = BeanIds.AUTHENTICATION_MANAGER)
+					@Override
+					public AuthenticationManager authenticationManagerBean() throws Exception {
+						return super.authenticationManagerBean();
+					}
+		④ 接口访问鉴权过滤器
+			A. 当用户第一次登陆之后，我们将JWT令牌返回给了客户端，客户端应该将该令牌保存起来。在进行接口请求的时候，将令牌带上，放到HTTP的header里面，header的名字要
+			和jwt.header的配置一致，这样服务端才能解析到。下面我们定义一个拦截器：
+				a. 拦截接口请求，从请求request获取token，从token中解析得到用户名
+				b. 然后通过UserDetailsService获得系统用户（从数据库、或其他其存储介质）
+				c. 根据用户信息和JWT令牌，验证系统用户与用户输入的一致性，并判断JWT是否过期。如果没有过期，至此表明了该用户的确是该系统的用户。
+				d. 但是，你是系统用户不代表你可以访问所有的接口。所以需要构造UsernamePasswordAuthenticationToken传递用户、权限信息，并将这些信息通过authentication告
+				知Spring Security。Spring Security会以此判断你的接口访问权限。
+				e. 代码
+					@Component
+					public class JwtAuthenticationTokenFilter extends OncePerRequestFilter {
+
+						@Resource
+						MyUserDetailsService myUserDetailsService;
+
+						@Resource
+						JwtTokenUtil jwtTokenUtil;
+
+						@Override
+						protected void doFilterInternal(HttpServletRequest request,
+														HttpServletResponse response,
+														FilterChain filterChain)
+								throws ServletException, IOException {
+							String jwtToken = request.getHeader(jwtTokenUtil.getHeader());
+							if(jwtToken != null && StringUtils.isNoneEmpty(jwtToken)){
+								String username = jwtTokenUtil.getUsernameFromToken(jwtToken);
+
+								//如果可以正确的从JWT中提取用户信息，并且该用户未被授权
+								if(username != null &&
+										SecurityContextHolder.getContext().getAuthentication() == null){
+
+									UserDetails userDetails = myUserDetailsService.loadUserByUsername(username);
+
+									if(jwtTokenUtil.validateToken(jwtToken,userDetails)){
+										//给使用该JWT令牌的用户进行授权
+										UsernamePasswordAuthenticationToken authenticationToken
+												= new UsernamePasswordAuthenticationToken(userDetails,null,
+																					userDetails.getAuthorities());
+
+										SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+
+									}
+								}
+							}
+
+							filterChain.doFilter(request,response);
+
+						}
+					}
+			B. 在spring Security的配置类（即WebSecurityConfigurerAdapter实现类的configure(HttpSecurity http)配置方法中，加入如下配置：
+				a. 代码
+					@Override
+					protected void configure(HttpSecurity http) throws Exception {
+						http
+						...
+							.sessionManagement()
+							.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+							.and()
+							.addFilterBefore(jwtAuthenticationTokenFilter, UsernamePasswordAuthenticationFilter.class);
+						....
+					}
+				b. 因为我们使用了JWT，表明了我们的应用是一个前后端分离的应用，所以我们可以开启STATELESS禁止使用session。当然这并不绝对，前后端分离的应用通过一些
+				办法也是可以使用session的，这不是本文的核心内容不做赘述。
+				c. 将我们的自定义jwtAuthenticationTokenFilter，加载到UsernamePasswordAuthenticationFilter的前面。
+		⑤ 测试一下：
+			A. 测试登录接口，即：获取token的接口。输入正确的用户名、密码即可获取token。
+			B. 下面我们访问一个我们定义的简单的接口“/hello”,但是不传递JWT令牌，结果是禁止访问。当我们将上一步返回的token，传递到header中，就能正常响应hello的接口结果。
+	4. 解决跨域访问的问题
+		① CORS简述
+			A. 要说明CORS(Cross Origin Resourse-Sharing) 跨站资源共享，就必须先说同源策略。长话短说，同源策略就是向服务端发起请求的时候，以下三项必须与当前浏览器应用一致：
+			域名、端口、协议。当然也有例外，如：img、srcipt、iframe等资源引用的HTML标签不受同源策略的限制。
+			B. 但是我们实际开发中又经常会跨站访问，比如前后端分离的应用是分开部署的，在浏览器看来是两个域。所以同源策略是用来禁止跨域访问的，CORS正好相反是根据自己的需求
+			与规则，有限的开放部分资源的共享。
+		
+		② 跨域访问的解决方案有哪些？
+			A. 第一类方案：前端解决方案
+				a. 虽然浏览器对于不符合同源策略的访问是禁止的，但是仍然存在例外的情况，如以下资源引用的标签不受同源策略的限制：
+					(1) html的script标签
+					(2) html的link标签
+					(3) html的img标签
+					(4) html的iframe标签：对于使用jsp、freemarker开发的项目，这是实现跨域访问最常见的方法，
+				b. 除了基于HTML本身的特性实现跨域访问，我们还可以使用jsonp、window的postMessage实现跨域访问。这些都是前端实现跨域访问的方式。
+			B. 第二类方案：使用代理
+				a. 实际上对跨域访问的支持在服务端实现起来更加容易，最常用的方法就是通过代理的方式，如：
+					(1) nginx或haproxy代理跨域
+					(2) nodejs中间件代理跨域
+				b. 其实实现代理跨域的逻辑非常简单：就是在不同的资源服务：js资源、html资源、css资源、接口数据资源服务的前端搭建一个中间层，所有的浏览器及客户端访问都通过代理转发。
+					所以在浏览器、客户端看来，它们访问的都是同一个ip、同一个端口的资源，从而符合同源策略实现跨域访问。 
+			C. 第三类方案：CORS
+				a. 跨域资源共享（CORS）：通过修改Http协议header的方式，实现跨域。说的简单点就是，通过设置HTTP的响应头信息，告知浏览器哪些情况在不符合同源策略的条件下也可以跨域访问，
+				浏览器通过解析Http协议中的Header执行具体判断。具体的Header如下：
+				b. CROS跨域常用header
+					(1) Access-Control-Allow-Origin: 允许哪些ip或域名可以跨域访问
+					(2) Access-Control-Max-Age: 表示在多少秒之内不需要重复校验该请求的跨域访问权限
+					(3) Access-Control-Allow-Methods: 表示允许跨域请求的HTTP方法，如：GET,POST,PUT,DELETE
+					(4) Access-Control-Allow-Headers: 表示访问请求中允许携带哪些Header信息，如：Accept、Accept-Language、Content-Language、Content-Type
+		③ SpringBoot下实现CORS的四种方式
+			A. SpringBoot实现CORS的四种方式，其中两种是全局配置，两种是局部接口生效的配置。一般来说，SpringBoot项目采用其中一种方式实现CORS即可。
+			B. 使用CorsFilter进行全局跨域配置
+				@Configuration
+				public class GlobalCorsConfig {
+					@Bean
+					public CorsFilter corsFilter() {
+						
+						CorsConfiguration config = new CorsConfiguration();
+						//开放哪些ip、端口、域名的访问权限，星号表示开放所有域
+						config.addAllowedOrigin("*");
+						//是否允许发送Cookie信息
+						config.setAllowCredentials(true);
+						//开放哪些Http方法，允许跨域访问
+						config.addAllowedMethod("GET","POST", "PUT", "DELETE");
+						//允许HTTP请求中的携带哪些Header信息
+						config.addAllowedHeader("*");
+						//暴露哪些头部信息（因为跨域访问默认不能获取全部头部信息）
+						config.addExposedHeader("*");
+
+						//添加映射路径，“/**”表示对所有的路径实行全局跨域访问权限的设置
+						UrlBasedCorsConfigurationSource configSource = new UrlBasedCorsConfigurationSource();
+						configSource.registerCorsConfiguration("/**", config);
+
+						return new CorsFilter(configSource);
+					}
+				}
+			C. 重写WebMvcConfigurer的addCorsMappings方法（全局跨域配置）
+				@Configuration
+				public class GlobalCorsConfig {
+					@Bean
+					public WebMvcConfigurer corsConfigurer() {
+						return new WebMvcConfigurer() {
+							@Override
+							public void addCorsMappings(CorsRegistry registry) {
+								registry.addMapping("/**")    //添加映射路径，“/**”表示对所有的路径实行全局跨域访问权限的设置
+										.allowedOrigins("*")    //开放哪些ip、端口、域名的访问权限
+										.allowCredentials(true)  //是否允许发送Cookie信息 
+										.allowedMethods("GET","POST", "PUT", "DELETE")     //开放哪些Http方法，允许跨域访问
+										.allowedHeaders("*")     //允许HTTP请求中的携带哪些Header信息
+										.exposedHeaders("*");   //暴露哪些头部信息（因为跨域访问默认不能获取全部头部信息）
+							}
+						};
+					}
+				}
+			D. 使用CrossOrigin注解（局部跨域配置）
+				a. 将CrossOrigin注解加在Controller层的方法上，该方法定义的RequestMapping端点将支持跨域访问
+				b. 将CrossOrigin注解加在Controller层的类定义处，整个类所有的方法对应的RequestMapping端点都将支持跨域访问
+				c. 代码
+					@RequestMapping("/cors")
+					@ResponseBody
+					@CrossOrigin(origins = "http://localhost:8080", maxAge = 3600) 
+					public String cors( ){
+						return "cors";
+					}
+			E. 使用HttpServletResponse设置响应头(局部跨域配置)
+				a. 这种方式略显麻烦，不建议在SpringBoot项目中使用。
+				b. 代码
+					@RequestMapping("/cors")
+					@ResponseBody
+					public String cors(HttpServletResponse response){
+						//使用HttpServletResponse定义HTTP请求头，最原始的方法也是最通用的方法
+						response.addHeader("Access-Control-Allow-Origin", "http://localhost:8080");
+						return "cors";
+					}
+		④ Spring Security 中的配置CORS
+			a. 当我们的应用使用了Spring Security之后，我们会发现上面的配置方法全部失效。此时需要在spring security的WebSecurityConfigurerAdapter中的
+				configure(HttpSecurity http)配置方法，加上http.cors()配置，第二小节中的配置才会生效。
+				public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
+					@Override
+					protected void configure(HttpSecurity http) throws Exception {
+						http.cors().and()
+						...
+					}
+				}
+			b. 另外Spring Security为我们提供了一种新的CORS规则的配置方法：CorsConfigurationSource 。使用这种方法实现的效果等同于注入一个CorsFilter过滤器。
+				@Bean
+				CorsConfigurationSource corsConfigurationSource() {
+					CorsConfiguration configuration = new CorsConfiguration();
+					configuration.setAllowedOrigins(Arrays.asList("http://localhost:8888"));
+					configuration.setAllowedMethods(Arrays.asList("GET","POST"));
+					configuration.applyPermitDefaultValues();
+					UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+					source.registerCorsConfiguration("/**", configuration);
+					return source;
+				}
+	5. CSRF跨站攻击防护
+		① 什么是CSRF
+			A. CORS(跨站资源共享)和CSRF(跨站请求伪造)
+				a. CORS(跨站资源共享)是局部打破同源策略的限制，使在一定规则下HTTP请求可以突破浏览器限制，实现跨站访问。
+				b. CSRF是一种网络攻击方式，也可以说是一种安全漏洞，这种安全漏洞在web开发中广泛存在。我们要需要堵上这个漏洞。
+			B. 当我们使用Spring Security的时候，这种CSRF漏洞默认的被防御掉了。但是你会发现在跨域请求的情况下，我们的POST、DELETE、PUT等HTTP请求方式失效了。
+			我们使用http.csrf.disable()暂时关闭掉了CSRF的防御功能，但是这样是不安全的
+		② CSRF的攻击方式
+			A. 通常的CSRF攻击方式如下：
+				a. 你登录了网站A，攻击者向你的网站A账户发送留言、或者伪造嵌入页面，带有危险操作链接。
+				b. 当你在登录状态下点击了攻击者的连接，因此该链接对你网站A的账户进行了操作。
+				c. 这个操作是你在网站A中主动发出的，并且也是针对网站A的HTTP链接请求，同源策略无法限制该请求。
+			B. 如果你不小心点击的连接，是针对网站的数据操作，如：转出货币，你的钱就被转走了。因为点击"链接"的请求是HTTP的GET请求，所以正规的开发人员的做法
+			是不要使用GET方法进行数据操作，只使用GET方法进行数据查询。
+		③ 如何防御CSRF攻击
+			A. 为系统中的每一个连接请求加上一个token，这个token是随机的，服务端对该token进行验证。破坏者在留言或者伪造嵌入页面的时候，无法预先判断CSRF token
+			的值是什么，所以当服务端校验CSRF token的时候也就无法通过。所以这种方法在一定程度上是靠谱的。
+			B. 但是如果你的电脑中毒，网络信息被劫持使用token的方法仍然不安全。所以没有绝对的安全，道高一次魔高一丈。作为开发者，我们就做到我们应该做到的。
+			C. 跳转提示：当用户不小心点击了第三方连接，合格的应用应该提示用户相关的风险！由用户自己确认是否真的要跳转或者执行第三方连接，或者就干脆不让非可信
+			连接在留言区等地方存在。
+		④ Spring Security的CSRF token攻击防护
+			A. 首先，我们要先开启防护功能，在用户登陆操作之后，生成的CSRF Token就保存在cookies中。首先，我们要先开启防护功能，在用户登陆操作之后，生成的CSRF 
+			Token就保存在cookies中。
+				a. 代码
+					public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
+						@Override
+						protected void configure(HttpSecurity http) throws Exception {
+							http.csrf()
+								.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+								.ignoringAntMatchers("/authentication");
+							.and()
+							...
+						}
+					}
+				b. 使用CookieCsrfTokenRepository生成CSRF Token放入cookie，并设置cookie的HttpOnly=false，允许读取该cookie。这样非浏览器等无法自动维护cookie的客户端
+				可以读取cookie中的CSRF Token，以供后续资源请求中使用。
+				c. 使用ignoringAntMatchers开放一些不需要进行CSRF防护的访问路径，比如：登录授权。
+			B. 至此，我们生成了CSRF token保存在了cookies中，浏览器向服务端发送的HTTP请求，都要将CSRF token带上，服务端校验通过才能正确的响应。这个校验的过程并不需要
+			我们自己写代码实现，Spring Security会自动处理。但是我们需要关注前端代码，如何正确的携带CSRF token。
+		⑤ 前端请求携带CSRF Token的方式
+			A. 默认情况下，CookieCsrfTokenRepository会向cookies中写入一个key为XSRF-TOKEN的cookie。
+			B. CookieCsrfTokenRepository在跨站防御验证的过程中，可以从HTTP Header中读取 X-XSRF-TOKEN或者从HTTP参数中读取_csrf，作为跨站防御验证的令牌.
+			C. 注意：这里是XSRF-TOKEN和 X-XSRF-TOKEN，没有写错。而不是CSRF-TOKEN和 X-CSRF-TOKEN
+			D. 在thymeleaf模板中可以使用如下方式，在发送HTTP请求的时候携带CSRF Token。如果是前后端分离的应用，或者其他模板引擎，酌情从cookies中获取CSRF Toekn。
+			E. 在Header中携带CSRF token
+				var headers = {};
+				headers['X-XSRF-TOKEN'] = "${_csrf.token}";
+				$.ajax({    
+					headers: headers,    
+				});
+			F. 直接作为参数提交。
+				$.ajax({    
+					data: {      
+					   "_csrf": "${_csrf.token}"        
+					}
+				});
+			G. form表单的隐藏字段
+				<input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+
+	6. JWT集群应用方案
+		① 回顾JWT授权与验证流程
+			A. 在我们之前实现的JWT应用中，登录认证的Controller和令牌验证的Filter是在同一个应用中的。
+			B. 要想使用JWT访问资源需要
+				b. 先使用用户名和密码，去Controller换取JWT令牌
+				c. 然后才能进行资源的访问，资源接口的前端由一个"JWT验证Filter"负责校验令牌和授权访问。
+		② 集群应用
+			A. 如果上面的应用部署两份形成集群应用，也就是“应用A”和“应用B”，代码是同一套代码。如果认证过程是在“应用A”获取的JWT令牌，可以访问“应用B”的接口资源么？
+			B. 答案是：可以。因为两个应用中没有在内存(session)中保存中保存任何的状态信息，所有的信息都是去数据库里面现加载的。所以只要这两个应用，使用同一个数据库、
+			同一套授权数据、同一个用于签名和解签的secret。就可以实现“应用A”的认证、在“应用B”中被承认。
+			C. 对于上面的集群应用，“应用A”和“应用B”实际上是一份代码部署两份。如果“应用A”和“应用B”是真正的两套代码的部署结果呢？答案仍然是可以。前提是你的认证Controller
+			代码和鉴权Filter代码的实现逻辑是一样的、校验规则是一样的。使用同一个数据库、同一套授权数据、同一个用于签名和解签的secret。所以JWT服务端应用可以很容易的扩展。
+		③ 独立的授权服务
+			A. 基于JWT的这种无状态的灵活性，它很容易实现应用横向扩展。只要具备以下条件任何JWT的应用都可以整合为一个应用集群。
+				a. 认证Controller代码统一
+				b. 鉴权Filter代码统一、校验规则是一样的。
+				c. 使用同一套授权数据
+				d. 同一个用于签名和解签的secret。
+			B. 基于这个条件前提，我们完全可以把认证Controller代码单独抽取出来，形成“认证服务器”。如下图所示：
+			C. 或者我们还可以进一步把所有的Jwt验证鉴权Filter代码单独抽取出来，形成“服务网关”，放在接口资源的前端。当然“服务网关”的功能不只是鉴权、还要有请求转发的功能。
+			D. 最后剩下的一系列的“接口资源”，实际上就是我们常说的“资源服务器”。
+
