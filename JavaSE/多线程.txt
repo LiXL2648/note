@@ -1,0 +1,240 @@
+多线程：
+	1. 程序、进程、线程的概念
+	2. java中多线程的创建和使用
+		A. 继承Thread类和Runnable接口
+		B. Thread类的主要方法
+		C. 线程的调度与设置优先级
+	3. 线程的声明==生命周期
+	4. 线程的同步
+	5. 线程的通讯
+一、基本概念：程序-进程-线程
+	1. 程序（program）是为了完成任务、用某种语言编写的一组指令的集合。即值一段静态的代码，静态对象
+	2. 进程（process）是程序的一次执行过程，或是正在运行的一个程序。动态过程：有它自身的产生、存在和消亡的过程
+	3. 线程（Thread） 进程可进一步细化为线程，是一个程序内部的一条执行路径
+		若一个程序可同一时间执行多个线程，就是支持多线程的
+	4. 何时需要多线程
+		A. 程序需要同时执行两个或者多个程序
+		B. 程序需要实现一些需要等待的任务时，如用户输入、文件读写操作、网络操作、搜索等
+		C. 需要一些后台运行的程序时
+二、多线程的创建和启动
+	1. java语言的JVM允许程序运行多个线程，它通过java.lang.Thread类来实现。
+	2. Thread类的特性
+		A. 每个线程都是通过某个特定Thread对象的run()方法来完成操作的，经常把run()方法的主体称为线程体
+		B. 通过该Thread对象的start()方法来调用这个线程
+三、java.lang.Thread类
+	1. 创建多线程的第一种方式，继承与java.lang.Thread类
+		A. 创建一个继承于Thread的子类
+		B. 重写Thread类的run()方法，方法内实现此子类需要完成的功能
+		C. 创建一个子类的对象
+		D. 调用线程的start()方法：启动此线程；调用相应的run()方法。
+		E. 一个线程只能执行一次start()方法、不能通过通过Thread类的继承继承类对象run()启动一个线程
+	2. Thread的常用方法：
+		A. start()方法：启动线程并且执行相应的run()方法
+		B. run()：子线程要执行的代码放入run()方法中
+		C. currentThread()：静态的，调用当前的线程
+		D. getName()：获取此线程的名字
+		E. setName()：设置此线程的名字
+		F. yieId()：调用此方法的线程释放当前的CPU的执行权
+		G. join()：在一个线程中调用另一个线程的join()方法，表示当执行到此方法时，当前线程停止执行，直到另一个线程执行完毕，当前线程重新执行
+		H. isAlive()：判断当前线程是否存活
+		I. sleep(long l)：显示的让当前线程睡眠l毫秒
+		J.  设置线程的优先级
+			getPriority()：返回线程优先级值
+			setPriority(int newPriority)：设置线程的优先级
+四、Runnable接口：
+	1. 创建一个实现Runnable接口的类
+	2. 实现Runnable接口的抽象方法，实现某个功能
+	3. 创建Runnable接口实现类的对象
+	4. 将此对象作为形参传递到Thread的构造器中，创键Thread类的对象，此对象即为一个线程
+	5. 调用start()方法，启动线程
+五、java.lang.Thread类和Runnable接口区别于联系
+	联系：继承Thread类和实现Runnable接口的类直接或者间接地实现了Runable接口
+	区别：实现Runnable接口实现多线程的方式由于继承Thread类的方式
+			1. 避免了java中单继承的局限性
+			2. 解决了多个线程公用同一个资源的问题
+六、使用多线程的优点：
+	背景：只使用单个线程完成多个任务（调用多个方法），肯定比用多个线程来完成的时间更短，为何仍需多线程
+	多线程的优点：
+		1. 提高应用程序的响应。对图形化界面更有意义，可增强用户的体验
+		2. 提高计算机系统CPU的利用率
+		3. 改善程序结构。将既长又复杂的进程分为多个线程，独立运行，利于理解和修改
+七、线程的分类		
+	java中线程分为两类：一种是守护线程，一种是用户线程。
+	1. 它们在几乎每个方面都是相同，唯一区别是判断JVM何时离开
+	2. 守护线程是用来服务用户线程的，可以在start()方法前调用thread.setDaemon(true)可以把一个用户线程变成一个守护线程
+	3. Java垃圾回收就是一个典型的守护线程。
+	4. 若JVM中都是守护线程，当前JVM将推退出
+八、线程的生命周期
+	JDK中用Thread.State枚举表示了线程的几种状态
+	1. 要想实现多线程，必须在主线程中创建新的线程对象。java语言使用Thread类及其子类的对象表示线程，在它的一个完整的生命周期中通常要经历如下的五种状态：
+		A. 新建：当一个Thread类或其子类的对象被声明并创建时，新的线程对象出于新建状态
+		B. 就绪：出于新建状态的线程被start()后，将进入线程队列等待CPU时间片，此时它已具备运行的条件
+		C. 运行：当就绪的线程被调度并获得处理器资源时，便进入运行状态，run()方法定义了线程的操作和功能
+		D. 阻塞：在某种特殊的情况下，被认为挂起或者执行输入操作时，让出cpu并临时终止自己的执行，进入阻塞状态
+		F. 死亡：线程完成了它的全部工作或者线程被提前强制性地终止。
+  	2. 线程存在安全问题的原因？
+		A. 由于一个线程在操作共享数据过程中，未执行完毕的情况下，另外线程参与进来，导致共享数据存在安全问题
+		
+	3. 如何解决线程的安全问题？
+		A. 必须让一个线程操作共享数据完毕后，其他线程才有机会参与共享数据的操作
+		B. java如何实现线程安全的：线程的同步机制，两种方式
+			方式一：同步代码块
+				synchronized(同步监视器){
+					//需要被同步的代码块（没有操作的数据不需要包进来）（即为操作共享数据的代码）
+				}
+				①共享数据，多个线程共同操作的同一个数据（变量）
+				②同步监视器：由任何一个类的对象来充当，哪个线程获取此监视器，谁就执行大括号里被同步的代码，俗称为锁。
+				③要求：所有的线程公用同一把锁
+				④注：在实现Runnable接口的类中，可将当前对象作为锁，用this表示。
+					  在继承Thread的子类中，慎用当前对象作为锁，因为每次调用子类创建线程的对象都不同，不满足所有线程公用一把锁的要求
+						同样需要创建静态对象左右同步代码块的锁。
+			方式二：同步方法：
+				1. 将操作共享数据的方法声明为synchronized。即此方法为同步方法，能够保证当其中一个线程执行此方法时，
+					其他线程在外等待直至此线程执行完此方法。
+				2. 同步方法也有锁，默认为当前对象（this）
+九、互斥锁：
+	1. 在Java语言中，引入了对象互斥锁死亡概念，来保证共享数据操作的完整性
+		A. 个对象都对应于一个可称为“互斥锁”的标记，这个标记用来保证在任意时刻，只有一个线程访问该对象
+		B. 关键字synchronized来与对象的互斥锁联系。当某个对象用synchronized修饰时，表明该对象在任意时刻只能由一个线程访问
+		C. 同步的局限性：由于同一时间只能有一个线程访问，因此导致程序的执行效率降低
+		D. 同步的方法（非静态的）锁为this
+		E. 同步方法（静态的）锁为当前类本身
+	2. 小结：释放锁的操作
+		A. 当前线程的同步方法、同步代码块执行结束
+		B. 当前线程在同步代码块、同步方法中遇到break、reture终止了该代码块、该方法的继续执行
+		C. 当前线程在同步代码块、同步方法中出现了未处理的Error或者Exception，导致异常结束
+		D. 当前线程在同步代码块、同步方法中执行了线程对象的wait()方法，当前线程赞停，并释放锁
+	3. 不会释放锁的操作
+		A. 线程执行同步代码块或者同步方法时，程序调用了Thread.sleep()、Thread.yieId()方法赞停当前线程的执行
+		B. 线程执行同步代码块时，其他线程调用了该线程的suspend()方法将该线程挂起，该线程不会释放锁（同步监视器）
+			应该尽量避免使用suspend()和resume()来控制线程
+十、线程的死锁问题
+	1. 死锁：不同的线程分别占用对方需要的同步资源不放弃，都在等对方放弃自己需要的同步资源，就形成了线程的死锁
+	2. 解决方法：①专门的算法、原则②尽量减少同步资源的定义
+十一、线程通信
+	1. wait()与notify()和notifyAll()
+		A. wait()：令当前线程挂起并放弃CPU、同步资源，使别的线程可访问并修改共享资源，而当前线程排队等候再次对资源的访问
+		B. notify()：唤醒正在排队等待同步资源的线程中优先级最高者结束等待
+		C. notifyAll()：唤醒正在排列等待资源的所有线程结束等待
+	2. Java.lang.Object提供的这三个方法只有在synchronized方法或者synchronize代码块中才能使用，否则会报java.lang.异常
+十二、生产者、消费者
+	1. 经典问题：生产者、消费者问题
+		 生产者（productor）将产品交给店员（Clerk），而消费者（Customer）从店员处取走产品
+		 店员一次只能持有固定数量的产品（比如20），如果生产者试图生产更多的产品，店员会叫生
+		 产者停一下，如果店里有空位置放产品了再通知生产者继续生产；如果店里的产品没有了，店员
+		 会告诉消费者等一下，如果店里有产品了再通知消费者来取走产品
+	2. 可能出现的问题：
+		生产者比消费者快时，消费者会漏掉一些数据没有取到。
+		消费者比生产快时，消费者会取走相同的数据。
+	3. 问题分析：
+		A. 多线程，生产者消费者有多名
+		B. 共享数据，产品的数量
+		C. 线程通讯，当生产超过20则进入等待，消费继续；当产品小于1则消费等待，生产继续
+	 
+class Clerk{//店员，用于通知生产者跟消费者的生产跟消费活动
+    int production;//共享数据
+
+    public synchronized void produce(){//操作共享数据需要同步机制
+        if(production < 20){//当产品数量小于20，则进入生产活动
+            try {
+                Thread.currentThread().sleep(1000);
+            }catch (InterruptedException e){
+                e.printStackTrace();
+            }
+            production++;
+            notifyAll();//当生产了产品，则唤醒消费者，通知其进入消费等待
+            System.out.println(Thread.currentThread().getName() + ":生产了第" + production + "个产品");
+        }else{//当产品的数量超过20，则进入等待，释放锁
+            try {
+                wait();
+            }catch (InterruptedException e){
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public synchronized void Consume(){//操作共享数据需要同步机制
+        if (production >0){//当产品数量大于0时，消费者允许进入消费活动
+            System.out.println(Thread.currentThread().getName() + ":消費了第" + production + "个产品");
+            try {
+                Thread.currentThread().sleep(1000);
+            }catch (InterruptedException e){
+                e.printStackTrace();
+            }
+            production--;
+            notifyAll();//当消费了产品，则唤醒生产者，通知其进入生产等待
+        }else {//当产品数量低于0时，消费进入等待，释放锁
+            try {
+                wait();
+            }catch (InterruptedException e){
+                e.printStackTrace();
+            }
+        }
+    }
+}
+
+class Productor implements Runnable{//生产者，具有生产功能
+    Clerk c;
+    public Productor(Clerk c){//保证所以生产者线程操作同一数据
+        this.c = c;
+    }
+    public void run(){//重写run()方法，进入生产活动
+        while(true){
+            c.produce();
+        }
+    }
+
+}
+
+class Customer implements Runnable{消费者，具有消费功能
+    Clerk c;
+    public Customer(Clerk c){//保证所有消费者线程操作同意数据
+        this.c = c;
+    }
+    public void run(){//重写run()方法，进入消费活动
+        while (true){
+            c.Consume();
+        }
+    }
+}
+public class TestProductorCustomer {
+    public static void main(String[] args){
+        Clerk c = new Clerk();//保证所有生产者消费者操作同一数据
+        Productor p1 = new Productor(c);
+        Productor p2 = new Productor(c);
+        Customer c1 = new Customer(c);
+        Customer c2 = new Customer(c);
+
+        Thread pt1 = new Thread(p1);
+        Thread pt2 = new Thread(p2);
+        Thread cp1 = new Thread(c1);
+        Thread cp2 = new Thread(c2);
+
+        pt1.setName("生产者1");
+        pt2.setName("生产者2");
+        cp1.setName("消费者1");
+        cp2.setName("消费者2");
+
+        pt1.start();
+        pt2.start();
+        cp1.start();
+        cp2.start();
+    }
+}
+		
+		
+		
+		
+		
+		
+		
+		 
+		
+		
+		
+		
+		
+		
+		
+		
+		

@@ -1,0 +1,207 @@
+集合：1. java集合框架
+      2. Collection 
+      3. Iterator迭代器接口 
+      4. Collection子接口之一：Set接口
+         HashSet LinkedHashSet TreeSet
+      5. Collection子接口之二：List接口
+         ArrayList LinkedList Vector
+      6. Map接口
+         HashMap TreeMap Hashtable
+      7. Collections工具类
+集合的概述：
+	1. 一方面，面向对象语言对事物的体现都是以对象的形式，为了方便对多个对象的操作，就要对对象
+           进行存储。另一方面，实验Array存储对象方面有一些弊端，而java集合就像一种容器，可以动态地
+           把多个对象的引用放入容器中
+        2. java集合类可以用于储存数量不等的多个对象，还可以用于保存具有映射关系的关联数组
+	3. java集合可分为collection和Map两种体系
+		collecttion接口：
+			Set：元素无序化、不可重复的集合
+			List：元素有序化、可重复的集合
+		Map接口：具有映射关系“key-value对”的集合
+如何使用集合：
+	1. 存储对对象可以考虑①数组②集合
+	2. 数组存储对象的特点：String[] str = new String[length];str[i] = .....
+		弊端：①一旦创建，其长度不可变
+		      ②真实的数组存放的对象个数不确定
+	3. 
+collection：1. size():返回集合中元素的个数
+	    2. add(Object obj):在集合中添加元素
+	    3. Collection c = Array.asList(元素1,元素2,...,):Array是实现Collection接口的实现类
+            4. addAll(Collection接口的对象名):向当前集合中添加一个集合中所有的元素
+	    5. isEmpty():判断集合是否为空
+	    6. clear():清空元素
+	    7. System.out.println(引用名)查看集合元素
+	    8. contains(Object obj):判断集合中是否包含指定obj元素，如果包含，则返回true，反之返回false
+		A. 判断的依据，根据元素所在的类的equals()方法
+		B. 明确：如果存入集合中的元素是自定义类的对象。要求：自定义类要重写equals()方法
+	    9. containsAll(引用名):判断当前集合是否包含另一个集合中所有元素
+	    10. retinAll(引用名):求当前集合与形参的交集（共有元素）
+	    11. remove(Object obj):删除集合中的元素，若成功，返回true，否则返回false
+            12. removeAll(引用名):求差集，即从当前集合中删除形参中与当前集合重复的元素
+	    13. equals(Object obj):判断两个对象中的元素是否完全相同
+	    14. toArray():将集合转化为数组需要通过Object的引用来接收
+	    15. iterator():返回一个Iterator接口的实现类的对象，进而实现集合的遍历：Iterator iterator = 引用.interator()
+		遍历集合的方法：方式一：直接打印System.out.println(iterator.next());
+				方式二：利用for循环遍历集合：for(int i=0;i<引用.size();i++){System.out.println(iterator.next());}
+				方式三：使用使用Iterator迭代器遍历集合：hasNext()错误使用“引用.next():java.util.NotSuchElementException”：
+					while(iterator.hasNext()){System.out.println(iterator.next());}
+				方式四：增强for循环实现集合的遍历：for(Object obj : Collection c){System.out.println(obj);}
+List接口：存储有序的，可以重复的元素，List接口的实现类：ArrayList（主要实现类）、LinkedList（对于频繁插入、删除操作）、Vector（古老的实现类，线程安全）
+
+	1. ArrayList类：List接口的主要实现类
+		List接口相对于Collection接口新实现的方法：
+		①void add(int index, Object ele)：在指定的索引位置index添加ele
+		②Object get(int index)：获取指定索引位置index的元素，返回Object类型
+		③boolean addAll(int index, Collection eles)：在指定索引位置index添加集合eles
+		④Object remove(int index)：删除指定索引位置index的元素，返回Object类型
+		⑤Object set(int index, Object obj)：修改指定索引位置index的元素
+		  List常用的方法：
+			增：（add(Object obj)）删：（remove()）改：（set(int index, Object obj)）
+                        查：（get(int index)）插：（add(int index, Object obj)）长度（size()）
+		⑥int indexOf(Object obj)：返回obj在集合中首次出现的位置，没有的则返回-1
+		⑦int lastIndexOf(Object obj)：返回obj在集合中最后一次出现的位置，没有则返回-1
+		⑧List subList(int fromIndex,int toIndex)：返回从fromIndex开始到toIndex结束的左闭右开List子集合
+set接口：存储无序的，不可重复的元素，set接口的实现类：HashSet（主要实现类）、LinkHashSet、treeSet。set中常用方法都是collection下定义的
+	1. 无序性：无序性 != 随机性，真正的无序性指的是元素在底层存储的位置是无序的，根据哈希值来存储
+	2. 不可重复性：当向set中添加相同的元素时，后面加入的元素无法添加
+		说明，要求添加set中元素所在的类，一定要重写equals()和hasCode()方法，进而保证set中元素的不可重复性！
+	3. set中元素使用了哈希算法进行存储：当向set中添加元素时，首先调用对象所在的类中的hasCode()方法，计算此对象的哈希值，此哈希值决
+					    定了此对象在set中的存储位置，若此位置之前没有对象存储，则这个元素直接存储到此位置。若此位
+					    置已有了元素存储，在通过equals()比较两个对象是否相同。如果相同，后一个对象就不能再添加进来
+					    如果不相同，都存储。要求：hasCode()方法要与equals()方法一直。		
+	4. HashSet类：set接口的主要实现类
+	5. LinkedHashSet类：维护了一个添加进集合的顺序，导致当我们遍历LinkedHashSet集合元素时，是按照添加进去的顺序遍历的
+		HashSet和LinkedHashSet的比较：LinkedHashSet插入性能略低于HashSet，但在迭代访问set里的全部元素时具有极好的性能
+	6. TreeSet类：
+		①向TreeSet中添加元素必须是同一个类的
+		②可以按照添加进集合中的元素的指定的顺序遍历：像String类或者包装类按照从小到大的顺序遍历
+		③当自定义类没有实现comparable接口时，向TreeSet中添加自定义类的对象时，会报ClassCaseException
+		④当向TreeSet中添加自定义类对象时，有两种排序方法：自然排序、定制排序
+			A. 自然排序：①要求自定义类需要实现Comparable接口，重写compareTo(Object obj)方法，并确认按照自定义类的哪个属性排列。
+				     ②向TreeSet中添加元素时，首先按照compareTo()方法进行比较，一旦返回0，默认两个对象相同，无法添加到set集合中。
+				     ③当两个对象的compareTo中比较的此属性值相同，程序会认为这两个对象是相同的，进而后一个对象无法添加到set集合中。
+				     ④要求：compareTo()、hasCode()和equals()方法要保持一致。 
+			B. 定制排序：①创建一个实现comparetor接口的类对象
+				     ②重写comparetor的compare()方法，在此compare()方法中，指明按照自定义类的哪个属性进行排序
+				     ③将此对象作为新参传递给TreeSet的构造器中
+				     ④向TreeSet中添加Comparator接口中的compare()方法以及自定义类的对象
+				     ⑤要求compare()、hasCode()和equals()方法保持一致。
+Map接口：1. Map接口与Collection并列存在，用于保存具有映射关系的数据：Key-Value
+	 2. Map中的key和value都可以是任何引用数据类型的数据
+	 3. Map中的key用Set来存放，不允许重复，即同一个Map对象所对应的类，须重写hashCode()和equals()方法
+	 4. 常用String类作为Map的“键”。
+ 	 5. key和value之间存在单向一对一关系，即通过指定的key总能找到唯一的、确定的value。
+
+Map接口的常用方法：主要的实现类：HashMap、LinkedHashMap、TreeMap、Hashtable(子类：Properties)
+	添加、删除操作：
+		1. Object put(Object key, Object value)：向Map中添加一个元素
+		2. Object remove(Object key)：按照指定的key删除此key-value对
+		3. void putAll(Map t)：将一个Map中的所有元素添加到当前Map中
+		4. void clear()：清空Map中的所有元素
+	元视图操作的方法：
+		1. Set keySet()：遍历key集
+		2. Collection values()：遍历value集
+		3. Set entrySet()：遍历Entry集
+	元素查询的操作
+		1. Object get(Object key)：获取指定key的value值，若无此key,则返回null
+		2. boolean containsKey(Object key)：判断是否包含key的Entry
+		3. boolean cantainsValue(Object value)：判断是否包含value的Entry
+		4. int size()：返回集合的长度
+		5. boolean isEmpty()：判断Map是否为空
+		6. boolean equals(Object obj)：
+	如何遍历Map：Map map = new HashMap();
+		1. 遍历key集：
+			Set key = map.keySet();
+		2. 遍历value集：
+			Collection value = map.values();
+		3. 遍历Entry集：
+			方式一：
+				Set key = map.keySet();
+				Object o = map.get(key);
+			方式二：
+				Set key_value = map.entrySet();
+				for(Object obj : key_value){
+					Map.Entry entry = (Map.Entry)o;//Entry是Map中的内部类
+					entry.getKey();
+					entry.getValue();
+				}
+	HashMap类：主要实现类
+		A. Map接口的常用实现类：HashMap、LinkedHashMap、TreeMap和Properties
+		B. HashMap是Map接口使用最频繁的实现类
+		C. 允许使用null键和null值，与HashSet一样，不保证映射的顺序
+		D. HashMap判断两个key相等的标准是：两个key通过equals()方法返回true，hasCode值也相等
+		E. HashMap判断两个value相等的标准是：两个value通过equals()方法返回true。
+		1. key是用set存放的，不可重复。
+	  	2. value是用collection存放的，可以重复
+		3. 一个key-value对，是一个Entry，所有的Entry是用set存放，也是不可重复
+		4. 向HashMap中添加元素时，会调用key所在类的equals()方法，判断两个key是否相同
+			若相同，则只能添加其中一个，并且是后加入Map的元素。
+	LinkedHashMap:
+		使用链表维护添加进Map中的顺序。故遍历Map时，是按照添加的顺序遍历的
+	TreeMap：
+		1. 按照添加进Map中的元素的key的指定属性进行排序。要求key是同一个类的对象
+		2. 针对key，有两种排序方式：自然排序，定制排序
+
+	Hashtable：
+		1. Hashtable是个古老的Map实现类，线程安全
+		2. 与HashMap不同，Hashtable不允许使用null作为key和value
+		3. 与HashMap一样，Hashtable也不能保证其中Key-Value对的顺序
+		4. Hashtable判断两个key相等、两个value相等的标准与HashMap一致
+
+		Properties：Hashtable的子类，常用来处理属性文件，键和值都为String类型的。
+			Properties p = new Properties();//创建Properties对象
+			p.load(new FileInputStream(new File("jdbc.properties")));//读取文件
+			String str = p.getProperty(String s);//通过获取文件的键key得到value值。
+				注：文件需要创建在project下，文件的扩展名为.properties，文件的格式为user=root
+操作集合的工具类：Collections（操作数组的工具类：Arrays）
+	1. Collections是一个操作Set、List和Map等集合的工具类
+	2. Collection中提供了一系列静态方法对集合元素进行排序、查询和修改等操作，还提供了对集合对象
+		设置不可变、对集合对象实现同步控制等方法
+	3. 排序操作：（均为static方法）
+		①reverse(List)：反转List中的元素的顺序
+		②shuffle(List)：对List集合元素进行随机排序
+		③sort(List, Comparator)：根据指定的Comparator产生的顺序对List集合元素进行排序
+		④sort(List)：根据元素的自然顺序对指定List集合元素进行按升序排序
+		⑤swap(List,int,int)：将指定list集合中的i处元素和j处元素进行交互
+	4. 查找、替换
+		①Object max(Collection)：根据元素的自然顺序，返回给定集合中的最大元素
+		②Object max(Collection，Comparator)：根据Comparator指定的顺序，返回给定集合中的最大元素
+		③Object min(Collection)：根据元素的自然顺序，返回给定集合中的最小元素
+		④Object min(Collection，Comparator)：根据Comparator指定的顺序，返回给定集合中的最小元素
+		⑤int frequency(Collection, Object)：返回指定集合中指定元素的出现次数
+		⑥void copy(List dest, List src)：将src中的元素复制到dest中
+			List list1 = new ArrayList();//错误实现，原因是新建的集合长度小于list的长度
+						     //将list赋值给list1会报数组下标越界
+			List list1 = Array.asList(new Object[list.size()]);//正确实现方式
+			Collections.copy(list1,list);
+		⑦boolean replaceAll(List list,Object oidVal,Object newVal)：使用新值替换List对象的所有旧值
+	5. 同步控制
+		Collections类中提供了多个synchronizedXXX()方法，该方法可使将指定集合包装成线程同步的集合，
+			从而可以解决多线程并发访问集合时的线程安全问题
+		synchronizedList(List list)：保证list线程安全
+Enumeration接口：Enumeration接口是Iterator迭代器的“古老版本”
+		hasMoreElements()：对应Iterator迭代器的hasNext()方法
+		nextElement()：对应Iterator迭代器的next()方法		
+		Enumeration stringEnum = new StringTokenizer("a-b*c-d-e-g","-");
+		while(stringEnum.hasMoreElements()){
+			Object o = stringEnum.nextElement();
+		}
+作业：1. 请从键盘随机输入10个整数保存到list中，并按倒序、从小到大的顺序显示出来
+
+
+      2. 请把学生名与考试分数存到Map中，并按照分数显示前三名成绩学员的名字
+
+
+面试题：String[] str = new String[]{"AA","BB","DD"};
+        for(int i = 0; i < str.length; i++){
+		str[i] = i + "";
+	}
+	for(String s : str){
+		s = i + "";
+	}
+        请问str有发生改变吗？      
+	区分Collection和Collections：
+		Collection是一个接口，跟存储数据相关可以考虑使用Collection接口，继承Collection接口的有List接口和Set接口
+			List接口是有序的可重复性的，而Set接口是无序的不可重复性的。
+		Collections是一个操作List、Set和Map的工具类，Collections提供了一系列静态方法对集合元素进行排序、查询和修
+			等操作，还可以设置集合对象不可变、对集合对象实现同步控制等方法
