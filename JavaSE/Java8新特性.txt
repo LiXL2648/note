@@ -143,50 +143,257 @@
 		③ Lambda表达式需要“函数式接口”的支持
 			A. 函数式接口：接口中有只有一个抽象方法，则称为“函数式接口”
 			B. 可以使用@FunctionalInterface注解检查其标注的接口是否为“函数式接口”
-		④ 练习：对一个数进行数学运算
-			public interface MyFunction<T> {
+		④ 练习：
+			A. 对一个数进行数学运算
+				public interface MyFunction<T> {
 
-				T operator(T t);
-			}
+					T operator(T t);
+				}
 		
-			MyFunction<Integer> myFunction = x -> x * x;
-			System.out.println( myFunction.operator(10));
+				MyFunction<Integer> myFunction = x -> x * x;
+				System.out.println( myFunction.operator(10));
+			B. 调用Collections.sort()方法，通过定制排序比较两个Employee（先按照年龄比，年龄相同按姓名比），使用Lambda作为参数传递
+				@Test
+				public void test5() {
+					Collections.sort(list, (e1, e2) -> {
+						if (e1.getAge() == e2.getAge()) {
+							return e1.getEmpName().compareTo(e2.getEmpName());
+						} else {
+							return Integer.compare(e1.getAge(), e2.getAge());
+						}
+					});
+					list.forEach(System.out::println);
+				}
+			C.  声明函数式接口，接口中声明抽象方法，在测试类中，编写方法使用接口作为参数，将一个字符串转成大写，并作为返回值。再将该字符串进行截取
+				@Test
+				public void test6() {
+					String value = getValue("LiXL&YuCX", str -> str.toUpperCase());
+					value = getValue(value, str -> str.substring(0, 4));
+					System.out.println(value);
+				}
 
+				
+				private <T> T getValue(T t, MyFunction<T, T> myFunction) {
+					return myFunction.operator(t);
+				}
+				
+				public interface MyFunction<T, R> {
 
+					R operator(T ... t);
+				}
+			D.  声明一个带两个泛型的函数式接口，泛型类型为<T, R>，T为参数，R为返回值，接口中声明抽象方法，在测试类中，使用该接口作为参数，计算两个long类型的和，
+			再计算两个long类型的乘积
+				public void test7() {
+					Integer sum = getValue(args -> args[0] + args[1], 26, 48);
+					System.out.println(sum);
+					Integer mul = getValue(args -> args[0] * args[1], 26, 48);
+					System.out.println(mul);
+				}
+				
+				private <T> T getValue(MyFunction<T, T> myFunction, T ... t) {
+					return myFunction.operator(t);
+				}
+				
+				public interface MyFunction<T, R> {
 
+					R operator(T ... t);
+				}
+二. 函数式接口
+	1. 四大内置的核心函数式接口：
+		① Consumer<T>：
+			A. 消费型接口
+			B. 抽象方法：void accept(T t);
+			C. 举例：
+				public void testConsumer() {
+					consume(100D, menoy -> System.out.println("其次消费总共花费 " + menoy + " 元"));
+				}
 
+				public void consume(Double money, Consumer<Double> consumer) {
+					consumer.accept(money);
+				}
+		② Supplier<T> ：
+			A. 供给型接口
+			B. 抽象方法：T get();
+			C. 举例：
+				@Test
+				public void testSupplier() {
+					List<Integer> list = supplie(10, () -> (int) (Math.random() * 100));
+					list.forEach(System.out::println);
+				}
 
+				private List<Integer> supplie(int num, Supplier<Integer> supplier) {
+					List<Integer> list = new ArrayList<>();
+					for (int i = 0; i < num; i++) {
+						Integer value = supplier.get();
+						list.add(value);
+					}
+					return list;
+				}
+		③ Function<T, R>：
+			A. 函数型接口
+			B. 抽象方法：R apply(T t);
+			C. 举例：
+				@Test
+				public void testFunction() {
+					String result = strHandler("LiXL", str -> str.toUpperCase());
+					System.out.println(result);
+				}
 
+				public String strHandler(String str, Function<String, String> function) {
+					return function.apply(str);
+				}
+		④ Predicate<T>：
+			A. 断言型接口
+			B. 抽象方法：boolean test(T t);
+			C. 举例：
+				@Test
+				public void testPredicate() {
+					List<String> list = Arrays.asList("LiXL", "LiXC", "LiXY", "LiLX", "YuCX");
+					List<String> newList = filter(list, str -> str.startsWith("Li"));
+					System.out.println(newList);
+				}
 
+				private List<String> filter(List<String> list, Predicate<String> predicate) {
+					List<String> newList = new ArrayList<>();
+					list.forEach(str -> {
+						if (predicate.test(str)) {
+							newList.add(str);
+						}
+					});
+					return newList;
+				}
+	2. 其他接口
+		① BiFunction<T, U, R>：
+			A. 参数类型：T,U
+			B. 返回值类型：R
+			C. 用途：对类型为 T，U 参数应用操作，返回 R 类型的结果。包含方法 R apply(T t, U u)
+		② UnaryOperator<T>（Function<T, R> 的子接口）
+			A. 参数类型：T
+			B. 返回值类型：T
+			C. 对类型为 T 的对象进行一元运算，并返回类型为 T 的结果，包含方法为 T apply(T t)
+		③ BinaryOperator<T>（BiFunction<T, U, R>的子接口）：
+			A. 参数类型：T，T
+			B. 返回值类型：T
+			C. 对类型为 T 的对象进行二元运算，并返回类型为 T 的结果，包含方法为 T apply(T t1, T t2)
+		④ BiConsumer<T, U>
+			A. 参数类型：T，U
+			B. 返回值类型：void
+			C. 对类型为 T，U 的参数进行操作，包含方法为 void accept(T t, U u);
+		⑤ ToIntFunction<T>，ToLongFunction<T>，ToDoubleFunction<T>
+			A. 参数类型：T，T
+			B. 返回值类型：分别为 int，long，double
+			C. 分别计算 int，long，double，值的函数
+		⑥ IntFunction<R>，LongFunction<R>，DoubleFunction<R>
+			A. 参数类型：分别为 int，long，double
+			B. 返回值类型：R
+			C. 参数分别为 int，long，double的函数
+		⑦ BiPredicate<T, U>
+			A. 参数类型：T，U
+			B. 返回值类型为boolean
+三. 方法引用和构造器引用
+	1. 方法引用
+		① 若Lambda体中的内容有方法已经实现，我们可以使用“方法引用”（可以理解为方法引用是Lambda表达式的另一种变现形式）
+		② 主要有三种语法格式：
+			A. 对象::实例方法名
+				Consumer<String> consumer = x -> System.out.println(x);
+				consumer.accept("Hello");
 
+				Consumer<String> consumer1 = System.out::println;
+				consumer1.accept("Hello World!");
+				
+				Employee employee = list.get(0);
+				Supplier<String> supplier = employee::getEmpName;
+				System.out.println(supplier.get());
+			B. 类::静态方法名
+				Comparator<Integer> com = (x, y) -> Integer.compare(x, y);
+				int compare = com.compare(48, 26);
+			   
+				Comparator<Double> com1 = Double::compare;
+				int compare1 = com1.compare(26D, 48D);
+			C. 类::实例方法名
+				BiPredicate<String, String> bp = (x, y) -> x.equalsIgnoreCase(y);
+				System.out.println(bp.test("LiXL", "lixl"));
 
+				BiPredicate<String, String> bp1 = String::equals;
+				System.out.println(bp1.test("LiXL", "LiLX"));
+		③ 注意：
+			A. 进行方法引用时，Lambda体中调用方法的参数列表与返回值类型，需要与函数型接口中的抽象方法的参数列表和返回值保持一致
+			B. 若Lambda的参数列表列表的第一个参数是方法的调用者，而第二个参数是实例方法的参数时，可以使用类名::实例方法。
+	2. 构造器引用
+		① 语法：类名::new
+		② 举例：
+			Supplier<Employee> supplier = () -> new Employee();
+			System.out.println(supplier.get());
 
+			Supplier<Employee> supplier1 = Employee::new;
+			System.out.println(supplier1.get());
+			
+			Function<String, Employee> fun = x -> new Employee(x);
+			System.out.println(fun.apply("LiXL"));
 
+			Function<String, Employee> fun1 = Employee::new;
+			System.out.println(fun1.apply("LiLX"));
+		② 注意: 进行构造器引用时，Lambda体中调用构造器的参数列表与返回值类型，需要与函数型接口中的抽象方法的参数列表和返回值保持一致
+	3. 数组引用：
+		① 语法：Tyep::new
+		② 举例：
+			Function<Integer, String[]> fun = x -> new String[x];
+			System.out.println(fun.apply(10).length);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+			Function<Integer, String[]> fun1 = String[]::new;
+			System.out.println(fun1.apply(20).length);
+四.	强大的 Stream API
+	1. 了解Stream
+		① Java8 中有两大最为重要的改变，第一个就是 Lambda 表达式；另外一个则是 Steam API（java.util.stream.*）
+		② Steam 是Java8 中处理集合的关键抽象概念，它可以指定你希望对集合进行的操作。可以执行非常复杂的查找，过滤和映射数据等操作。
+		③ 使用Stream API 对集合进行操作，就类似于使用SQL执行的数据查询。也可以使用 Stream API来并行执行操作。简而言之 Stream API 
+		提供了一种高效且易于使用的处理数据的方式
+	2. 什么是Stream
+		① 流（Stream）：是数据渠道，用于操作数据源（集合，数组等）所生成的元素序列。“集合讲的是数据，流讲的是计算”
+		② 注意：
+			A. Stream 自己不会存储元素
+			B. Stream 不会改变源对象。相反，他们会返回一个持有结果的新Stream。
+			C. Stream 操作是延迟执行的，这意味着他们会等到需要结果的时候才执行，
+	3. Stream 的三个操作步骤
+		① 创建Stream：一个数据源（如：集合，数组），获取一个流
+		② 中间操作：一个中间操作链，对数据源的数据进行处理
+		③ 中止操作（终端操作）：一个终止操作，执行中间操作链，并产生结果
+	4. 创建Stream
+		① Java 8 中的Collection接口被扩展，提供了两个获取流的方法
+			A. default Stream<E> stream()：返回一个顺序流
+			B. default Stream<E> parallelStream()：返回一个并行流
+			C. 举例：
+				List<Employee> emps = new ArrayList<>();
+				Stream<Employee> stream = emps.stream();
+				Stream<Employee> parallelStream = emps.parallelStream();
+		② 由数组创建流
+			A. Java 8 中的 Arrays的静态方法 stream()可以获取数组流
+				static <T> Stream<T> stream(T[] array)：返回一个流
+			B. 重载形式，能够处理对应基本类型的数组
+				a. public static IntStream stream(int[] array)
+				b. public static LongStream stream(long[] array)
+				c. public static DoubleStream stream(double[] array)
+			C. 举例
+				Employee[] employees = new Employee[10];
+				Stream<Employee> stream1 = Arrays.stream(employees);
+		③ 通过Stream类中的静态方法of()
+			A. static<T> Stream<T> of(T... values)
+			B. 举例
+				Stream<String> stream2 = Stream.of("LiXL", "LiLX");
+		④ 创建无限流
+			A. 迭代：
+				a. static<T> Stream<T> iterate(final T seed, final UnaryOperator<T> f)
+				b. 举例
+					Stream<Integer> stream3 = Stream.iterate(0, x -> x + 2);
+					stream3.limit(10).forEach(System.out::println);
+			B. 生成：
+				a. static<T> Stream<T> generate(Supplier<T> s)
+				b. 举例
+					Stream<Integer> stream4 = Stream.generate(() -> (int) (Math.random() * 10000));
+					stream4.limit(10).forEach(System.out::println);
+	5. 中间操作
+		① 多个中间操作可以连接起来形成一个流水线，除非流水线上触发终止操作，否则中间操作不会执行任何处理！而在终止操作时一次性全部处理，
+		称为“惰性求值”
 
 
 
