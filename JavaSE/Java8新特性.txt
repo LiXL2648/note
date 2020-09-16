@@ -393,23 +393,72 @@
 					stream4.limit(10).forEach(System.out::println);
 	5. 中间操作
 		① 多个中间操作可以连接起来形成一个流水线，除非流水线上触发终止操作，否则中间操作不会执行任何处理！而在终止操作时一次性全部处理，
-		称为“惰性求值”
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+		称为“惰性求值”或则“延迟加载”
+		② 筛选与切片
+			A. Stream<T> filter(Predicate<? super T> predicate);
+				a. 接收Lambda，从流中排除某些元素
+				b. 举例：
+					list.stream().filter(e -> e.getGender() == 1)
+							.forEach(System.out::println);
+				c. 过滤后会产生一个新流，但是不会执行任何操作，终止操作时会一次性执行全部内容
+				d. 内部迭代：迭代操作由Stream API 完成
+				e. 外部迭代：
+					Iterator<Employee> iterator = list.iterator();
+					while (iterator.hasNext()) {
+						System.out.println(iterator.next());
+					}
+			B. Stream<T> distinct();
+				a. 筛选，通过流所生成元素的 hashCode() 和 equals() 去除重复元素
+				b. 举例：
+					list.stream()
+							.filter(e -> e.getSalary() > 7000)
+							.distinct()
+							.forEach(System.out::println);
+				c. 需要重写 equals() 和hashCode() 方法
+			C. Stream<T> limit(long maxSize);
+				a. 截断流，使其元素不超过给定的数量
+				b. 举例：
+					list.stream()
+							.filter(e -> e.getSalary() > 7000)
+							.limit(2)
+							.forEach(System.out::println);
+				c. 若迭代次数满足条件，则会出现短路现在，即满足条件往后得迭代将不执行
+			D. Stream<T> skip(long n);
+				a. 跳过元素，返回一个扔掉前 n 个元素的流。若流中的元素不足 n 个，则返回一个空流。与limit(long maxSize)互补
+				b. 举例：
+					list.stream()
+							.filter(e -> e.getSalary() > 7000)
+							.skip(2)
+							.forEach(System.out::println);
+		③ 映射
+			A. <R> Stream<R> map(Function<? super T, ? extends R> mapper);
+				a. 接收一个函数作为参数，该函数会被应用到每个元素上，并将其映射成一个新的元素
+			B. IntStream mapToInt(ToIntFunction<? super T> mapper);
+				a. 接收一个函数作为参数，该函数会被应用到每个元素上，产生一个新的IntStream
+			C. LongStream mapToLong(ToLongFunction<? super T> mapper);
+				a. 接收一个函数作为参数，该函数会被应用到每个元素上，产生一个新的LongStream
+			D. DoubleStream mapToDouble(ToDoubleFunction<? super T> mapper);
+				a. 接收一个函数作为参数，该函数会被应用到每个元素上，产生一个新的DoubleStream
+			E. <R> Stream<R> flatMap(Function<? super T, ? extends Stream<? extends R>> mapper);
+				a. 接收一个函数作为参数，将流中的每个值都换成另一个流，然后把所有流连接成一个流
+		④ 排序
+			A. Stream<T> sorted();
+				a. 产生一个新流，其中按自然顺序排序
+			B. Stream<T> sorted(Comparator<? super T> comparator);
+				a. 产生一个新流，其中按比较器顺序排序
+	6. 终止操作
+		① 终端操作会从流的流水线生成结果。其结果可以是任何不是流的值，例如：List，Integer，甚至是void
+		② 查找与匹配
+			A. boolean allMatch(Predicate<? super T> predicate);
+				a. 检查是否匹配所有元素
+			B. boolean anyMatch(Predicate<? super T> predicate);
+				a. 检查是否至少匹配一个元素
+			C. boolean noneMatch(Predicate<? super T> predicate);
+				a. 检查是否没有匹配所有元素
+			D. Optional<T> findFirst();
+				a. 返回第一个元素
+			E. Optional<T> findAny();
+				a. 返回当前流中的任意元素
 
 
 
