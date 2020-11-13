@@ -1,0 +1,438 @@
+一、Ajax概述
+	1. Ajax的技术产生
+		①Ajax被认为是（Asynchronous JavaScript and XML的缩写）。现在，允许浏览器与服务器通信而无须刷新页面的技术都叫做Ajax
+		②“Ajax”这个名字是在2005年2月，Adaptive Path的Jesse James Garrett在他的文章Ajax:A New Approach to Web Application中创造。
+		③而Ajax这项技术，是Google在Google Labs发布Google Maps和Google Suggest后真正为人所认识
+	2. 什么是Ajax：一种不用刷新整个页面便可与服务器通讯的办法
+		①Web传统模型：客户端向服务器发送一个请求，服务器返回整个页面，如此反复
+		②Ajax模型中：数据在客户端与服务器之间独立传输，服务器不再返回整个页面
+		③不用刷新整个页面便可与服务器通讯的方法
+			A. Flash
+			B. Java applet
+			C. 框架：如果使用一组框架构造了一个网页，可以只更新其中一个框架，而不必惊动整个页面
+			D. 隐藏的iframe
+			E. XMLHttpRequest：该对象时对JavaScript的一个扩展，可使网页与服务器进行通信，是创建Ajax应用的最佳选择。
+			实际上通常把Ajax当成XMLHttpRequest对象的代名词
+	3. Ajax的工作原理图
+		客户端    《======》    传输   《======》    服务器
+		XHTML				协议：xmlhttp			Java等语言
+		css					载体：文本、xml、json	输出结果
+		JavaScript
+	4. Ajax工具包：Ajax并不是一项新技术，它实际上是几种技术，每种技术各尽其职，以一种全新的方式聚合在一起
+		①服务器端语言：服务器需要具备向浏览器发送待定信息的能力，Ajax与服务器语言无关
+		②XML（eXtensible Markup Language，可扩展标记语言）是一种描述数据的格式，Ajax程序需要某种格式化的格式来在服务器和客户端之间传递信息，XML是其中一种选择
+		③XHTML（eXtended Hypertext Markup Language，使用扩展超媒体标记语言）和CSS（Caseading Style Sheet，级联样式单）标准化呈现；
+		④DOM（Document Object Method， 文档对象模型）实现动态显示和交互；
+		⑤使用XMLHttpRequest对象进行异步数据读取
+		⑥使用JavaScript绑定和处理所有数据
+	5. Ajax的缺陷：Ajax不是完美的技术。使用Ajax，它的一些缺陷不得不衡量一下：
+		①有JavaScript和Ajax引擎导致的浏览器的兼容（今基本已经解决）
+		②页面局部刷新，导致后退等功能失效
+		③对流媒体的支持没有Flash、Java Applet好
+		④一些手持设备（如手机、PDA等）支持性差
+二、 XMLHttpRequest的概述
+	1. XMLHttpRequest对最早是在IE5中以ActiveX组件的形式实现的。非W3C标准
+	2. 创建XMLHttpRequest对象（由于非标准所以实现方法不统一）
+		①Internet Explorer把XMLHttpRequest实现为一个ActiveX对象
+		②其他浏览器（Firebox、Safari、Opera...）把它实现为一个本地的JavaScript对象
+		③XMLHttpRequest在不同浏览器上的实现是兼容的，所以可以用同样的方式访问XMLHttpRequest实例的属性和方法
+		而无论这个实例创建的方法是什么。 
+	3. 创建XMLHttpRequest对象
+		①为了每次写Ajax的时候都节省一点时间，可以把对象检测的内容打包成一个可以复用的函数
+			function getHTTPObject() {
+				var xhr = false;
+				if(window.XMLHttpRequest) {
+					xhr = new XMLHttpRequest();
+				}else if(window.ActiveXObject) {
+					xhr = new ActiveXObject("Microsoft.XMLHTTP");
+				}
+				return xhr;
+			}
+		②说明：对window.XMLHttpRequest的调用会返回一个对象或者null，if语句会把调用返回的结果看做是true或者false（如果返回对象则是
+		true，返回null则是false）。如果XMLHttpRequest对象存在，则把xhr的值设为该对象的新实例。如果不存在，就去检测ActiveXObject的实例是否存在，
+		如果答案是肯定的，则把微软XMLHTTP的新实例赋给xhr
+三、XMLHttpRequest的API
+	1. XMLHttpRequest的方法：
+		①abort(): 停止当前请求
+		②getAllResponseHeaders(): 把HTTP请求的所有响应首部作为键/值对返回
+		③getResponseHeaders("header"): 返回指定首部的串值
+		*④open("method", "url"): 建立对服务的调用。Method参数可以是GET、POST或者PUT。url参数可以是相对URL或者绝对URL。
+		*⑤send(content): 向服务器发送请求
+		*⑥setRequestHeader("header", "value"): 把指定首部设置为所提供的值，在设置任何首部之前必须先调用open()
+	2. XMLHttpRequest的属性：
+		*8①onreadystatechange: 每个状态改变是都会触发这个事件处理器，通常会调用一个JavaScript函数
+		*②readyState: 请求的状态，有5个可选值；0=未初始化、1=正在加载、2=已经加载、3=交互中、4=完成。
+		*③responseText: 服务器的响应，表示为一个串
+		*④responseXML: 服务器的响应，表示为XML。这个对象可以解析为DOM对象
+		*⑤status: 服务器的HTTP状态码（200对应OK， 404对应NotFount等）
+		*⑥statusText: HTTP状态码的相应文本（OK或者NotFount等）
+四、发送请求
+	1. 利用XMLHttpRequest实例与服务器进行通信包含以下3个关键的部分
+		①onreadystatechange事件处理函数
+		②open()
+		③send()
+	2. onreadystatechange:
+		①该事件处理函数由服务器触发，而不是用户
+		②在Ajax执行过程中，服务器会通知客户端当前的通信状态，这依靠更新XMLHttpRequest对象的readyState来实现，
+		改变readyState属性是服务器对客户端连接操作的一种方式。每次readyState属性的改变都会触发readystatechange事件
+	3. open(method, url, asynch):
+		①XMLHttpRequest对象的open方法允许程序员用一个Ajax调用向服务器发送请求
+		②method：请求类型，类似“GET”或者“POST”的字符串。若只想从服务器检索一个文件，而不需要发送任何数据，使用
+		GET（可以在GET请求里通过附件在url上的查询字符串来发送数据，不过数据大仙限制为2000个字符）。若需要向服务器发送数据，用POST请求
+		③在某些情况下，有些浏览器会把多个XMLHttpRequest请求的结果缓存在同一个URL。如果对每个请求的响应不同，就会带来不好的结果，在此将时间戳
+		追加到URL的最后，就能确保URL的唯一性，从而避免浏览器缓存结果。
+		④url：路径字符串，指向你锁清秋的服务器上的那个文件，可以是绝对路径，也可以是相对路径
+		⑤asynch: 表示请求是否要异步传输，默认值为true，指定为true，在读取后面的脚本之前，不需要等待服务器的响应。指定为false，当脚本处理过程经过
+		这点事，会停下来，一直等到Ajax请求执行完毕再继续执行。一般不使用该属性。
+	4. send(data):
+		①open方法定义了Ajax请求的一些细节，send方法可为已经待命的请企业发送指令
+		②data：将要传递给服务器的字符串。
+		③若选用的是GET请求，则不会发送任何数据，给send方法传递null即可：request.send(null);
+		④当向send()方法提供参数时，要确保open()中指定的方法是POST，如果没有数据作为请求体的一部分发送，则使用null
+	5. setRequestHeader(header, value)
+		①当浏览器向服务器请求页面时，它会伴随着这个请企业发送一组首部信息，这些首部信息是一系列描述请求的元数据（metadata）。首部信息用来声明一个请求是GET或者POST
+		②Ajax请求中，发送首部信息的工作可以有setRequestHeader(header, value)来完成
+			A. header：首部的名称
+			B. value： 首部的值
+		③如果用POST请求向服务器发送数据，需要将“ContentType”的首部信息设置为“application/x-www-form-urlencoded”。它会告知服务器正在发送数据，并且数据已经符合URL编码了
+		④该方法必须在open()之后才可以使用
+	6. 完成的Ajax的GET请求
+		window.onload = function() {
+		
+			//1. 获取a节点，并为其添加onclick响应函数
+			document.getElementsByTagName("a")[0].onclick = function() {
+				
+				//3. 创建一个XMLHttpRequest对象
+				var request = new XMLHttpRequest();
+				
+				//4. 准备发送请求的数据：url，为确保url唯一性，通常在url后面追加时间戳
+				var url = this.href + "?time=" + new Date();
+				var method = "GET";
+				
+				//5. 调用XMLHttpRequest对象的open()方法
+				request.open(method, url);
+				
+				//6. 调用XMLHttpRequest对象的send()方法
+				request.send(null);
+				
+				//alert("hello");
+				
+				//7. 为XMLHttpRequest对象添加onreadystatechange响应函数
+				request.onreadystatechange = function() {
+				//8. 判断 响应是否完成：XMLHttpRequest对象的readystate属性值为4的时候
+					if(request.readyState == 4) {
+					//9. 再判断响应是否可用：XMLHttpRequest对象的status属性值为200
+						if(request.status == 200 || request.status == 304) {
+							//10.打印响应的结果：responseText
+							alert(request.responseText);
+						}
+					}
+				}
+				
+				//2. 取消a节点的默认行为
+				return false;
+			}
+		}
+	7. 完成Ajax的POST请求
+		window.onload = function() {
+		
+			//1. 获取a节点，并为其添加onclick响应函数
+			document.getElementsByTagName("a")[0].onclick = function() {
+				
+				//3. 创建一个XMLHttpRequest对象
+				var request = new XMLHttpRequest();
+				
+				//4. 准备发送请求的数据：url，为确保url唯一性，通常在url后面追加时间戳
+				var url = this.href + "?time=" + new Date();
+				var method = "POST";
+				
+				//5. 调用XMLHttpRequest对象的open()方法
+				request.open(method, url);
+				
+				//使用POST请求方式需要通过setRequestHeader(header, value)设置首部信息
+				//即需要将“ContentType”的首部信息设置为“application/x-www-form-urlencoded”
+				request.setRequestHeader("ContentType", "application/x-www-form-urlencoded");
+				
+				//6. 调用XMLHttpRequest对象的send()方法
+				request.send("name='Li'");
+				
+				//alert("hello");
+				
+				//7. 为XMLHttpRequest对象添加onreadystatechange响应函数
+				request.onreadystatechange = function() {
+				//8. 判断 响应是否完成：XMLHttpRequest对象的readystate属性值为4的时候
+					if(request.readyState == 4) {
+					//9. 再判断响应是否可用：XMLHttpRequest对象的status属性值为200
+						if(request.status == 200 || request.status == 304) {
+							//10.打印响应的结果：responseText
+							alert(request.responseText);
+						}
+					}
+				}
+				
+				//2. 取消a节点的默认行为
+				return false;
+			}
+		}
+五、接受响应
+	1. 用XMLHttpRequest对象的方法可向服务器发送请求。在Ajax处理过程中，XMLHttpRequest的如下属性可被服务器更改
+		①readyState
+		②status
+		③responseText
+		④responseXML
+	2. readyState：
+		①readyState属性表示Ajax请求的当前状态，它的值用数字表示。
+			A. 0：代表未初始化。还没有调用open()方法
+			B. 1：代表正在加载。open()方法已被调用，但是send()方法还没有被调用
+			C. 2：代表已加载完毕。send已经被调用。请求开始
+			D. 3：代表交互中。服务器正在发送响应
+			E. 4：代表完成。响应发送完毕
+		②每次readyState值的改变，都会触发readyStatechange事件，如果把onreadystatechange事件处理函数赋给一个函数，
+		那么每次readyState值的改变都会引发该函数的执行
+		③readyState值的变化会因浏览器的不同而有所差异。但是，当请求结束的时候，每个浏览器都会把readyState的值统一设为4.
+	3. status：
+		①服务器发送的每一个响应也都带有首部信息，三位数的状态码是服务器发送的响应中最重要的首部信息，并且属于超文本传输协议中的一部分
+		②常用状态码及其含义：
+			①404：没有找到页面（not found）
+			②403：禁止访问（forbidden）
+			③500：内部服务器出错（Internet service error）
+			④200：一切正常（OK）
+			⑤304：没有被修改（not modified）
+		③在XMLHttpRequest对象中，服务器发送的状态码都保存在status属性里。通过把这个属性和200或者304进行比较，可以确保服务器
+		是否已经发送了一个成功的响应
+	4. responseText
+		①XMLHttpRequest的responseText属性包含了从服务器发送的数据。它是一个HTML、XML或者普通文本，这就取决于服务器发送的内容
+		②readyState属性编程4时，responseText属性才可用，表名Ajax请求已经结束
+	5. responseXML：
+		①如果服务器返回的是XML，那么数据将存储在responseXML属性中
+		②只用度武器发送了带有正确首部信息的数据时，responseXML属性才是可用的。MIME类型必须是text/xml。
+六、数据格式提要：
+	1. 在服务器端Ajax是一门与语言无关的技术。在业务逻辑层使用何种服务器端语言都可以
+	2. 从服务器端接受数据的时候，那些数据必须以浏览器能够理解的格式来发送。服务器的编程语言只能以如下3种格式返回数据
+		①XML
+		②JSON
+		③HTML
+	3. 解析HTML
+		①HTML由一些普通文本组成，如果服务器通过XMLHttpRequest发送HTML，文本将存储在responseText属性中
+		②不必从responseText中读取数据。它已经是希望的格式，可以直接把它插入到页面中
+		③插入HTML代码最简单的方法是更新这个元素的innerHTML属性
+		④通过XMLHttpRequest发送HTML小结
+			A. 优点：
+				a. 从服务器端发送的HTML代码在浏览器端不需要使用JavaScript进行解析
+				b HTML的可读性好
+				c HTML代码块与innerHTML属性搭配，效率高
+			B. 缺点：
+				a. 若需要通过Ajax更新一篇文档的多个部分，HTML不合适
+				b. innerHTML并非DOM标准
+	4. 解析XML
+		①由于服务器通过XMLHttpRequest发送XML，文本将存储在responseXML属性中，所以需要使用XMLHttpRequest的responseXML来获取
+		②结果不能直接使用，必须先创建对应的节点，再把节点加入到页面中
+		③通过XMLHttpRequest发送XML小结
+			A.优点：
+				a. XML是一种通用的数据格式
+				b. 不必把数据强加到已经定义好的格式中，而是要为数据自定好合适的标记
+				c. 利用DOM可以完全掌握文档
+			B. 缺点：
+				a. 如果文档来自于服务器，就必须保证文档含有正确的首部信息，若文档类型不正确，那么responseXML属性将为空
+				b. 当浏览器接收到长的XML文件后，DOM解析可能会很复杂。
+	5. 解析JSON
+		①JSON：
+			A. JSON（JavaScript Object Notation），一种简单的数据格式，比XML更轻巧。JSON是JavaScript的原生格式，这意味着在JavaScript中
+			处理JSON不再需要任何特殊的API或者工具包
+			B. JSON的规则很简单，对象是一个无序的“‘名称/值’对”集合，一个对象以“{”（左花括号）开始，以“}”（右花括号）结束。
+			每个“名称”后跟一个“:”（冒号）；“‘名称/值’对之间”使用“,”（逗号）分隔
+			C. JSON示例：
+				var jsonObject = {
+						"name":"Li",
+						"age":24,
+						"address":{
+							"city":"GuangZhou",
+							"school":"ZHKU"
+						},
+						"major":function() {
+							alert("JavaEE");
+						}
+				};
+				
+				alert(jsonObject.name);
+				alert(jsonObject.address.city);
+				jsonObject.major();
+		②JSON只是一种文本字符串，它被存储在responseText属性中
+		③为了读取存储在responseText属性中的JSON数据，需要根据JavaScript的eval语句。函数eval会把一个字符串当做它的参数。
+		然后这个字符串会被当做JavaScript代码来执行。因为JSON的字符串就是由JavaScript代码构成的，所有它本身是可执行的
+			代码示例：
+				//1. 结果为json字符串，所以需要使用responseText来获取
+				var result = request.responseText;
+				
+				//2. 使用eval()转换json字符串为本地可执行的JS代码
+				var jsonResult = eval("(" + result + ")");
+				
+				 //3. 或person对象的属性
+				var name = jsonResult.person.name;
+				var website = jsonResult.person.website;
+				var email = jsonResult.person.email;
+		③JSON提供了json.js包，使用parseJSON()方法将字符串解析成JS对象
+		④通过XMLHttpRequest发送JSON小结
+			A. 优点：
+				a. 作为一种数据传输格式，JSON与XML很相似，但是它更加灵巧
+				b. JSON不需要从服务器端发送含有特性内容类型的首部信息
+			B. 缺点：	
+				a. 语法过于严谨
+				b. 代码不易读
+				c. eval()函数存在风险
+	6. 对比小结：
+		①若应用程序中不需要与其他应用程序共享数据的时候，使用HTML片段来返回数据时是最简单的
+		②如果数据徐亚重用，JSON文件是首选，在其性能和文件大小方面都有优势
+		③当远程应用程序未知时，XML文档是首选，因为XML是web服务领域的“世界语”。
+七、jQuery中的Ajax
+	1. jQuery对Ajax操作进行了封装，在jQuery中最底层的方法是$.ajax(), 第二层是load()、$.get()和$.post(),
+	第三层是$.getScript()和$.getJSON().
+	2. load()方法：
+		①load()方法是jQuery中最为简单和常用的Ajax方法，鞥载入远程的HTML代码并插入到DOM中，它的结构是：
+		load(url[, data][, callback])
+			A. url: String类型，请求HTML页面的URL地址
+			B. data: Object类型, 可选的，发送到服务器的key/value数据
+			C. callback: Function类型，可选的，请求完成时的回调函数，无论是请求成功还是请求失败
+		②程序员只需要使用jQuery选择器为HTML片段指定目标位置，然后将要加载的文件url作为参数传递给load()方法即可。
+		③使用load()实例：
+			$(function() {
+				$("a").click(function() {
+					var url = this.href;
+					var args = {"time":new Date()};
+					$("#content").load(url, args);
+					
+					return false;
+				});
+			});
+		④load()方法的细节：
+			A. 如果只需要加载目标HTML页面内的某些元素，则可以通过load()方法的URL参数达到目的，通过URL参数指定选择器，
+			就可以方便的从加载过来的HTML文档中选出所需要的内容，load()方法的URL参数的语法接口为“url selector”（注意：url和选择器之间有一个空格）
+			B. 传递方式：load()方法的传递参数根据参数data来自动自定，如果没有参数传递，采用GET方式传递，否则采用POST方式
+			C. 对于必须加载完成才能继续的操作，load()方法提供了回调函数，该函数有三个参数：
+				a. 代表请求返回内容的data；
+				b. 代表请求状态的textStatus对象
+				c. XMLHttpRequest对象
+	3. $.get()/$.post()/$.getJSON(): 
+		①$.get()方法使用GET方式来进行异步请求，它的结构是: $.get(url[, data][, callback][,type])
+			A. callback：可选的，Function类型，载入成功时回调函数（只有当Response的返回状态是success时才能调用该回调函数）
+			自动将请求结果和状态传递给该回调函数
+			B. type，可选的，String类型，服务器返回内容的格式，包括：XML，HTML，SCRIPT，JSON，TEXT，_DEFAULT
+		②$.get()方法的回调函数只有两个参数：
+			A. data：代表返回的内容，可以是XML文档、JSON文件、HTML片段等；
+			B. textStatus代表请求状态，其值可能为：success，error，notmodify，和timeout四种
+		③$.get()和$.post()方法是jQuery中的全局函数，而find()等方法都是对jQuery对象进行操作的方法
+		④$.get()方法的请求方式为GET请求，$.post()的请求方式为POST请求, $.getJSON()方法的请求方式为GET请求
+		⑤$.get()/$.post()方法的实例
+			$(function() {
+				$("a").click(function() {
+					var url = this.href;
+					var args = {"time":new Date()};
+					$.post(url, args, function(data) {
+						var name = $(data).find("name").text();
+						var website = $(data).find("website").text();
+						var email = $(data).find("email").text();
+						
+						$("#information").empty()
+										 .append("<h4><a href='mailto" + email + "'>" + name + "</a></h4>")
+										 .append("<a href='" +website + "'>" + website + "</a>");
+					});
+					
+					return false;
+				});
+			});
+		⑥ $.getJSON()/$.get(url[, args], callback, JSON)方法的实例
+			$(function() {
+				$("a").click(function() {
+					var url = this.href;
+					var args = {"time":new Date()};
+					$.get(url, args, function(data) {
+						var name = data.person.name
+						var website = data.person.website;
+						var email = data.person.email;
+						
+						$("#information").empty()
+										 .append("<h4><a href='mailto" + email + "'>" + name + "</a></h4>")
+										 .append("<a href='" +website + "'>" + website + "</a>");
+					}, "JSON");
+					
+					return false;
+				});
+			});
+	4. 基本使用
+		①请求HTML数据
+			load(url[, args][, callback]);
+		②请求XML
+			$.get(url[, args][, callback][, type]);
+			$.post(url[, args][, callback][, type]);
+		③请求JSON
+			$.getJSON(url[, args][, callback]);
+			$.get(url[, args][, callback][, "JSON"]);
+			$.post(url[, args][, callback][, "JSON"]);
+八、使用JackSon
+	1. 加入jar包：
+		①jackson-annotations-2.9.7.jar
+		②jackson-core-2.9.7.jar
+		③jackson-databind-2.9.7.jar
+	2. 具体的使用步骤
+		①创建com.fasterxml.jackson.databind.ObjectMapper对象
+		②调用ObjectMapper的writeValueAsString()方法把一个bean对象或者集合转换为JSON字符串
+	3. 注意：
+		①JackSon根据bean的getter属性来定位JSON对象的属性
+		②可以通过添加注解com.fasterxml.jackson.annotation.JsonIgnore忽略某一个getter定义的属性
+	4. 具体的代码实例：
+		//1. 导入jar包
+		//2. 创建com.fasterxml.jackson.databind.ObjectMapper对象
+		ObjectMapper mapper = new ObjectMapper();
+		//3. 调用ObjectMapper的writeValueAsString()方法把一个对象转换为JSON
+		Customer customerLi = new Customer(2648, "LiXiaoliang");
+		Customer customerYu = new Customer(829, "YuCaixin");
+		String jackson = mapper.writeValueAsString(customerLi);
+		
+		
+		List<Customer> customers = new ArrayList<>();
+		customers.add(customerLi);
+		customers.add(customerYu);
+		
+		String customersJSON = mapper.writeValueAsString(customers);
+		
+		//4. 注意：JackSon 使用 bean 的 getter 属性来定位 JSON 对象的属性
+		//5. 可以通过添加注解com.fasterxml.jackson.annotation.JsonIgnore
+		//忽略某一个getter定义的属性
+		System.out.println(jackson);
+		System.out.println(customersJSON);
+	5. 输出结果
+		bean对象的JSON字符串为一个JSON对象：{"id":2648,"name":"LiXiaoliang","city":"GuangZhou"}
+		bean集合的JSON字符串为一个JSON对象的数组：[{"id":2648,"name":"LiXiaoliang","city":"GuangZhou"},{"id":829,"name":"YuCaixin","city":"GuangZhou"}]
+九、实现城市 -> 部门 -> 员工 -> 员工的详细信息的Ajax三级联动显示
+	1. 涉及三张数据表及字段如下：
+		①locations：location_id、city
+		②departments：department_id、department_name、location_id
+		③employees：employee_id、last_name、email、department_id 
+	2. 需要学习的jQuery的一个插件：blockUI
+	3. 准备工作：在Ajax操作之前可以先显示所有的城市信息
+		①/employees/employees.jsp 转发到 EmployeesServlet的listLocations（获取了全部的Locations的信息，并把Locations放入到request中）
+		②通过转发的方式到/WEB-INF/pages/employees.jsp（使用JSTL显示了所有的城市信息）
+	4. 使用Ajax过程：
+		①添加 #locations change()响应函数
+		②使departments只保留第一个option子节点
+		③获取 #locations 的option值，若该值为""，则不用发送Ajax请求
+		④若值部位"",说明#locations发送了改变，准备Ajax请求
+			A. url:employeesServlet?method=listdepartments
+			B. args: locationId, time
+		⑤返回一个JSON数组
+			A. 若返回的JSON数组为0：提示："当前城市没有部门"
+			B. 若返回的JSON数组不为0：创建<option>请选择...</option>子节点并把新创建的option子节点加到#departments中
+
+
+
+
+
+
+
+
+
+
+
+
+
+		

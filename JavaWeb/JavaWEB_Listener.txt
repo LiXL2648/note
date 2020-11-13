@@ -1,0 +1,208 @@
+一、Servlet监听器：
+	1. 简介：
+		①监听器: 专门用于对其他对象身上发生的事件或者状态改变进行监听和相应处理的对象，当被监听的对象发生情况时，立即采取相应的行动
+		②Servlet监听器：Servlet规范中定义了一种特殊类，它用户监听web应用程序找那个的ServletContext、ServletRequest和HttpSession等域
+		对象的创建和销毁事件，以及监听这些域对象中的属性发生修改的事件
+	2. Servlet监听器的分类：按监听的事件类型Servlet监听器可分为如下三种类型：
+		①监听域对象自身创建和销毁的事件监听器
+			A. 域对象创建个销毁的事件监听器就是用来监听ServletContext、HttpSession、ServletRequest这三个对象的创建和销毁事件的监听器
+			B. 域对象的创建和销毁的时机
+				a. ServletContext：web服务器启动是为每个web应用程序创建相应的ServletContext对象，web服务器关闭某个web应用程序时销毁相应的ServletContext对象
+				b. ServletRequest：每次请求开始时被创建，每次访问结束后被销毁
+				c. HttpSession：浏览器开始于服务器会话时创建，调用HttpSession的invalidate()，超过了Session的最大有效市场，当前web应用被卸载是被停止
+				②监听域对象中的属性的增加和删除的事件监听器
+		③监听绑定到HttpSession域中的某个对象的状态的事件监听器
+	3. Servlet监听器的API
+		①ServletContextListener接口
+			A. ServletContextListener接口用于监听ServletContext对象的创建和销毁事件。
+			B. 当ServletContext对象被创建时，激发contextinitialized(ServletContextEvent sce)方法
+			C. 当ServletContext对象被销毁时，激发contextDestroyed(ServletContextEvent sce)方法
+			D. ServletContextEvent API
+				a. getServletContext():
+		①ServletRequestListener接口
+			A. ServletRequestListener接口用于监听ServletRequest对象的创建和销毁事件。
+			B. 当ServletRequest对象被创建时，激发requestinitialized(ServletRequestEvent sre)方法
+			C. 当ServletRequest对象被销毁时，激发requestDestroyed(ServletRequestEvent sre)方法
+			D. ServletRequestEvent API
+				a. getServletContext():
+				b. getServletRequest():
+		①HttpSessionListener接口
+			A. HttpSessionListener接口用于监听HttpSession对象的创建和销毁事件。
+			B. 当HttpSession对象被创建时，激发sessionInitialized(HttpSessionEvent sce)方法
+			C. 当HttpSession对象被销毁时，激发sessionDestroyed(HttpSessionEvent sce)方法
+			D. HttpSessionEvent API
+				a. getServletContext():
+				b. getHttpSession():
+	4.  编写Servlet监听器
+		①Servlet规范为每种事件监听器绑定了响应的接口，开发人员编写的事件监听器程序只要实现这些接口，web服务器根据用户编写的事件监听器所实现的接口把它注册到相应的被监听的对象上
+		②一些Servlet事件监听器需要在web应用程序的web.xml文件中进行注册，一个web.xml可以注册多个Servlet事件监听器，web服务按照他们在web.xml文件中的注册顺序来加载和注册这些Servlet事件监听器 
+		③Servlet时间监听器的注册和调用的过程是由Servlet容器自动完成的，当发生被监听的对象被创建，修改或者销毁事件是，Servlet容器将调用与之相关的Servlet事件监听器对象的相关方法，
+		开发人员在这些方法值班费编写的事件处理代码即被执行
+		④由于一个web应用程序只会为每个事件监听器创建一个对象，有可能出现多个线程同时调用同一个事件监听器对象的情况，所以，在编写实现监听器类时，应该考虑多线程安全的问题
+		⑤在web.xml文件中注册listener：
+			<listener>
+				<listener-class>com.li.javaweb.listener.MyListener</listener-class>
+			</listener>
+		⑥编写listener
+			public class MyListener implements ServletContextListener, ServletRequestListener, HttpSessionListener{
+
+				@Override
+				public void contextInitialized(ServletContextEvent sce) {
+					System.out.println("ServletContext is initialized...");
+				}
+
+				@Override
+				public void contextDestroyed(ServletContextEvent sce) {
+					System.out.println("ServletContext is destroyed...");
+				}
+
+				@Override
+				public void requestDestroyed(ServletRequestEvent sre) {
+					System.out.println("ServletRequest is destroyed...");
+				}
+
+				@Override
+				public void requestInitialized(ServletRequestEvent sre) {
+					System.out.println("ServletRequest is initialized...");
+				}
+
+				@Override
+				public void sessionCreated(HttpSessionEvent se) {
+					System.out.println("HttpSession is created...");
+				}
+
+				@Override
+				public void sessionDestroyed(HttpSessionEvent se) {
+					System.out.println("HttpSession is destroyed...");
+				}
+
+			}
+	5. ServletContextListener、ServletRequestListener和HttpSessionListener的比较
+		①ServletContextListener、ServletRequestListener和HttpSessionListener的功能相类似
+		②利用ServletContextListener、ServletRequestListener和HttpSessionListener的可以把request、session和application的
+		生命周期进一步了解
+			A. request：
+				a. 是一个请求，当一个响应返回时，即被销毁。当发送一个请求时被创建。
+				b. 请求转发时是一个request，重定向是两个request
+			B. session：
+				a. 当第一次访问WEB应用的一个jsp或Servlet时，且该jsp或者Servlet中还需要创建session对象，此时服务器会创建一个session对象
+				b. session销毁：session过期，直接调用session的invalidate()方法，当前web应用被卸载（session可以持久化）
+				c. 关闭浏览器，并不代表session被销毁，可以通过sessionid找到服务器中的session对象
+			C. application：贯穿于当前web应用的生命周期。当前WEB应用被加载时创建application对象，当前web应用被卸载是销毁application对象
+二、域对象中属性的变更的事件监听器
+	1. ServletContextAttributeListener, HttpSessionAttributeListener, ServletRequestAttributeListener：	
+		①域对象中属性的变更的事件监听器就是用来监听ServletContext、HttpSession和ServletRequest这三个对象中的属性变更信息事件的监听器
+		②这三个监听器接口分别是ServletContextAttributeListener、HttpSessionAttributeListener和ServletRequestAttributeListener，这三个接口都定义
+		了三个方法来处理被监听对象中的属性的增加、替换和删除的事件，同一个事件在这三个接口中对应的方法名称完全相同，只是接受不同的参数类型。
+	2. 以ServletRequestAttributeListener为例：
+		①创建监听域对象属性事件监听器
+			public class TestServletRequestAttributeListener
+			implements ServletContextAttributeListener, HttpSessionAttributeListener, ServletRequestAttributeListener {
+
+				//添加属性时被调用
+				@Override
+				public void attributeAdded(ServletRequestAttributeEvent srae) {
+					System.out.println("ServletReques中添加属性....");
+				}
+				//移除属性时被调用
+				@Override
+				public void attributeRemoved(ServletRequestAttributeEvent srae) {
+					System.out.println("ServletReques中删除属性");
+				}
+				//替换属性时被调用
+				@Override
+				public void attributeReplaced(ServletRequestAttributeEvent srae) {
+					System.out.println("ServletReques中替换属性");
+				}
+
+				@Override
+				public void attributeAdded(HttpSessionBindingEvent se) {
+					// TODO Auto-generated method stub
+
+				}
+
+				@Override
+				public void attributeRemoved(HttpSessionBindingEvent se) {
+					// TODO Auto-generated method stub
+
+				}
+
+				@Override
+				public void attributeReplaced(HttpSessionBindingEvent se) {
+					// TODO Auto-generated method stub
+
+				}
+
+				@Override
+				public void attributeAdded(ServletContextAttributeEvent scae) {
+					// TODO Auto-generated method stub
+
+				}
+
+				@Override
+				public void attributeRemoved(ServletContextAttributeEvent scae) {
+					// TODO Auto-generated method stub
+
+				}
+
+				@Override
+				public void attributeReplaced(ServletContextAttributeEvent scae) {
+					// TODO Auto-generated method stub
+
+				}
+
+			}
+		②在web.xml文件中注册事件监听器
+			<listener>
+				<listener-class>com.li.javaweb.listener.TestServletRequestAttributeListener</listener-class>
+			</listener>
+		③ServletContextAttributeListener, HttpSessionAttributeListener, ServletRequestAttributeListener这三个属性的使用较少
+		④ServletContextAttributeEvent, HttpSessionAttributeEvent, ServletRequestAttributeEvent 的API
+			A. getName()：获取属性名
+			B. getValue(): 获取属性值
+			C. 三个属性事件监听器的API都是相同的
+	3. 感知Session绑定的事件监听器
+		①HttpSessionBindListener和HttpSessionActivationListener
+			A. 保存在Session域中的对象可以有多种状态：绑定到Session中；从Session域中解除绑定；随Session对象持久化到一个存储设备中；随Session对象从一个存储设备中恢复
+			B. Servlet规范中定义了两个特殊的监听器来帮助JavaBean对象了解自己在Session域中的这些状态：HttpSessionBindListener接口和HttpSessionActivationListener接口，实现这两个接口的类不需要web.xml文件进行注册
+		②HttpSessionBindingListener接口：
+			A. 实现了HttpSessionBindingListener接口的JavaBean对象可以感知自己被绑定到Session中和从Session中删除的事件
+				public class Customer implements HttpSessionBindingListener {
+					//当前对象被绑定到Session中时调用该方法
+					@Override
+					public void valueBound(HttpSessionBindingEvent event) {
+					}
+					//当前对象从Session中解除绑定时调用该方法
+					@Override
+					public void valueUnbound(HttpSessionBindingEvent event) {
+					}
+				}
+			B. 当对象被绑定到HttpSession对象中时，web服务器调用该对象的void valueBound(HttpSessionBindingEvent event)方法
+			C. 当对象从HttpSession对象中解除绑定时，web服务器调用该对象的void valueUnbound(HttpSessionBindingEvent event)方法
+			D. 注意：该监听器不需要在web.xml文件中进行配置
+			E. HttpSessionBindingEvent API：
+				a. getName(): 获取绑定在session中属性的名字
+				b. getValue(): 获取绑定在session中属性的值
+				c. getSession(): 获取session
+		③HttpSessionActivationListener接口：
+			A. 实现HttpSessionActivationListener和Serializable接口的JavaBean对象可以感知自己被活化和钝化的事件
+				public class Customer implements HttpSessionBindingListener, HttpSessionActivationListener, Serializable {
+
+					private static final long serialVersionUID = 1L;
+					
+					//该方法当JavaBean被钝化之前被调用
+					@Override
+					public void sessionWillPassivate(HttpSessionEvent se) {
+					}
+					//该方法当JavaBean被活化之后被调用
+					@Override
+					public void sessionDidActivate(HttpSessionEvent se) {
+					}
+
+				}
+				a. 活化：从磁盘中读取session对象
+				b. 钝化：将session保存在磁盘中
+				c. session对象存储在Tomcat服务器的work\Catalina\localhost\contexPath目录下的session.ser文件
+			B. 当绑定到HttpSession对象中的JavaBean将要随着HttpSession对象被钝化之前，web服务器调用该对象的void sessionWillPassivate(HttpSessionEvent event)方法
+			C. 当绑定到HttpSession对象中的JavaBean将要随着HttpSession对象被活化之后，web服务器调用该对象的void sessionDidActivate(HttpSessionEvent event)方法
+			D. 该监听器较少被使用

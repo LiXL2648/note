@@ -1,0 +1,74 @@
+一、EL
+	1. 简称：
+		EL全名为Expression Language，它原本是JSTL1.0位方便存取数据所自定义的语言，当时EL只能在JSTL标签中使用，如下
+		<c:out value="${3+7}">
+		到了JSP2.0之后，EL正式纳入成为标准规范之一。因此，只要支持Servlet2.4/JSP2.0的Container，就可以在JSP网页中直接使用EL了
+	2. EL 与 其他方式的比较
+		①在不同页面使用<jsp:getProperty>标签时，必须使用<jsp:useBean>标签，这种方式太麻烦
+			<jsp:useBean id="student" class="com.li.cookie.bean.Student" scope="session"></jsp:useBean>
+			NameFromUseBean: <jsp:getProperty property="studentName" name="student"/><br/>
+		
+		②使用传统方式获取属性值，这种方式相对较麻烦
+			<%
+				Student student2 = (Student)session.getAttribute("student");
+			%>
+			NameFromSession: <%= student2.getStudentName() %><br/>
+		
+		③使用EL表达式获取, 这种方式最方便
+			NameFromEL：${sessionScope.student.studentName }<br/>
+二、EL语法: 所有EL都是以“${”为起始，以“}”为结尾的，如：${sessionScope.user.sex}
+	1. .和[]运算符：
+		①EL提供.和[]两种运算符来存储数据
+		②两种运算符的作用是一样的
+		③如果域对象中的属性名带有特殊字符串时，则使用[]会方便很多
+	2. EL变量
+		①EL存取变量数据的方法很简单，例如：${username}
+		②该方法的意思是取出某一范围中名称为username的变量
+		③由于没有指定是哪一个范围的username，所以它的默认值从page范围开始找，假如找不到，再依次到request、session、application的范围中
+		④假如在途中找到username，就直接回传，不再继续找下去，但是假如全部的范围都没有找到时，就回传null。
+	3. 自动类型转换
+		①EL除了提供方便存取变量的语法之外，它的另一个方便的功能是自动类型转换
+		②例如： ${student1.studentId +10 }
+	4. EL的隐含对象：
+		①与范围有关的隐含对象，它们分别对应着四个域对象
+			A. pageScope、requestScope、sessionScope、applicationScope
+			B. 它们基本上和jsp的pageContext、request、session、application一样
+			C. 这四个隐含对象只能用来取得范围属性值，即JSP中的getAttribute(String name)，却不能取得其他相关的信息
+		②与输入有关的隐含对象，获取请求参数
+			A. param（获取一个请求参数）和paramValues（获取一组请求参数）
+			B. 它们基本上跟request.getParameter(String name)和request.getParameterValues(String name)一样
+			C. 举例：
+				<a href="el1.jsp?time=<%= new Date()%>&name=Li&name=Yu&name=Lin">Return...</a>
+				time: ${param.time }<br/>
+				names: ${paramValues.name }<br/>
+		③其他隐含对象（cookie、header和headerValues、initParam只需了解）
+			A. cookie
+				cookie: ${cookie.JSESSIONID }<br/>
+				cookieName: ${cookie.JSESSIONID.name }<br/>
+				cookieValue: ${cookie.JSESSIONID.value }<br/>
+			B. header和headerValues：获取消息头的参数
+				Accept-Language：${header["Accept-Language"] }<br/>
+			C. initParam：获取当前web的初始化参数
+				<context-param>
+					<param-name>initName</param-name>
+					<param-value>LiYu</param-value>  	
+				 </context-param>
+				initParam: ${initParam.initName }<br/>
+			D. pageContext：即为PageContext类型，但只可以获取子类或者父类的各个属性，也可以一直点写去
+				contextPath: ${pageContext.request.contextPath }<br/>
+				sessionId: ${pageContext.session.id }<br/>
+	5. EL的运算符：
+		①算数运算符：加减乘除取余
+		②关系运算符：> < >= <= == != 三目运算符
+			举例：成年? ${param.age > 18 ? "成年" : "未成年" }<br/>
+		③逻辑运算符：&&或and、||或or、!或者not
+		④条件运算符：
+		⑤()运算符：改变优先级的运算符
+		⑥Empty运算符：empty可以作用于一个集合，若一个集合不存在，或者集合中不存在元素，其结果都为true。
+			<%
+				List<String> list = new ArrayList<String>();
+				//list.add("2648");
+				request.setAttribute("list", list);
+				
+			%>
+			list is empty? ${empty requestScope.list }<br/>：true/false

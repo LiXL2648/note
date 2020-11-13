@@ -1,0 +1,260 @@
+一、JSTL
+	1. 简介
+		②JSTL的全名为JavaServer Page Standard Tag Library，目前最新的版本为1.2。JSTL是由JCP（Java Communicaty Proccess）所指定的标准规格，它主要提供给
+		JAVA WEB开发人员一个标准的标签函数库。
+		②Web程序开发人员能够利用JSTL和EL来开发WEB程序，取代传统直接在页面上嵌入Java程序（scripting）的做法，以提高程序的可读性、维护性和方便性
+		③JSTL（JSP标准标签函数库）是一个标准的已制定好的标签库，可以应用于各个领域，如：基本的输入输出、流程控制、循环遍历、XML文件剖析、数据库查询及国际化
+		和文字格式标准化的应用等。
+		④另外，JSTL也支持EL语法。
+	2. JSTL所提供的标签函数库主要分为五大类：
+		JSTL												前置名称	URI
+		①核心标签库（Core tag library）							c		http://java.sun.com/jsp/jstl/core
+		②I18格式标签库（I18-capable formatting tag library）	fmt		http://java.sun.com/jsp/jstl/fmt
+		③SQL标签库（SQL tag library）							sql		http://java.sun.com/jsp/jstl/sql
+		④XML标签库（XML tag library）							xml		http://java.sun.com/jsp/jstl/xml
+		⑤函数标签库（Function tag library）						fn		http://java.sun.com/jsp/jstl/function
+二、安装和使用JSTL
+	1. 安装JSTL1.1版本
+		①下载jakarta-taglibs-standard-1.1.2.tar.gz压缩包
+		②解压jakarta-taglibs-standard-1.1.2.tar.gz压缩包得到jakarta-taglibs-standard-1.1.2
+		③在根路径的lib目录下将jstl.jar和standard.jar两个jar包直接拷到当前WEB应用的/WEB-INF/lib/中即安装成功
+	2. 安装JSTL1.2版本
+		①在官网直接下载taglibs-standard-impl-1.2.5.jar和taglibs-standard-spec-1.2.5.jar两个jar包
+		②将两个jar包直接拷到当前WEB应用的/WEB-INF/lib/中即安装成功
+	3. 使用JSTL
+		①在当前JSP页面中使用taglibs指令将核心标签库和核心函数库导入即可
+			<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core"%>
+			<%@ taglib prefix="fn" uri="http://java.sun.com/jsp/jstl/functions" %>
+		②直接在页面上使用核心标签和核心函数即可
+三、 核心标签库（core tag library）
+	1. 核心标签库的主要功能有：基本输入输出、流程控制、迭代操作和URI操作。
+	2. 表达式操作：
+		①<c:out>: 主要用于显示数据的内容，就像是<%= scripting-language %>一样
+			A. 语法：<c:out value="value"></c:out>
+				<c:out value="${requestScope.book}"></c:out>
+			B. 优点：
+				它比EL更强大，可以为敏感的字符进行自动转义
+			C. 属性：
+				名称			说明								EL				类型	必须			默认值
+				a. value:		需要显示出来的值					支持EL表达式	Object	是必须属性		没有默认值
+				b. default：	如果value为null，则显示default的值	支持EL表达式	Object	不是必须属性	没有默认值
+				c. escapeXml	是否转换特殊字符					支持EL表达式	boolean	不是必须属性	默认值为true
+			D. 假如value为null，会显示default的值，如果没有设定default的值，则会显示一个空的字符串
+		②<c:set>: 主要用于将变量储存在JSP范围中或者是JavaBean的属性中
+			A. 语法一：将数据存储在JSP范围中
+				<c:set value="value" var="varName" scope="[page|request|session|application]"/>
+				<c:set value="${param.name}" var="name" scope="page"></c:set>
+			B. 语法二: 将数据存储在JavaBean的属性中
+				<c:set value="value" target="target" property="propertyName"/>
+				<c:set value="${param.id }" target="${requestScope.student }" property="studentId"></c:set>
+			C. 属性：
+				名称		说明							EL	类型	是否必须	默认值
+				a. value	要被存储的值					Y	Object	否			无
+				b. var		欲存入的变量名称				N	String	否			无
+				c. scope	var变量的JSP范围				N	String	否			page
+				d. target	为一JavaBean或Java.util.Map对象	Y	Object	否			无
+				e. property	指定target对象的属性			Y	String	否			无
+		③<c:remove>: 主要用于移除储存在JSP范围内的属性
+			A. 语法：<c:remove var="varName" scope="[page|request|session|application]"/>
+			B. 属性：
+				名称		说明							EL	类型	是否必须	默认值
+				a. var		欲移除的变量名称				N	String	是			无
+				b. scope	var变量的JSP范围				N	String	否			page
+	3. 流程控制操作
+		①<c:if>: 用途和一般程序使用的if一样，但是没有else
+			A. 语法：有标签体内容
+				<c:if test="testCondition" [var="varName"] [scope="[page|request|session|application]"]>
+			B. 属性：
+				名称		说明							EL	类型	是否必须	默认值
+				a. test		如果表达式的结果为true则执行	Y	boolean	是			无
+							标签体的内容，false则不执行
+				b. var		用来储存test运算后的结果，即
+							true或者false					N	Sting	否			无
+				c. scope	var变量的JSP范围				N	String	否			page
+			C. 特点：该方法没有else分支语句，但是可以将判断结果存储在JSP范围内的var变量名中
+			D. 举例
+				<c:set value="20" var="age" scope="request"></c:set>
+				isAdult：<c:if test="${requestScope.age > 18}">true</c:if><br/>
+		②<c:choose>	、<c:when>、<c:otherwise>
+			A. 可以实现if...else if...esle的效果，但较为麻烦，其中<c:choose>是以<c:when>和<c:otherwise>的父标签的形式存在
+				<c:when>和<c:otherwise>不能脱离<c:choose>存在，<c:when>可以存在多个，但是<c:otherwise>必须在<c:when>之后使用
+			B. 语法：
+				<c:choose>本体内容（<c:when>和<c:otherwise>）</c:choose>
+				<c:choose>
+					<c:when test="${requestScope.age > 60}">老年</c:when>
+					<c:when test="${requestScope.age > 30}">中年</c:when>
+					<c:when test="${requestScope.age > 18}">成年</c:when>
+					<c:otherwise>青少年</c:otherwise>
+				</c:choose><br/>
+			C. <c:when>的属性：
+				名称		说明							EL	类型	是否必须	默认值
+				a. test		如果表达式的结果为true则执行	Y	boolean	是			无
+							标签体的内容，false则不执行
+	4. 迭代操作：
+		①<c:forEach>: 循环控制，它可以将集合、数组、map中的成员循环遍历一遍。运作方式为当条件符合时，就会持续重复执行<c:forEach>本体内容
+			A. 迭代一集合对象的所有成员
+				a. <c:forEach [var="varName"] items="collection" [varStatus="varStatusName"] 
+				[begin="begin"] [end="end"] [step="step"]>本体内容</c:forEach>
+				B. 举例
+					a. Collection
+						<%
+							List<Student> students = new ArrayList<Student>();
+							students.add(new Student(1001, "Li", "13480303706"));
+							students.add(new Student(1002, "Yu", "13480303706"));
+							students.add(new Student(1003, "Lin", "13480303706"));
+							request.setAttribute("students", students);
+						%>
+						<c:forEach items="${requestScope.students }" var="student">
+							${student.studentId }, ${student.studentName }, ${student.phone }<br/>
+						</c:forEach>
+					b. Array
+						<%
+							String[] names = new String[]{"Li", "Yu", "Lin"};
+							request.setAttribute("names", names);
+						%>
+						<c:forEach items="${requestScope.names }" var="name" varStatus="statusName">
+							${name }, ${statusName.first }, ${statusName.last }, ${statusName.index } ${statusName.count }<br/>
+						</c:forEach>
+					c. map
+						<%
+							Map<String, Student> map = new HashMap<String, Student>();
+							map.put("a", new Student(1001, "Li", "13480303706"));
+							map.put("b", new Student(1002, "Yu", "13480303706"));
+							map.put("c", new Student(1003, "Lin", "13480303706"));
+							request.setAttribute("map", map);
+						%>
+						<c:forEach items="${requestScope.map }" var="entry">
+						${entry.key }, ${entry.value.studentId },  ${entry.value.studentName },  ${entry.value.phone }<br/>
+						</c:forEach>
+			B. 	属性：
+				名称		说明							EL	类型		是否必须	默认值
+				a. var		用来存放现在指到的成员			N	String		否			无
+				b. items	被迭代的集合对象				Y	Array
+																Collection	否			无
+																Iterator
+																Map
+																String
+				c. varStatus用来存放现在指到的相关成员信息	N	String		否			无
+				d. begin	开始的位置						Y	int			否			0
+				e. end		结束的位置						Y	int			否			最后一个成员
+				f. begin	开始的位置						Y	int			否			1
+			C. <c:forEach>除了支持数组以外
+				a. 还有标准的J2SE的集合类型，如：ArrayList、List、LinkedList、Vector、Stack和set等等。
+				b. 另外还包括java.util.Map类的对象，例如：HashMap、HashTable、Properties、Provider、Attribute。
+			D. <c:forEach>还有begin、end和step三个属性：begin主要用于设定在集合对象开始的位置（第一个位置为0）：end
+			用来设置结束的位置；而step则是用来设定现在指到的成员和一个将被指到的成员之间的间隔
+			E. 遍历session的attributeNames属性，由于隐含对象只能获取存储JSP范围内的属性，因此只能通过pageContext获取其他隐含对象，
+			再通过隐含对象获取attributeNames属性
+				<c:forEach items="${pageContext.session.attributeNames }" var="attributeName">
+					${attributeName } 
+				</c:forEach>
+				
+		②<c:forTokens>: 用来浏览字符串中所有的成员，其成员是由定义符号（delimiters）所分隔的，类似于String的split()方法
+			A. 语法：
+				<c:forTokens items="stringOfTokens" delims="delimiters" [var="varName"]>
+				[varStatus="varStatusName"] [begin="begin"] [end="end"] [step="step"]>
+					本体内容
+				</c:forTokens>
+			B. 举例
+				<c:set value="a,b,c,d.e.f;g" var="str" scope="request"></c:set>
+				<c:forTokens items="${requestScope.str }" delims="," var="s">
+					${s }<br/>
+				</c:forTokens>
+	5. URL操作
+		①JSTL包含三个与URL有关的标签，它们分别是：<c:import>、<c:redirect>、<c:url>，它们的主要功能是：用来将其他文件的内容包含起来、网页的导向、还有产生url
+		②<c:import>: 可以包含任何页面到当前页面。它和JSP action的<jsp:include>的最大区别在于：<jsp:include>只能包含和自己同一个web application下的文件.
+			A. 语法：<c:import url="url" [context="context"] [var="varName"]></c:import>
+			B. 属性：
+				名称			说明										EL	类型		是否必须	默认值
+				url				文件被包含的地址							是	String		否			无
+				context			相同container下，其他web站台必须以“/开头”	是	String		否			无
+				var				储存被包含的文件内容（以String类型存入）	否	String		否			无
+				scope			var变量的JSP范围							否	String		否			page
+				charEncoding	被包含文件之间的编码格式					是	String		否			无
+		②<c:redirect>: 使当前JSP页面重定向到指定的页面。是当前页面转发到当前页面可以使用<jsp:forward page="">
+			A: 语法：<c:redirect url="/url"></c:redirect>
+			B. /代表的是当前WEB应用的根目录，原因是标签是由交由Servlet容器去解析
+			C. <c:redirect>可自转发到任何页面
+		③<c:url>: 可以生成URL地址，可以根据Cookie是否可以智能进行URL重写，并对get请求参数进行编码
+			A. 可以把产生的URL存储在JSP域范围内
+			B. 还可以使用<c:param>为URL添加请求参数，并对请求参数进行自动转码
+			C. value中的“/”代表的是当前WEB应用的根目录
+			D. 语法：
+				<c:url value="/index.jsp" var="url" scope="request">
+					<c:param name="Li" value="李"></c:param>
+				</c:url>
+四、函数标签库
+	1. 严格来说，函数标签库不能算作是标签库，因为她是利用EL的Function所实现的
+	2. 函数标签库大部分都是用来处理字符串用的
+	3. 除了处理字符串的函数之外，函数标签库还有fn:length()函数，它用于取得字符串的字符数或者集合对象的大小
+	4. 在JSP中要使用JSTL中的函数标签库时，必须先在<%@ taglib %>指令中设定prefix和uri的值，一般设定如下
+		<%@ taglib prefix="fn" uri="http://java.sun.com/jsp/jstl/functions" %>
+	5. 常见的函数如下，详情请见jsp2.0技术手册第217页：
+		①${fn:contains() }:
+			A. 判断某字符串中是否在一字符串之中
+			B. 语法：${fn:contains(string, substring) } => boolean
+		②${fn: containsIgnoreCase() }:
+			A. 判断某字符串是否已在一字符之中，并忽略大小写
+			B. 语法：${fn:containsIgnoreCase(string, substring) } => boolean
+		②${fn:startsWith() }: 
+			A. 判断一字符串是否以某一字符串为开头
+			B. 语法：${fn:startsWith(string, prefix) } => boolean
+		③${fn:endsWith() }: 
+			A. 判断一字符串是否以某一字符串为结尾
+			B. 语法：${fn:endsWith(string, suffix) } => boolean
+		④${fn:escapeXml() }:
+			A. 转义字符将被转换成Entity码，即用来转换转义字符。例如：将<、>、'、"和&转换为&lt;、&gt;、&#039;、&#034;和&amp;。
+			B. 语法：${fn:escapeXml(string) }=> string
+		⑤${fn:indexOf() }: 
+			A. 回传某字符串在一字符串中第一次吻合的位置
+			B. 语法${fn:indexOf(string, substring) }=> int
+		⑥${fn:split() }:
+			A. 将字符串分离成一字符串数组, 即函数将string以delimiters作为分离点，然后回传分离后的字符串数组
+			B. 语法${fn:split(string, delimiters) } => string[]
+		⑦${fn:join() }:
+			A. 将数组中的全部元素以指定字符串作为连接符，回传结合后的字符串
+			B. 语法：${fn:join(array, separator)} => string
+		⑧${fn:replace() }:
+			A. 将字符串中的某些子字符串用另外一字符串替换
+			B. 语法：${fn: replace(string, beforeSubstring, afterSubstring) } => string
+		⑨${fn:trim() }:
+			A. 去除字符串中的前后空白
+			B. 语法：${fn:trim(string)} => string
+		⑩${fn:substring() }:
+			A. 截取字符串中的某一子字符串
+			B. 语法：${fn:substring(string, beginIndex, endIndex) } => string
+			C. 说明：函数截取string中第beginIndex（包含beginIndex）至endIndex（不包含endIndex）的字符串，string的位置由0开始计算
+		①①${fn:substringAfter() }:
+			A. 截取字符串中某子字符串之后的字符串
+			B. 语法：${fn:substringAfter(string, substring) } => string
+		①②${fn:substringBefore() }:
+			A. 截取字符串中某子字符串之前的字符串
+			B. 语法：${fn:substringBefore(string, substring) } => string
+		①③${fn:toLowerCase() }:
+			A. 将字符串转换为小写字符
+			B. 语法：${fn:toLowerCase(string) } => string
+		①④${fn:toUpper Case() }:
+			A. 将字符串转换为大写字符
+			B. 语法：${fn:toUpperCase(string) } => string
+		①⑤${fn:length() }： 
+			A. 回传一集合对象的数量或一字符串的字符数
+			B. 语法：${fn:length(input) }
+			C. 说明：input为符合<c:forEach>中items属性的类型
+	6. 标准函数库的简单实用
+		<c:set value="C:\Users\Administrator\Desktop\JavaWEB_Cookie.txt" var="path"></c:set>
+	
+		<c:set value='${fn:replace(path , "\\\\", "/") }' var="replacePath"></c:set>
+		<c:out value="${replacePath }"></c:out><br/>
+		
+		<c:set value='${fn:split(replacePath, "/") }' var="strs"></c:set>
+		<c:forEach items='${strs }' var="str">
+			${str }<br/>
+		</c:forEach>
+		<br/>
+		<c:forEach items='${strs }' var="str" begin="${fn:length(strs)-1 }" end="${fn:length(strs) }">
+			${str }<br/>
+		</c:forEach>
+		
+		
+		
+		

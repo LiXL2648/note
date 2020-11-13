@@ -1,0 +1,267 @@
+一、Filter：
+	1. Filter（过滤器）简介
+		①Filter的基本功能是对Servlet容器调用Servlet的过程进行拦截，从而在Servlet进行响应处理的前后实现一些特殊的功能
+		②在Servlet API中定义了三个接口类来供开发人员编写Filter程序：Filter、FilterChain、FilterConfig
+		③Filter程序是一个实现了Filter接口的Java类，与Servlet程序相似，它有Servlet容器进行调用和执行
+		④Filter程序需要在web.xml文件中进行注册和设置它所能拦截的资源: Filter程序可以拦截JSP、Servlet静态图片文件和静态HTML文件
+	2. 如何创建一个Filter，并且实现运行
+		①创建一个Filter：只能实现Filter接口，并重写父类接口的抽象方法：public class UsernameFilter implements Filter
+		②在web.xml文件中配置并映射Filter，其中<url-pattern>指定该Filter可以拦截哪些资源，也可以通过哪些url访问该Filter
+			<!-- 注册Filter -->
+			<filter>
+				<filter-name>UsernameFilter</filter-name>
+				<filter-class>com.li.javaweb.filter.UsernameFilter</filter-class>
+			</filter>
+			<!-- 映射Filter -->
+			<filter-mapping>
+				<filter-name>UsernameFilter</filter-name>
+				<url-pattern>/filter/hello.jsp</url-pattern>
+			</filter-mapping>
+		③相关API：
+			A. Filter接口：
+				a. public void init(FilterConfig fConfig)
+					（1）类似于Servlet的init()方法，在创建Filter对象（Filter对象在Servlet容器加载当前WEB应用是立即被调创建）后，立即被执行，且只执行一次，
+					（2）该方法用于对当前Filter进行初始化，这是个生命周期方法，只被调用一次，说明该Filter对象是单例的。
+					（3）FilterConfig类似于ServletConfig
+					（4）可以在web.xml可以配置Filter的初始化参数，配置方式与Servlet一样
+						<filter>
+							<filter-name>UsernameFilter</filter-name>
+							<filter-class>com.li.javaweb.filter.UsernameFilter</filter-class>
+							<init-param>
+								<param-name>username</param-name>
+								<param-value>Li</param-value>
+							</init-param>
+						</filter>
+					（5）多个Filter之前的init()方法的调用顺序与filter配置顺序无关。
+				b. public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+					（1）真正Filter的逻辑diamante需要编写在该方法中，每次拦截都会调用该方法
+					（2）FilterChain，多个FilterChain可以构成一个FilterChain链
+				c. public void destroy()：释放当前Filter所占用的资源，该方法会在Filter被销毁前调用，并且只被调用一次
+			B. FilterConfig接口：
+				a. getFilterName(): 获取配置Filter的的filter-name
+				b. getInitParameter(String name): 获取某个初始化参数的值
+				c. getInitParameterNames(): 获取所有的初始化参数名
+				d. getServletContext(): 获取当前web的配置参数对象, 该对象可以获取web.xml的当前web配置信息
+					<context-param>
+						<param-name>password</param-name>
+						<param-value>2648</param-value>
+					</context-param>
+			C. FilterChain接口：
+				a. doFilter(request, response): 
+					（1）与其他Filter的FilterChain构成一个链
+					（2）把请企业传给当前Filter的下一个Filter
+					（3）若当前Filter是Filter链的的最后一个Filter，则会将请企业传给目标Servlet（或JSP、HTML）
+					（4）多个Filter拦截的顺序和<filter-mapping>配置的顺序有关，靠前的先被调用
+	3. Filter的基本工作原理
+		①当在web.xml中注册一个Filter来对某个Servlet程序进行拦截处理时，这个Filter就成了对Servlet容器与该Servlet程序的通信路上的一道关卡
+		该<Filter可以对Servlet容器发送给Servlet程序的请求和Servlet程序回送给Servlet容器的响应进行拦截，可以决定是否将请求继续传递给Servlet程序，
+		以及对请求和响应信息是否进行修改>
+		②在一个web应用程序中可以注册多个Filter程序，每个Filter程序都可以对一个或一组Servlet程序进行拦截
+		③若多个Filter程序对某个Servlet程序的访问过程进行拦截，当针对该Servlet的访问请求到达时，web容器将把这多个Filter程序组合成一个Filter
+		链（过滤器链）。<Filter链中各个Filter的拦截顺序与他们在应用程序的web.xml中映射的顺序一致>
+二、多个Filter的doFilter的执行顺序为
+	1. 严格按照web.xml中filter-mapping的映射顺序执行
+	2. 假如chain.doFilter(request, response)的前后都有待执行的代码
+	3. 执行循序：
+		①是在web.xml中排靠前的Filter的doFilter的chain.doFilter往前的代码
+		②执行紧接着Filter的下一个Filter的doFilter的chain.doFilter往前的代码
+		③如果当前的Filter是最后一个Filter，则响应请求的页面，如果不是，则继续执行第②步
+		④当响应完请求页面的时候，继续执行chain.doFilter以下的代码
+		⑤在web.xml中排在最后的Filter的chain.doFilter以下的代码最先开始执行，一直执行到排在第一位的Filter的chain.doFilter以下的代码
+三、HTTPFilter：
+	1. HTTPFilter：实现自Filter接口
+		import java.io.IOException;
+
+		import javax.servlet.Filter;
+		import javax.servlet.FilterChain;
+		import javax.servlet.FilterConfig;
+		import javax.servlet.ServletException;
+		import javax.servlet.ServletRequest;
+		import javax.servlet.ServletResponse;
+		import javax.servlet.http.HttpServletRequest;
+		import javax.servlet.http.HttpServletResponse;
+
+		/**
+		 * 自定义的HttpFilter，实现自Filter接口
+		 * 
+		 * @author Li
+		 *
+		 */
+		public abstract class HttpFilter implements Filter {
+
+			/**
+			 * 用于保存FilterConfig对象
+			 */
+			private FilterConfig filterConfig;
+
+			/**
+			 * 不建议子类子类直接覆盖，若直接覆盖，将可能导致filterConfig成员变量初始化失败
+			 */
+			@Override
+			public void init(FilterConfig filterConfig) throws ServletException {
+				this.filterConfig = filterConfig;
+				init();
+			}
+
+			/**
+			 * 供子类继承的初始化方法，可以通过getFilterConfig()获取FilterConfig对象
+			 * 
+			 * @throws ServletException
+			 */
+			protected void init() throws ServletException {
+			}
+
+			/**
+			 * 直接返回init(FilterConfig)的FilterConfig的对象
+			 * 
+			 * @return
+			 */
+			public FilterConfig getFilterConfig() {
+				return filterConfig;
+			}
+
+			/**
+			 * 原生的doFilter()方法，在方法内部把ServletRequest和ServletResponse转化为HttpServletRequest
+			 * 和HttpServletResponse，并调用了doFilter(HttpServletRequest request,
+			 * HttpServletResponse response, FilterChain chain)
+			 * 
+			 * 若编写Filter的过滤方法不建议直接覆盖该方法，而建议继承doFilter(HttpServletRequest request,
+			 * HttpServletResponse response, FilterChain chain)方法
+			 */
+			@Override
+			public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
+					throws IOException, ServletException {
+				HttpServletRequest request = (HttpServletRequest) req;
+				HttpServletResponse response = (HttpServletResponse) res;
+
+				doFilter(request, response, chain);
+			}
+
+			/**
+			 * 抽象方法，为HttpFilter请求定制，必须实现
+			 * @param request
+			 * @param response
+			 * @param chain
+			 * @throws IOException
+			 * @throws ServletException
+			 */
+			public abstract void doFilter(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+					throws IOException, ServletException;
+
+			/**
+			 * 空的destroy方法
+			 */
+			@Override
+			public void destroy() {
+			}
+
+		}
+	2. 相关API：
+		①FilterConfig filterConfig：用于保存FilterConfig对象
+		②init(FilterConfig filterConfig)：不建议子类子类直接覆盖，若直接覆盖，将可能导致filterConfig成员变量初始化失败
+		③init()：供子类继承的初始化方法，可以通过getFilterConfig()获取FilterConfig对象
+		④FilterConfig getFilterConfig()：直接返回init(FilterConfig)的FilterConfig的对象
+		⑤doFilter(ServletRequest req, ServletResponse res, FilterChain chain)：
+			A. 原生的doFilter()方法，在方法内部把ServletRequest和ServletResponse转化为HttpServletRequest
+			和HttpServletResponse，并调用了doFilter(HttpServletRequest request,
+			HttpServletResponse response, FilterChain chain)
+
+			B. 若编写Filter的过滤方法不建议直接覆盖该方法，而建议继承doFilter(HttpServletRequest request,
+			HttpServletResponse response, FilterChain chain)方法
+		⑥doFilter(HttpServletRequest request, HttpServletResponse response, FilterChain chain)：
+			A. 抽象方法，为HttpFilter请求定制，必须实现
+			B. 真正Filter的逻辑diamante需要编写在该方法中，每次拦截都会调用该方法
+		⑦destroy()：空的destroy方法
+四、dispatcher:
+	1. <dispatcher>指定过滤器所拦截的资源被Servlet容器调用的方式，取值为REQUEST,INCLUDE,FORWARD,ERROR之一
+	默认的取值为REQUEST。可以设置多个<dispatcher>子元素用来指定Filter对资源的多种调用方式进行拦截
+	2. <dispatcher>子元素可以设置的值及其意义：
+		①REQUEST: 当用户直接访问页面时（即通过get或post请求页面时），Servlet容器会直接调用过滤器，该值是filter-mapping
+		默认设置的值，如果目标资源是通过RequestDispatcher的include()或者forward()方法访问时，该过滤器将不会被调用
+		②FORWARD: 如果目标资源是通过RequestDispatcher的forward()方法或者通过page指令指定错误页面访问时，该过滤器将会被调用，除此之外都不会被调用
+		③INCLUDE: 如果目标资源是通过RequestDispatcher的include()方法访问时，该过滤器将会被调用，除此之外都不会被调用
+		④ERROR：如果目标资源是通过声明式异常处理机制调用时，该过滤器将会被调用，除此之外都不会被调用
+	3. 该子元素在web.xml中的设置方式如下：
+		<filter-mapping>
+			<filter-name>SecondFilter</filter-name>
+			<url-pattern>/filter/test.jsp</url-pattern>
+			<!-- <dispatcher>默认的值为REQUEST -->
+			<dispatcher>REQUEST</dispatcher>
+			<!-- 当通过转发的方式请求页面时，<dispatcher>节点的值需要设为FORWARD，才能调用filter -->
+			<dispatcher>FORWARD</dispatcher>
+			<!-- 当通过引用的方式请求页面时，<dispatcher>节点的值需要设为INCLUDE，才能调用filter -->
+			<dispatcher>INCLUDE</dispatcher>
+			<!-- 当在web.xml定义错误页面时，<dispatcher>节点的值需要设为INCLUDE，才能调用filter -->
+			<dispatcher>ERROR</dispatcher>
+		</filter-mapping>
+五、Filter的典型应用
+	1. 禁用浏览器缓存的过滤器
+		①有3个HTTP响应头字段都可以禁止浏览器缓存当前页面，它们分别在Servlet中的示例代码如下：
+			A. response.setDateHeader("Expires",-1);
+			B. response.setHeader("Cache-Control","no-cache");
+			C. response.setHeader("Pragma","no-cache");
+		②并不是所有的浏览器都能完全支持上面的三个响应头，因此最后是同时使用上面三个响应头
+	2. 字符编码过滤器
+		通过配置参数encoding指明使用何种字符编码，以处理HTML Form表单中post请求参数的中文问题
+	3. 	检测用户是否登录的过滤器
+		①情景：系统中的某些页面只有在正常登录后才可以使用，用户请求这些页面时要检查session中有无该用户信息，但在所有必要的页面上加上
+		session的判断相当麻烦
+		②解决方案：编写一个用于检查用户是否登录的过滤器，如果用户未登录，则重定向到指定的登录页面
+		③要求：需检查在session中保留的关键字；如果用户未登录，需重定向到指定的页面（URL不包括ContextPath）；不做检查的URL列表（以分号分开，
+		并且URL中不包含ContextPath）都要采取可配置的方式
+	4. 权限管理：使用Filter完成一个简单的权限管理模型
+		①需求：
+			A. 管理权限
+				a. 查看某人的权限
+				b. 修改某人的权限
+			B. 对访问进行权限控制：有权限则可以访问，否则提示“没有对应的权限，请返回”
+		②实现：
+			A. 管理权限：
+				a. 封装权限信息：Authority
+					Authorities{
+						private String displayName;
+						private String url;
+					}
+				b. 封装用户信息：User
+					User{
+						private String username;
+						private List<Authority> Authorities;
+					}
+				c. 创建一个DAO，定义查看权限信息与修改权限信息的方法
+					UserDao{
+						 User getUser(String username);
+						 void update(String username, List<Authority> Authorities); 
+					}
+				d. 页面：
+					(1). authority-manager.jsp：有一个文本框，供输入username，提交后，使用checkbox显示当前用户所有的权限信息
+					(2). 检查request中是否有User信息，并显示“xxx的权限是：”若有权限，则在checkbox中打钩，若无则不打钩
+				e. Servlet：
+					(1). 查看User的权限信息：
+						authority-manager.jsp输入username提交表单后，获取表单的请求参数，再根据username获取User信息，把User放入到request请求域中，
+						转发到authority-manager.jsp
+					(2). 修改User的权限信息：
+						authority-manager.jsp修改权限的表单提交后；获取请求参数：username，authority（多选）；把选项封装为List；
+						调用UserDAO的update()方法实现权限的修改；重定向到authority-manager.jsp
+				B. 对访问进行权限管理
+					a. 使用Filter进行权限的过滤：检验用户是否有权限，若有，则直接响应页面；若没有则重定向到403.jsp
+					b. 使用Filter如何进行过滤
+						(1). 获取ServletPath
+						(2). 在用户已经登录（使用用户登录过滤器）的情况下，获取用户信息
+						(3). 再获取用户所具有的权限信息：List<>
+						(4). 检验用户是否有请求ServletPath的权限：可以创建用户所具有权限的Authority对象，判断List<Authority>是否包含该对象，需重写Authority中的equals()方法
+						(5). 若有权限：则响应
+						(6). 若没有权限：则重定向403.jsp
+					c. 其他
+						(1). 用户若登录，需要把用户信息（User对象）放入到HttpSession中
+						(2). 检验权限之前需要判断用户是否已经登录
+	5. 不雅文字过滤器
+		①HttpServletRequestWrapper类和HttpServletResponseWrapper类
+			A. HttpServletRequestWrapper类：Servlet API中提供了一个HttpServletRequestWrapper类来包装原始的HttpServletRequest的对象
+			HttpServletRequestWrapper类实现了HttpServletRequest接口中的所有方法，这些方法的内部实现金属调用了一下所包装的request对象的对应方法
+			B. 相类似ServletAPI也提供一一个HttpServletResponseWrapper类来包装原始的response对象
+		②作用：用于对HttpServletRequest或HttpServletResponse的某一个方法进行修改或者增强
+		③具体使用：
+			在Filter中使用自定义的MyHttpServletRequest（继承自HttpServletRequestWrapper类）的对象替换HttpServletRequest对象，该对是HttpServletRequest对象修改版或者增强版，即包含了HttpServletRequest的的所有方法。
+			
+
+			

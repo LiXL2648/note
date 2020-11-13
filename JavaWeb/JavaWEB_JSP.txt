@@ -1,0 +1,362 @@
+一、JSP入门
+	1. 建立对JSP的直观认识
+	2. JSP的运行原理
+	3. JSP的隐式对象
+	4. 注册于配置JSP的访问路径
+	5. JSP与Servlet的应用比较
+二、JSP的起源
+	1. 在很多动态网页中，绝大部分内容都是固定不变的，只有局部内容需要动态产生和改变
+	2. 如果使用Servlet程序来输出只有局部内容需要动态改变的网页，其中所有的静态内容也需要程序员应Java程序代码产生，整个Servlet程序的代码将是非常臃肿，编写和维护都将非常困难
+	3. 对大量静态内容的美工设计和相关HTML代码的编写，并不是程序员所要做的工作，程序员对此也不一定在行。网页美工设计和制作人员不懂Java编程，更是无法完成这样的工作。
+	4. 为了弥补Servlet的缺陷，SUN公司在Servlet的基础上推出了JSP（Java Servlet Pages）技术作为解决方案
+	5. JSP是简化Servlet编写的一种技术，它将Java代码和HTML语句混合在同一个文件中编写，只对网页中要产生动态的内容采用Java代码来编写，而对于固定不变的静态内容采用普通静态HTML的方式编写
+三、建立对JSP的直观认识
+	1. JSP页面是由HTML语句和嵌套在其中的Java代码组成的一个普通文本文件，JSP页面的文件扩展名为.jsp
+	2. 在JSP页面中编写的Java代码需要嵌套在<% %>之中，嵌套在<% %>之中的Java代码称之为脚本片段，没有嵌套在<% %>之中的内容称之为JSP的模板元素
+	3. JSP中的Java代码可以使用out.println语句将Java程序代码产生的结果字符串输出给客户端，也可以使用syso语句将它们打印到命令行窗口
+	4. JSP文件就像普通的HTML文件一样，它们可以放置在WEB应用程序中的除WEB-INF及其子目录外的其他任何目录中，JSP页面的访问路径与普通HTML页面的访问路径形式也完全一致
+	5. 在JSP页面中也可以使用一种称之为JSP表达式的元素，只需要将输出的变量或者表达式直接封装在<%= %>之中，就可以向客户端输出这个变量或表达式的运算结果。在JSP表达式中嵌套的变量或者表达式后面不能有分号
+四、JSP的运行原理
+	1. WEB容器（Servlet引擎）接收到以.jsp为扩展名的URL的访问请求时，它将把该访问请求交给JSP引擎去处理
+	2. 每个JSP页面在第一次被访问时，JSP引擎将它翻译成一个Servlet源程序，接着再把这个Servlet源程序编译成Servlet的class文件，然后再由WEB容器（Servlet引擎）像调用普通Servlet程序一样的方式来装载和解释执行这个JSP页面翻译成的Servlet程序
+	3. JSP规范也没有明确要求JSP中的脚本程序语言必须采用Java语言，JSP中的脚本程序代码可以采用Java语言之外的其他脚本语言来编写，但是，JSP页面最终必须转换成Java Servlet程序
+	4. 可以在WEB应用程序正式发布之前，将其中的所有JSP页面先编译成Servlet程序。
+五、JSP页面的隐含变量：
+	1. JSP页面的隐含变量存在于以下方法中
+		public void _jspService(HttpServletRequest request, HttpServletResponse response)
+        throws java.io.IOException, ServletException {
+
+			JspFactory _jspxFactory = null;
+			PageContext pageContext = null;
+			HttpSession session = null;
+			ServletContext application = null;
+			ServletConfig config = null;
+			JspWriter out = null;
+			Object page = this;
+			JspWriter _jspx_out = null;
+			PageContext _jspx_page_context = null;
+			
+			//...
+			
+			//使用<% %>编写的代码在此位置，可以用到request、response、pageContext、session、application、config、out、page这八个隐含对象（实际上还可以使用一个叫做exception的隐含对象）
+	2. 九个隐含对象：
+		①request: HTTPServletRequest的一个对象
+		②response: HttpServletResponse的一个对象（在JSP页面中几乎不会调用response的任何方法）
+		③pageContext: 页面的上下文，是PageContext的一个对象，可以从该对象中获取到其他8个隐含对象，也可以从中获取当前页面的其他信息
+		④session: 代表浏览器和服务器的一次会话，是HTTPSession的一个对象，稍后详细讲解
+		⑤application: 代表当前WEB应用，是ServletContext对象
+		⑥config: 当前JSP对应的Servlet的Servletconfig对象（几乎不用），若需要访问当前JSP配置的初始化参数，需要通过隐射的地址才可以
+			映射JSP：
+			<servlet>
+				<servlet-name>hellojsp</servlet-name>
+				<jsp-file>index.jsp</jsp-file>
+				<init-param>
+					<param-name>test</param-name>
+					<param-value>testvalue</param-value>
+				</init-param>
+			 </servlet>
+	 
+			 <servlet-mapping>
+				<servlet-name>hellojsp</servlet-name>
+				<url-pattern>hello.jsp</url-pattern>
+			 </servlet-mapping>
+		⑦out: JspWriter的对象，调用out.println()可以直接把字符串打印在浏览器上
+		⑧page: 指向当前JSP对象的Servlet对象的引用，但是为Object类型，只能调用Object类的方法（几乎不使用）
+		⑥exception: 在声明了page指令的isErrorPage="true"时，才可以使用<%@page isErrorPage="true" %>
+	3. 需要掌握的隐含对象:
+		①pageContext
+		②request
+		③session
+		④application
+		⑤该属性的作用域从小到大依次排序
+	4. 不常用的隐含对象:
+		①out
+		②response
+		③config
+		④page
+	5. 只有当页面page指令的isErrorPage="true"时
+		①exception
+六、JSP语法：
+	1. JSP模板元素
+		①JSP页面中的静态HTML内容称之为JSP模板元素，在静态的HTML内容之间可以嵌套JSP的其他各种元素产生动态内容和执行业务逻辑
+		②JSP模板元素定义了网页的基本骨架，既定义了页面的结构和外观。
+	2. JSP表达式
+		①JSP表达式提供了将一个Java变量或表达式的计算结果输出到客户端的简化方式，它将要输出的变量或者表达式直接封装在<%= 和 %>之中。
+		②JSP表达式中的变量或表达式的计算结果将被换成一个字符串，然后被插入整个JSP页面输出结果的相应位置处。
+		③JSP表达式中的变量或者表达式后面不能与分号，JSP表达式被翻译成Servlet程序中的一条out.print(...)语句。
+		④举例，即以下两种方式的输出过程和结果一致。
+			<%
+				String str = "我是一个字符串";
+				out.print(str);
+			%>
+			<br>
+			<%= str %>
+	3. JSP的脚本片段
+		①JSP脚本片段是指嵌套在<%h和%>之间的一条或多条JAVA程序代码
+		②在JSP脚本片段中，可以定义变量，执行基本的程序运算、调用其他Java类、访问数据库、访问系统等普通Java程序所能实现的功能。
+		③在JSP脚本片段中可以直接使用JSP提供的隐式对象完成WEB应用程序特有的功能
+		④在JSP脚本片段中的Java代码将被原封不动的搬移仅有JSP页面所翻译成的Servlet的_JSPService方法中。所以，
+		   JSP脚本片段中只能是符合Java语法要求的程序代码，除此之外的任何文本、HRML标记、其他JSP元素都必须在脚本片段之外编写
+		⑤JSP脚本片段中的Java代码必须严格遵循Java语法，例如，每条命令执行语句后面必须采用分号（;）结束。
+		⑥在一个JSP页面中可以有多个脚本片段（每个脚本片段代码嵌套在各自独立的一对<%和%之间>），在两个或多个脚本片段之间可以嵌入文本、HTML标记和其他JSP元素。
+		⑦举例：
+			<%
+				String ageStr = request.getParameter("age");
+				Integer age = Integer.parseInt(ageStr);
+				if(age >= 18) {
+			%>
+					成年
+			<% 	
+				}else {
+			%>
+					未成年
+			<% 
+				}
+			%>
+	4. JSP声明
+		①JSP声明将Java代码封装在<%!和%>之中，它里面的代码将被插入进Servlet的_jspService方法的外面，所以，JSP声明可用于定义JSP页面转换成的Servlet程序的静态代码块、成员变量和方法。
+		②多个静态代码块、变量和函数可以定义在一个JSP声明中，也可以分别单独定义在多个JSP声明中
+		③JSP隐式对象的作用范围仅限于Servlet的的_jspService方法中，所以在JSP声明中不能使用这些隐式对象
+		④在JSP页面中几乎从不使用JSP声明
+	5. 注释
+		①JSP注释：<%-- --%>
+		②HTML注释：<!-- -->
+		③区别：JSP注释的Java代码不会被执行，而HTML注释的Java代码会被执行。
+	6. 如何查找JSP页面中的错误
+		①JSP页面中的JSP语法格式有问题，导致其不能被翻译成Servlet源文件，JSP引擎将提示这类错误发生在JSP页面中的位置（行和列）以及相关信息
+		②JSP页面中的JSP语法格式没有问题，但被翻译成Servlet源文件中出现Java语法问题，导致JSP页面翻译成Servlet源文件不能通过编译，JSP引擎也将提示这类错误发生在JSP页面的位置（行和列）以及相关信息
+		③JSP页面翻译成的Servlet程序在运行时出现异常，这与普通Java程序的运行时错误完全一样，Java虚拟机将提示错误发生在Servlet源文件中的位置（行和列）以及相关信息。
+	
+七、对JSP的概括
+	1. Servlet是写逻辑的，而写界面则需要JSP
+	2. JSP是在HTML页面中写Java代码，但扩展名必须是.jsp。
+	3. JSP可以放置在WEB应用中除了WEB-INF及其子目录外的其他任何目录中
+	4. JSP本质上是一个Servlet程序，建议去JSP翻译后的.java源文件。
+	5. JSP的九个隐含变量  
+八、域对象
+	1. 域对象的方法API：
+		①Object getAttribute(String name): 获取指定的属性
+		②void setAttribute（String name, Object o): 设置属性
+		
+		③Enumeration getAttribute(): 获取所有的属性的名字组成的Enumeration对象
+		④removeAttribute(String name): 移除指定的属性值
+		
+	2. 域对象：
+		①pageContext: 属性的作用范围仅限于当前JSP页面
+		②request:属性的作用范围仅限于同一个请求（在请求转发时可以跨页面取属性值）
+		③session: 属性的作用范围仅限于一次会话，即浏览器打开直到关闭称之为一次会话（在此期间会话不会失效）
+		④application: 属性的作用范围仅限于当前WEB应用，是属性作用范围最大的域对象，即只要一处设置属性，其他各处如JSP、Servlet中都可以获取域对象的属性。
+	3. 举例：
+		①在attr.jsp中定义域对象的属性：
+			<%
+				pageContext.setAttribute("pageContextAttr", "pageContextVal");
+				request.setAttribute("requesttAttr", "requestVal");
+				session.setAttribute("sessionAttr", "sessionVal");
+				application.setAttribute("applicationAttr", "applicationVal");
+			%>
+		
+		
+			pageContextAttr: <%= pageContext.getAttribute("pageContextAttr") %><br>
+			requesttAttr: <%= request.getAttribute("requesttAttr") %><br>
+			sessionAttr: <%= session.getAttribute("sessionAttr") %><br>
+			applicationAttr: <%= application.getAttribute("applicationAttr") %><br>
+		
+			<a href="attr2.jsp">point attr2.jsp</a><br>
+			<a href="testAttr">point servlet</a><br>
+		②在attr2.jsp中获取域对象的属性
+			pageContextAttr: <%= pageContext.getAttribute("pageContextAttr") %><br>
+			requesttAttr: <%= request.getAttribute("requesttAttr") %><br>
+			sessionAttr: <%= session.getAttribute("sessionAttr") %><br>
+			applicationAttr: <%= application.getAttribute("applicationAttr") %><br>
+		③在Servlet中获取属性
+			PrintWriter out = response.getWriter();
+		
+			//requesttAttr
+			Object requesttAttr = request.getAttribute("requesttAttr");
+			out.print("requesttAttr: " + requesttAttr + "<br/>");
+			
+			//sessionAttr
+			Object sessionAttr = request.getSession().getAttribute("sessionAttr");
+			out.print("sessionAttr: " + sessionAttr + "<br/>");
+			
+			//applicationAttr
+			Object applicationAttr = getServletContext().getAttribute("applicationAttr");
+			out.print("applicationAttr: " + applicationAttr + "<br/>");
+		④结果：在attr.jsp页面中能获取所有域对象的属性，在attr2.jsp中只能获取session和application的属性，在Servlet中只能获取
+				application的属性，原因是在同一个页面中中可以获取所有的域对象的attribute属性，在同一个浏览器会话中只能获取session和
+				application的attribute属性，而当application存在于WEB应用中时，application的attribute属性就能获取到。
+九、请求重定向和转发
+	1. RequestDispatcher接口：执行请求转发的接口
+		①RequestDispatcher实例对象是由Servlet引擎创建的，它用于包装一个要被其他资源调用的资源（例如，Servlet、HTML文件、JSP文件等），并可以通过其中的方法转发给所包装的资源。
+		②RequestDispatcher接口定义了两个方法：forward和include方法。
+		③forward和include方法接收两个参数必须是传递给当前Servlet的service方法的那两个ServletRequest和ServletResponse对象。
+		④获取RequestDispatcher对象的方法：
+			A. ServletContext.getRequestDispatcher(参数只能是以“/”开头的路径)
+			B. ServletContext.getRequestDispatcher()
+			C. ServletRequest.getRequestDispatcher(参数可以不是以“/”开头的路径)
+	2. 直接调用HttpServletResponse的sendRedirect()方法执行请求重定向。
+	3. 请求重定向和转发的本质区别：请求转发只发出一次请求，而请求重定向则发出了两次请求
+		①请求转发，地址栏是初次发出请求的地址；请求重定向不再是初次发出请求的地址，而是最后响应的那个地址
+		②请求转发，在最终的Servlet中，request对象和请求转发Servlet中的request对象是同一个对象；而请求重定向的request对象不是同一个对象。
+		③请求转发，只能转发给当前WEB应用的资源，而请求重定向可以重定向到任何资源
+		④请求转发，“/”代表的是当前WEB的根目录，而请求重定向的“/”是站点（http://localhost:8080/）的根目录。
+	4. 举例：
+		①请求转发
+			System.out.println("ForwardServlet's doGet");
+			String path = "targetServlet";
+			request.setAttribute("name", "Li");
+			System.out.println("ForwardServletAttr: " + request.getAttribute("name"));
+			
+			//1. 调用HTTPServletRequest的getRequestDispatcher()方法获取RequestDispatcher对象
+			//需要传入转发的地址
+			RequestDispatcher requestDispatcher = request.getRequestDispatcher("/" + path);
+			//2. 调用RequestDispatcher的forward()方法进行请求的转发。
+			requestDispatcher.forward(request, response);
+		②请求重定向：
+			System.out.println("RedirectServlet's doGet");
+			request.setAttribute("name", "Yu");
+			System.out.println("ForwardServletAttr: " + request.getAttribute("name"));
+			
+			//执行请求的重定向，直接调用HttpServletResponse的sendRedirect()方法
+			//传入的参数为重定向的地址
+			String path = "targetServlet";
+			response.sendRedirect(path);
+十、JSP指令
+	1. 简介：
+		①JSP指令（directive）是为JSP引擎而设计的，它们并不直接产生任何可见输出，而是告诉引擎如何处理JSP页面中的其余部分。
+		②JSP指令的基本语法格式：
+			<%@ 指令 属性="值"%>
+			举例：<%@ page contentType="text/html;charset=utf-8"%>
+			注意：属性名部分是大小写敏感的。
+		③在目前的JSP2.0版本中，定义了page、include和taglib这三种指令，每种指令中定义了一些各自的属性
+		③如果要在一个JSP页面中设置同一条指令的多个属性，可以使用多条指令语句单独设置每个属性，也可以使用同一条指令语句设置多个属性。
+			A. 第一种方式：
+				<%@ page language="java" contentType="text/html; charset=UTF-8"
+					pageEncoding="UTF-8" import="java.util.Date" %>
+			B. 第二种方式：
+				<%@ page language="java" contentType="text/html; charset=UTF-8" %>
+				<%@ page pageEncoding="UTF-8" import="java.util.Date" %>
+	2. Page指令：
+		①page指令用于定义JSP页面的各种属性，无论page指令出现在JSP页面中的什么地方，它的作用都是整个JSP页面，为了保证程序的可读性和遵循良好的编程习惯，
+			page指令最好是放在JSP页面的起始位置
+		②JSP2.0规范中定义的page指令的完整语法：
+			<%@ page
+				[language="java"]
+				[extends="package.class"]
+				[import="{package.class|package}, ..."]
+				[session="true|false"]
+				[buffer="none|8kb|sizekb"]
+				[autoflush="true|false"]
+				[info="text"]
+				[errorPage="redirect_url"]
+				[isErrorPage="true|false"]
+				[contentType="text/html;charset=utf-8"]
+				[pageEncoding="characterSet|utf-8"]
+				[isELIgnored="true|false"]
+			%>
+		③import属性：指定当前JSP页面对应的Servlet需要导入的类。
+			<%@page import="java.text.DateFormat"%>
+		④session属性：取值为true或者为false，指定当前页面的session隐藏变量是否可用，也可以说明访问当前页面是否一定需要生成HTTPSession对象。
+		⑤⑤errorPage和isErrorPage属性：
+			A. errorPage属性: 指定若当前页面出错时实际响应的页面，其中“/”表示的是当前WEB应用的根目录。<%@ page errorPage="error.jsp" %>
+			B. isErrorPage属性：指定当前页面是否为错误处理页面，也指定当前页面能否使用exception隐含对象。若isErrorPage为true，并使用了exception的方法，
+			一般不建议直接访问该错误响应页面。
+			C. 对于Tomcat服务器而言，WEB-INF下的文件是不能通过在浏览器中输入地址来访问，但是可以通过请求转发即可访问
+			D. 在响应error.jsp时，JSP引擎使用了请求转发的形式请求了错误页面。
+			E. 还可以在web.xml中配置错误响应页面
+				<error-page>
+				<!-- 指定错误的代码：404表示没有指定的资源，500表示内部错误 -->
+				  <error-code>404</error-code>
+				<!-- 指定响应页面的位置 -->
+				  <location>/hello.jsp</location>
+			  </error-page>
+			  
+			  <error-page>
+				<!-- 指定响应的类型 -->
+				  <exception-type>java.lang.ArithmeticException</exception-type>
+				  <location>/WEB-INF/error.jsp</location>
+			  </error-page>
+		⑥contentType：指定当前JSP页面的响应类型，<%@ page contentType="text/html; charset=UTF-8" %>
+		实际上调用的是response.setContentType("text/html; charset==UTF-8")，可以指定当前JSP页面的响应类型为：application/msword
+		charset指定返回的页面的字符编码是什么，通常取值为UTF-8。
+		⑦pageEncoding: 指定当前JSP页面的字符编码，通常情况下该值和ContentType中charset一致。
+		⑧isELIgnored: 指定当前JSP是否可以使用EL表达式。
+	3. include指令
+		①include指令用于通知JSP引擎在翻译当前JSP页面时将其他文件中的内容合并进当前JSP页面转换成的Servlet源文件中，
+		这种在源文件级别进行引进的方式称之为静态引入，当前JSP页面与静态引入的页面紧密结合成为一个Servlet
+		②语法：
+			<%@ include file="relativeURL" %>，其中的file属性用于指定被引入文件的相对路径
+		③细节：
+			A. 被引入的文件必须遵循JSP语法，其中的内容可以包含静态HTML、JSP脚本元素、JSP指令的JSP行为元素等普通JSP页面所具有的一切内容。
+			B. 被引入的文件可以使用任何扩展名，即使其扩展名是html，JSP引擎也会按照处理JSP页面的方式处理他里面的内容，为了见明知意，
+			JSP规范建议使用.jspf(JSP fragments)作为静态文件的扩展名
+			C. 在将JSP文件翻译成Servlet源文件时，JSP引擎将合并被引入的文件与当前JSP页面中指令元素（设置pageEncoding属性的pagez指令除外），
+			所以，%除了import和pageEncoding属性之外，page指令的其他属性不能在这两个页面有不同的设置值%。
+			D. 除了指令元素之外，被引入的文件中的其他元素都被转换成相应的Java源代码，然后插入进当前JSP页面所翻译成的Servlet源文件中，插入位置与include指令在当前JSP页面的位置一致。
+			E. %引入文件与被引入文件是在被JSP引擎翻译成Servlet的过程中进行合并的，并不是先合并源文件后再对合并的结果进行翻译%。当前JSP页面的源文件与被引入文件的源文件可以采取不同的字符集编码，
+			即是在同一页面中使用page指令的pageEncoding或者contentType属性指定了其源文件的字符集编码，在另外一个页面中还需要指定其源文件所使用的字符集。
+			F. Tomcat 5.x在访问JSP页面时，可以检测它所引入的其他文件是否发生了修改，如果发生了修改，则重新编译当前JSP页面
+			G. %file属性的设置值必须使用相对路径%，如果以“/”开头，表示相对于当前WEB应用程序的根目录注意不是站点目录），否则，表示相对于当前文件。
+	4. 	JSP标签
+		①概念：
+			A. JSP还提供了一种称之为Action的元素，在JSP页面中使用Action元素可以完成各种通用的JSP页面功能，也可以实现一些出路复杂业务逻辑的专业功能
+			B. Action元素采用XML元素的语法格式，即每个Action元素在JSP页面中都以XML标签的形式出现
+			C. JSP规范中定义了一些标准的Action元素，这些元素的标签名都以jsp作为前缀，并且全部采用小写，例如：<jap:include>、<jsp:forward>等等。
+		②<jsp:include>标签：
+			A. <jsp:include>标签用于把另一个资源的输出内容插入进当前JSP页面的输出内容之中，这种在JSP页面执行时的引入方式称之为动态引入
+			B. 语法：
+				a. jsp:include page="relativeURL | <%=expression%>" flush="true|false"></jsp:include>
+				b. page属性用于指定被引入资源的相对路径，它可以通过执行一个表达式来获得。
+				C. flush属性指定在插入其他资源的输出内容时，是否先得到当前JSP页面的已输出内容刷新到客户端。
+			C. <jsp:include>与include指令的比较
+				a. <jsp:include>标签是当前JSP页面的执行期间插入诶引用资源的输出内容，当前JSP页面与被动态引入的资源是两个彼此独立的执行实体，%被动引入的资源必须是一个能独立被WEB容器调用和执行的资源%。
+				include指令只能引入遵循JSP格式的文件，被引入文件与当前JSP文件共同被翻译成一个Servlet的源文件
+				b. <jsp:include>标签和include指令都可以把一个页面的内容分成多个组件来生成，开发者不必再把页眉和页脚部分到的相同HTML代码复制到每个JSP文件中，从而可以更加轻松的完成维护工作，
+				%但是都应该注意最终的输出结果内容应遵循HTML语法结构%，例如，如果当前页面产生了<html>、</html>、<body>和</body>等标记。则被引入文件中就不能输出上述标记。
+				c. %<jsp:include>标签对JSP引擎翻译JSP页面的过程不起作用%，它是在JSP页面的执行期间才被调用，因此不会影响两个页面的编译。%由于include指令是在JSP引擎翻译JSP页面的过程中被解释处理，所以它对JSP引擎翻译JSP页面的过程起作用%
+				如果多个JSP页面中要用到一些相同的声明，那么可以吧这些相同声明语句放在一个单独的文件中，然后每个JSP页面使用动态或者静态方式将这个文件引用进来。
+				d. 虽然<jsp:include>与include指令有本质的区别，但是在开发中可以使用其中一种引入的方式引入资源。
+		③<jsp:forward>标签：
+			A. <jsp:forward>标签用于把一个请求转发给另一个请求
+			B. 语法：
+				a. <jsp:forward page="relativeURL | <%=expression%>"></jsp:forward>
+				b. page属性用于指定请求转发到的资源的相对路径，它也可以通过执行一个表达式开或者
+			C. RequestDispatcher.forward、PageContext.forward、<jsp:forward>的区别：
+				调用RequestDispatcher.forward的JSP脚本代码前后不能出现JSP模板内容
+				调用PageContext.forward的JSP脚本代码的后面不能有JSP模板内容
+				<jsp:forward>前后都能有JSP模板内容，并且其可向请求转发的JSP发送一些参数。
+			D. RequestDispatcher.forward与<jsp:forward>的相同点：都是请求转发
+				<jsp:forward page="b.jsp"></jsp:forward>
+				request.getRequestDispatcher("/b.jsp").forward(request, response);
+			E. <jsp:forward>与<jsp:include>都可以使用子标签<jsp:param/>向请求的页面或者引入的页面发送参数
+				当前页面JSP：
+				<jsp:forward page="b.jsp">
+					<jsp:param value="0829" name="Yu"/>
+				</jsp:forward>
+				
+				<jsp:include page="/dynamicInclude/b.jsp">
+					<jsp:param value="0504" name="Li"/>
+				</jsp:include> 
+				被引入或者请求转发页面JSP：
+				<%= request.getParameter("Yu") %>
+				<%= request.getParameter("Li") %>
+	5. 	中文乱码问题
+		①在JSP页面上输入中文，请求页面后不出现乱码，即保证contentType="text/html; charset=UTF-8"和pageEncoding="UTF-8"%中pageEncoding和charset的编码一致
+		且都支持中文，通常建议取值为UTF-8，还需要保证浏览器的显示字符编码和请求的JSP页面的编码一致。
+		②获取中文参数：默认参数在传输过程中使用的字符集编码为：ISO-8859-1
+			A. 对于post请求：只要在获取请求信息之前，调用request的setCharacterEncoding("UTF-8")即可解决获取中文参数乱码问题
+			B. 对于get请求：调用request的setCharacterEncoding("UTF-8")的方式不适应与get请求，并且在Tomcat6.0版以下的默认编码格式仍然是iso-8859-1,而在Tomcat7.0以上的默认编码是UTF-8，于是：
+				a. 方法一：采用重新编码的方式，即：
+					<%
+						String val = request.getParameter("username");
+						String username = new String(val.getBytes("iso-8859-1"), "UTF-8");
+						out.print(username);
+					%>
+				b. 方法二：可以通过修改Tomcat的server.xml文件的方式，参照http://localhost:8080/docs/config/index.html文档的useBodyEncodingForURI属性
+				为Connector节点添加URIEncoding="UTF-8"属性即可，该设置的位置为D:\Program Files\apache-tomcat-6.0.9\conf\server.xml以及eclipse下的server\Tomcat v6.0 Server at localhost-config\server.xml，缺一不可。
+				<Connector port="8080" protocol="HTTP/1.1" maxThreads="150" connectionTimeout="20000" redirectPort="8443" URIEncoding="UTF-8"/>
+					
+		
+		
+		
+		

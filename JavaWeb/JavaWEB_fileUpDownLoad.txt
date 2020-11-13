@@ -1,0 +1,157 @@
+一、文件上传基础
+	1. 进行文件上传时，表单需要做的准备
+		①请求方式为POST：<form action="uploadServlet" method="post">
+		②使用file的表单域：<input type="file" name="file"/>
+		③使用multipart/form-data的请求编码方式：<form action="uploadServlet" method="post" enctype="multipart/form-data">
+		④具体实现
+			form action="uploadServlet" method="post" enctype="multipart/form-data">
+				<input type="file" name="file"/>
+				<input type="text" name="desc"/>
+				<input type="submit" value="Submit"/>
+			</form>
+	2. 关于enctype:
+		①application/x-www-form-urlencoded.表单enctype属性的默认值。这种编码方式使用有限的字符集。当使用了非字母和数字时，必须使用“%HH”代替（H代表十六进制数字）。
+		对于大容量的二进制数据或包含非ASCII字符的文本来说，这种编码不能满足要求
+		②multipart/form-data，form设定了enctype="multipart/form-data"属性后，表示表单以二进制传输数据。
+	3. 服务器
+		①不能再使用request.getParameter()等方式获取请求信息，因为请求编码的方式已经改为multipart/form-data，以二进制的方式提交请求信息
+		②可以使用输入流的方式获取，但是不建议使用输入流的方式获取
+		③具体使用commons-fileuoload组件来完成文件的上传操作。
+二、具体使用commons-fileuoload组件来完成文件的上传操作。
+	1. 环境搭建：加入两个jar包
+		commons-fileupload-1.4.jar
+		commons-io-2.6.jar
+	2. 基本思想：
+		①commons-fileuoload 可以解析请求，得到一个FileItem对象组成的List
+		②commons-fileuoload 把所有的请求信息解析为FileItem对象，无论是文本域还是文件域
+		③可以调用FileItem的isFormField()方法来判断一个表单域或不是表单域（则是文件域）
+		④再进一步获取信息
+			A. 如果FileItem对象是表单域，可以获取请求参数的名字以及值
+				if (item.isFormField()) {
+					String name = item.getFieldName();
+					String value = item.getString();
+				}
+			B. 如果FIleItem对象是非表单域，则可以获取文件域的信息
+				if (!item.isFormField()) {
+					String fieldName = item.getFieldName();
+					String fileName = item.getName();
+					String contentType = item.getContentType();
+					boolean isInMemory = item.isInMemory();
+					long sizeInBytes = item.getSize();
+					InputStream is = fileItem.getInputStream();
+					...
+				}
+	3. 如何得到List<FileItem>
+		①简单的实现方式
+			// Create a factory for disk-based file items
+			DiskFileItemFactory factory = new DiskFileItemFactory();
+
+			// Create a new file upload handler
+			ServletFileUpload upload = new ServletFileUpload(factory);
+
+			// Parse the request
+			List<FileItem> items = upload.parseRequest(request);
+		②复杂的实现方式：可以为文件上传加入一些限制和其他的属性 
+			// Create a factory for disk-based file items
+			DiskFileItemFactory factory = new DiskFileItemFactory();
+
+			// Set factory constraints
+			//设置内存中最多可以存放的上传文件的大小，若超出则把文件写入到一个临时文件夹中，以byte为单位
+			factory.setSizeThreshold(yourMaxMemorySize);
+			//设置临时文件夹
+			factory.setRepository(yourTempDirectory);
+
+			// Create a new file upload handler
+			ServletFileUpload upload = new ServletFileUpload(factory);
+
+			// Set overall request size constraint
+			//设置上传文件的总的大小，也可以设置单个文件的大小
+			upload.setSizeMax(yourMaxRequestSize);
+
+			// Parse the request
+			List<FileItem> items = upload.parseRequest(request);
+三、文件的下载
+	1. 简介
+		①情景：在一些网络系统中，需要隐藏下载文件的真实地址，或者下载的文件需要一个程序来动态的确定后在传给客户端
+		②方案：利用程序编码实现下载
+			A. 可以增加安全访问控制，只经过授权认证的用户提供下载
+			B. 可以任意位置提供下载数据
+	2. 静态下载
+		①使用超链接关联到目标文件，目标文件另存为即可下载文件
+		②缺点：
+			A. 必须为程序指定文件的路径
+			B. 不能动态生成下载文件
+	3. 动态下载：利用程序实现下载需要设置两个响应头
+		①web服务器需要告诉浏览器器输出的内容的类型不是普通的文本文件或者HTML文件，而是一个要保存到本地的下载文件。设置ContentType的值为：application/x-msdownload
+		②web服务器希望浏览器不直接处理相应的实体内容，而是由用户选择将相应的实体内容保存到一个文件中，这需要设置Content-Disposition报头。该报头指定了接受程序处理数据内容的方式
+		在HTTP应用中只有attachment是标准方式，attachment表示要求用户干预。在attachment后面还可以指定fiilename参数，该参数是服务器建议浏览器将实体内容保存到文件中的文件名称。在设置
+		Content-Disposition之前一定要先指定ContentType
+		③具体文件：可以调用response.getOutputStream的方式，以I/O流的方式发送给客户端
+		④代码：
+			//1. 通知客户端浏览器：这是一个需要下载的文件，不能再按普通的HTML的方式打开
+			//即设置一个响应的类型：application/x-msdownload
+			response.setContentType("application/x-msdownload");
+			String filename = "文件下载.txt";
+			//2. 通知客户端浏览器需要通过手工干预的方式处理该文件，不在由浏览器处理该文件，而是交由用户自行处理
+			//设置用户处理的方式：Content-Disposition，为客户端下载动态指定文件下载名字，需使用URLEncoder.encode(filename, "UTF-8")进行转码
+			response.setHeader("Content-Disposition", "attachment;filename=" + URLEncoder.encode(filename, "UTF-8"));
+			//为下载文件指定路径
+			String txtFileName = "C:\\Users\\Administrator\\Desktop\\Linux实操篇.txt";
+			//3. 以I/O流的方式发送给客户端
+			OutputStream out = response.getOutputStream();
+			//对文件进行读入的I/O操作
+			InputStream in = new FileInputStream(txtFileName);
+			byte[] b = new byte[1024];
+			int len = 0;
+			
+			while ((len = in.read(b)) != -1) {
+				out.write(b, 0, len);
+			}
+			in.close();
+四、使用fileupload组件完成文件的上传应用
+	1. 需求
+		①上传
+			A. 在upload.jsp页面上使用jQuery实现“新增一个附件”，“删除附件”的功能，至少保留一个上传附件
+			B. 对文件的扩展名和文件的大小进行验证，以下的规则是可配置的，而不是写死在程序中的
+				a. 文件的扩展名必须是.pptx, docx, docx
+				b. 每个文件的大小不能超过1M
+				c. 总的文件大小不能超过5M
+			C. 若验证失败，则在upload.jsp页面上显示错误消息
+				a. 若某一个文件不符合要求：XXX文件扩展名不合法或者XXX文件的大小超过1M
+				b. 总的文件大小不能超过5M
+			D. 若验证通过，则进行文件的上传操作
+				a. 文件上传，并给一个不能和其他文件重复的名字，但扩展名不变
+				b. 在对应的数据表中添加一条记录
+				
+				id file_name file_path filr_desc
+		②下载
+			问题一：如何清除上传文件临时文件夹中的文件
+				A. 使用监听器的线程自动删除临时文件夹中的文件，但是这种比较耗资源
+				B. 手动删除临时文件夹中的文件，使用递归的方式进行删除
+			问题二：如何获取一个checkbox值的字符串数组
+				当使用checkbox上传表单时，FileItem会捕获到一组具有相同name属性的FileItem对象，该组对象即是组成字符串数组的元素
+			A. 在文件上传成功后的success.jsp页面上提供一个“下载资源”的超链接
+			B. 点击“下载资源”的超链接，会把请求发送到Servlet，读取数据库，在页面上可以下载资源信息
+			C. 再点击下载即可完成对应文件的下载。
+	2.  如何修改小工具或者框架的源代码
+		①原则：能不修改就不修改
+		②修改的方法
+			A. 修改源代码，替换jar包中对应的class文件
+			B. 在本地新建相同的包，和类，在这个类中修改即可
+			 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

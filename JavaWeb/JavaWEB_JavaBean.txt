@@ -1,0 +1,60 @@
+一、JavaBean
+	1. JavaBean的概念
+		①用作JavaBean的类必须提供一个公共的、无参的构造方法
+		②JavaBean的属性与普通Java类的属性概念不一样，JavaBean的属性是以方法定义的形式出现的
+		③用于对属性赋值的方法称为属性修改器或者setter方法，用于读取属性值的方法称为属性访问器或者getter方法
+		④属性修改器必须以小写的set前缀开始，后缀属性名，且属性名的第一个字母要改为大写
+		⑤属性访问器必须以小写的get前缀开始，后缀属性名，且属性名的第一个字母要改为大写
+		⑥JavaBean的属性名是根据setter方法与getter方法的名称来生成的，setter方法或者getter方法中除去前缀“set”和“get”后的部分即为属性名，但属性名的首字母必须为小写。
+	2. JavaBean在JSP中的应用
+		①<jsp:useBean>标签
+		②<jsp:setProperty>标签
+		③<jsp:getProperty>标签
+	3. 在JSP中如何使用JavaBean
+		①JSP规范专门定义了三个JSP标签：<jsp:useBean>、<jsp:setProperty>、<jsp:getProperty>, 它们分别用于创建和查找JavaBean的实例对象、设置JavaBean对象的属性、读取JavaBean对象的属性
+		②对于JSP页面来说，只要一个类具有一个公共的、无参的构造方法，就可以吧这个类当做JavaBean来使用，如果类中有不接受任何参数的getter方法或者值接受一个参数的setter方法，就可以把前缀“get”或“set后面的部分当做一个属性名来引用”
+		③JSP页面可以像调用一个普通Java类的方式去调用JavaBean，即先使用Java代码创建JavaBean的实例对象，然后直接调用JavaBean对象的getter和setter方法。
+二、JavaBean在JSP中的应用
+	1. <jsp:useBean>标签
+		①<jsp:useBean>标签用于在某个指定的域范围内（application、session、request、pageContext等）中查找一个指定名称的JavaBean对象，如果存在则直接返回该JavaBean对象的引用，如果不存在则实例化一个新的JavaBean对象并将它按指定的名称存储在指定的域范围内中
+		②常见的语法一：
+			<jsp:useBean id="student" class="com.li.cookie.bean.Student"
+			scope="session"></jsp:useBean>
+			A. class属性用于指定JavaBean的完整类名
+			B. id属性用于指定JavaBean实例对象的引用名称和其存储在域范围中的名称
+			C. scope属性用于指定JavaBean实例对象所存储的域范围，其取值只能是page、request、session、application等四个值中的一个，其默认值是page。
+		③该标签的实现原理为：
+			Student student1 = (Student)session.getAttribute("student1");
+			if(student1 == null) {
+				student1 = (Student)Class.forName("com.li.cookie.bean.Student").newInstance();
+				session.setAttribute("student1", student1);
+			}
+		④常见的语法二：
+			<jsp:useBean id="student2" beanName="com.li.cookie.bean.Student" type="java.lang.Object" scope="session"></jsp:useBean>，该标签创建的JavaBean实例是Object类的实例
+		⑤该标签的实现原理为：
+			<%
+				Object object = session.getAttribute("student2");
+				if(object == null) {
+					object = Class.forName("com.li.cookie.bean.Student").newInstance();
+					session.setAttribute("object", object);
+				}
+			%>
+	2. <jsp:setProperty>标签
+		①<jsp:setProperty>标签用于对JavaBean实例中的属性修改属性值，该标签可为某个属性修改属性值，也可以为所有的属性修改属性值
+		②常见的语法：
+			<jsp:setProperty property="studentName" value="Li" name="student"/>
+			A. property属性用于获取JavaBean属性
+			B. value属性用于设置JavaBean属性的属性值
+			C. name属性用于指定JavaBean实例对象的引用名称
+		③该标签的实现原理为：student.studentName("Li")
+		④为所有的属性都赋值（属性值来源于请求参数）的语法：
+			http://localhost:8080/cookie/bean.jsp?studentId=2648&studentName=Yu&phone=15622744756
+			<jsp:setProperty property="*" name="student"/>
+			A. 若property的值为*，省略value属性，则将自动为所有属性赋值为对应请求参数的值
+	3. <jsp:getProperty>标签
+		①<jsp:getProperty>标签用于获取JavaBean实例中的属性，
+		②常见的语法：
+			<jsp:getProperty property="studentName" name="student"/>
+			A. property属性用于获取JavaBean属性
+			B. name属性用于指定JavaBean实例对象的引用名称
+		③该标签的实现原理为：student.studentName()

@@ -1,0 +1,144 @@
+一、HTTPSession概述：
+	1. session在不同环境下的不同含义
+		①session，中文意思经常翻译为会话，其本来的含义是指有始有终的一系列动作消息。
+		②session在WEb开发环境下的语义又有了新的扩展，它的含义是指一类用来在客户端与服务器之间保持状态的解决方案。有时候Session也用来指这种解决方案的存储结构。
+	2. Session机制
+		①session机制采用的是在服务器保持HTTP状态信息的方案
+		②服务器使用一种类似于散列表的结构（也可能就是使用散列表）来保存信息
+		③当程序需要为某个客户端请求创建一个session时，服务器首先检查 这个客户端的请求里是否包含一个session标识（sessionId），如果已经包含一个sessionId则说明以前
+		已经为此客户端创建过session，服务器就按照sessionId把这个session检索出来使用（如果检索不到，可能会创建一个，这种情况可能出现在服务端已经删除了该用户对应的
+		session对象，但用户人为地请求的URL后面附加一个JSEEION的参数）。如果客户请求不包含sessionId，则为此客户创建一个session并生成一个与此session相关；联的sessionId
+		这个sessionId将在本次响应中返回给客户端保存。
+	3. 保存sessionId的几种方式
+		①保存session的方式可以采取cookie，这样在交互过程中国浏览器可以自动的按照这个规则把这个标识发送给服务器
+		②由于cookie可以被认为禁用，必须有其他机制以便于在cookie被禁用时仍然能够把session id传递回服务器，经常采用的一种技术叫做URL重写，就是把session id附加在URL路径的后面
+		附加的方式有两种，一种是作为URL路径后面的附加信息，另一种是作为查询字符串附加在URL后面。网络在整个交互过程中始终保持状态，就必须在每个客户端可能请求的路径后面都包含这个session id
+	4. Session Cookie
+		①session通过SessionId来区分不同的客户，session是以cookie或URL重写为基础的，默认使用cookie来实现，系统会制造一个名为JSESSIONID来输出cookie，这称之为session cookie，从区别persistent
+		cookies（也就是我们常说的cookie），session cookie是存储于浏览器内存中的，并不是写到硬盘中，通常看不到SESSIONID,但是把浏览器的cookie禁止后，WEB服务器会采用URL重写的方式传递SESSIONID
+		②session cookie针对某一次会话而言，会话结束session cookie也就随着消失了，而persistent cookie只是存在于客户端硬盘上的一段文本。
+		③关闭浏览器，只会是浏览器端内存里的session cookie消失，但不会使保存在服务器端中的session对象消失，同样不会使已经保存到硬盘上的持久化cookie消失。
+		④session cookie的底层原理：
+			Cookie[] cookies = request.getCookies();
+			if(cookies != null && cookies.length > 0) {
+				for(Cookie cookie : cookies) {
+					if("JSESSIONID".equals(cookie.getName())){
+						out.print(cookie.getValue() + "+<br/>");
+					}
+				}
+			}
+			Cookie cookie = new Cookie("JSESSIONID", sessionId);
+			cookie.setMaxAge(30);
+			response.addCookie(cookie);
+二、HttpSession的生命周期：
+	1. 什么时候创建HTTPSession对象：
+		①对于JSP：是否浏览器访问服务器的任何一个JSP，服务器都会立即创建一个HTTPSession对象？不一定
+			A. 若当前JSP是客户端访问的当前WEB应用的第一个资源，且JSP的page指令指定的session属性为false，则服务器就不会为JSP创建一个HTTPSession对象，但是可以手动创建HTTPSession对象。
+			B. 若当前JSP不是客户端访问的当前WEB应用的第一个资源，且其他页面已经创建了一个HTTPSession对象，则服务器也不会为当前JSP页面创建一个HTTPSession对象，而会把和当前会话关联的那个HTTPSession对象对象返回给当前的JSP对象。
+		②对于Servlet：若Servlet是客户端访问的第一个WEB应用资源，则只有调用了request.getSession()或者request.getSession(boolean create)才会创建HTTPSession对象。
+	2. page指令的session="false"到底是什么意思？
+		①当前JSP页面禁用session隐含变量！但可以使用其他的显示的HTTPSession对象。
+	3. 在Servlet中如何获取HTTPSession对象？
+		①request.getSession(boolean create):
+			A. 若create为false：不一定会返回一个HTTPSession对象。如果没有和当前JSP页面相关联的HTTPSession对象，则返回null，如果有则返回HTTPSession对象
+			B. 若create为true：一定会返回一个HTTPSession对象。如果没有关联的HTTPSession对象，则服务器会创建一个新的HTTPSession对象返回，如果有直接返回关联的HTTPSession对象
+		③request.getSession(): 等同于request.getSession()
+	4.  什么时候销毁HttpSession对象：
+		①直接调用HttpSession的invalidate()方法：可以直接使HttpSession对象失效。
+		②服务器卸载了当前的WEB应用。
+		③超出HttpSession的过期时间也会使得session被销毁
+			A. 设置HttpSession的过期时间：HttpSession.setMaxInactiveInterval()
+			B. web.xml文件中设置HttpSession的过期时间（可以在Tomcat根目录下的confi目录下的web.xml中进行修改，也可以在当前WEB项目下进行修改）
+			<session-config>
+				<session-timeout>30</session-timeout>
+			</session-config>
+		④并不是关闭浏览器就销毁了HttpSession。
+三、HttpSession的常用方法：
+	1. 非常用方法
+		①session.getId(): 获取session的Id
+		②session.isNew(): 返回session是否是新建的
+		③ession.getMaxInactiveInterval(): 返回session的最大生命期
+		④session.getCreationTime(): 返回session的新建时间
+		⑤session.getLastAccessedTime(): 返回session的最后一次访问时间
+	2. 常用方法
+		①session.setAttribute("username", username): 给session设置属性
+		②session.getAttribute("username"): 获取session的属性值
+		③session.invalidate(): 销毁session。
+	3. 获取session对象
+		①request.getSession()
+		②request.getSession(boolean create)
+四、利用URL重写实现Session跟踪
+	①Servlet规范中引入了一种补充的会话管理机制，它允许不支持Cookie的浏览器也可以与WEB服务器操持持续会话。这种补充机制要求在响应消息中的实体内容中必须包含
+	下一次请求的超链接，并将会话标识号作为超链接的URL地址的一个特殊的参数
+	②将会话标识号以参数的形式附加在超链接的URL地址后面的技术称之为URL重写，如果在浏览器不支持cookie或者关闭了cookie功能的情况下，WEB服务器还要能够与浏览器
+	实现现有状态的会话，就必须对所有可能被客户端访问的请求路径（包括超链接、form表单的action属性设置和重定向的URL）进行URL重写
+	③HttpServletResponse接口定义了两个用于完成URL重写的方法
+		A. encodeURL():
+		B. encodeRedirectURL():
+		C. 两个方法都是将超链接的URL作为该方法的参数传递进入
+		D. 两个方法的功能一致，任选一种即可。
+五、JavaWeb中的相对路径和绝对路径
+	1.开发时建议编写绝对路径：写绝对路径完全不会出现任何问题，但写相对路径可能会出现问题
+		在Servlet转发到JSP页面时，此时浏览器上的地址栏上显示的是Servlet的路径，而若JSP页面的路径还是相对于该JSP的页面地址，则可能会出现路径混乱的问题
+		/a.jsp
+		/path
+			/b.jsp
+			/c.jsp
+		a.jsp -> Servlet(转发) -> b.jsp -> 超链接到c.jsp(和b.jsp相同的路径下)，如果该过程使用的是相对路径的即会出现路径的问题
+		
+	2. 编写绝对路径可以避免上述问题：
+		①在JavaWeb中什么叫做“绝对路径”？
+			A. 相对于当前WEB应用的根路径的路径称为绝对路径，即任何的路径都必须带上contextPath
+			B. http://localhost:8080/contextPath(当前WEB应用的上下文路径)/a.jsp
+		②如何完成编写
+			A. 若“/”代表的是站点的根目录，在其前面加上contextPath就可以了，而contextPath可以由request或application的getContextPath()获取即可。
+	3. JavaWeb开发中的“/”代表什么？
+		①当前WEB应用的根路径：若“/”需要交由Servlet容器来处理。
+			A. 请求转发时：request.getRequestDispatcher("/path/b.jsp").forward(request, response)
+			B. web.xml文件中映射Servlet访问路径：
+				<servlet-mapping>
+					<servlet-name>ProcessStep2Servlet</servlet-name>
+					<url-pattern>/processStep2</url-pattern>
+				</servlet-mapping>
+			C. 各种定制标签中的“/”
+		②WEB站点的根路径：若“/”需要交由浏览器来处理。
+			A. 超链接：<a href="/TestServlet">To B Page</a>
+			B. 表单中的action：<form action="/login.jsp"></form>
+			C. 请求重定向的时候：response.sengRedirect("/a.jsp")
+六、表单的重复提交
+	1. 重复提交的情况
+		①在表单提交到一个Servlet，而Servlet又通过请求转发的方式响应一个JSP（HTML）页面，此时地址栏还保留Servlet的路径，在响应页面点击“刷新”时，会造成表单的重复提交
+		②在响应页面没有到达的时候重复点击“提交按钮”
+		③点击返回，再次点击“提交”
+	2. 不是重复提交的情况：点击“返回”，“刷新”原表单页面，再次点击“提交”
+	3. 如何避免表单的重复提交
+		①在表单中做一个标记，提交到Servlet时，检查标记是可否存在且是否和预定义的标记一致，若一致，则受理请求，并销毁标记，若不一致或者没有标记，则直接响应提示消息“重复提交”
+		②仅提供一个隐藏域：<input type="hidden" name="token" value="..."/>，该方法行不通：没有方法清除固定的请求参数
+		③把标记放在request中，该方法也行不通，因为表单页面刷新后，request已经被销毁，再提交一个表单时是一个新的request
+		④将标记放在session中，由于在Servlet中通过验证后需要将该标记销毁，因此需要在表单中创建一个隐藏域，在Servlet中获取两个参数进行比较。
+			A. 在原表单页面中，生成一个随机token
+			B. 在原表单页面中，将token的值放入session属性中
+			C. 在原表单页面中，把token放入隐藏域中，
+			
+			D. 在目标的Servlet中：获取session和隐藏域中的token值
+			E. 比较两个值是否一致：若一致，受理请求，庆把session中的token属性销毁
+			F. 若不一致，则直接响应页面：“重复提交”。
+七、验证码：防止表达的恶意提交
+	1. 基本原理：和表单的重复提交一致：
+		①在原表单页面，生成一个验证码的图片，与此同时，把图片上的验证码放入session中
+		②在原表单页面，定义一个文本域，用于输入验证码
+		③在目标的Servlet中：比较session和表单域中的验证码是否一致
+		④若一致，受理请求，且把session中的验证码删除
+		⑤若不一致，通过重定向的方式返回原表单页面，并提示“验证码错误”
+
+
+
+
+
+
+
+
+
+
+
+			

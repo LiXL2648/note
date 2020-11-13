@@ -1,0 +1,199 @@
+一、简单标签
+	1. 提出问题
+		①自定义标签可以降低jsp开发的复杂度和维护量，从HTML角度来说，可以使用HTML不用去过多的关注比较复杂的商业逻辑（业务逻辑）
+		②利用自定义标签，可以使得软件开发人员和页面设计人员合理分工：页面设计人员可以把精力集中在使用标签（HTML，XML或者JSP）创建网站上，而软件开发人员则可以将精力集中在实现底层功能上面，
+		   如：国际化等，从而提高工程的生产力
+		③将具有共同特性的tag库应用于不同的项目中，体现了软件复用的思想
+	2. 什么是自定义标签
+		用户定义的一种自定义的jsp标记。当一个含有自定义标签的jsp页面被jsp引擎编译成Servlet时，tag标签被转化成了对一个称为标签处理类的对象的操作。于是，当JSP页面被JSP引擎转化为Servlet后，
+		实际上tag标签被转化为对tag处理类的操作
+	3. 标签库API
+		标签库API定义在javax.servlet.jsp.tagext包中。
+	4. 传统标签和简单标签
+		①开发自定义标签，其核心就是要编写处理器类，一个标签对应一个处理器类，而一个标签库则是很多处理器的集合。所有的标签处理器类都要事先JspTag接口，改接口中没有定义任何方法，只要作为Tag
+		和SimpleTag接口的父接口
+		②在JSP2.0以前，所有标签处理器类都必须事先Tag接口，这样的标签称之为传统标签
+		③JSP2.0规范又定义了一种新的类型的标签，称之为简单标签，其对应的处理器类要实现SimpleTag接口
+	5. 标签的形式
+		①空标签：<hello/>
+		②带有属性的空标签：<max num1="3" num2="5">
+		③带有内容的标签：<greeting>hello</greeting>
+		④带有内容和属性的标签：<greeting name="Tom">hello</greeting>
+	6. 自定义标签tld文件与使用的比较
+		①tld文件
+			<!-- 建议在jsp页面上使用的标签的前缀 -->
+			<short-name>li</short-name>
+			<!-- 作为tld文件的id, 用来唯一标识当前的TLD文件，多个tld文件的uri不能重复， 
+			在jsp页面的taglibs标签的URI属性来引用-->
+			<uri>http://www.li.com/mytag/core</uri>
+			
+			<!-- 描述自定义的TestSimpleTag 标签 -->
+			<tag>
+				<!-- 标签名: 在jsp页面上使用标签时的名字 -->
+				<name>test</name>
+				<!-- 标签所在的全类名 -->
+				<tag-class>com.li.cookie.tag.TestSimpleTag</tag-class>
+				<!-- 标签体的类型 -->
+				<body-content>empty</body-content>
+			</tag>
+		②使用标签
+			<!-- 导入标签库（描述文件） -->
+			<%@ taglib prefix="li" uri="http://www.li.com/mytag/core" %>
+			<li:test/>
+		③使用标签时，导入标签库（描述文件）使用的指令是taglib指令，prefix（建议使用的前缀）对应tld文件的<short-name>（建议在jsp页面上使用的标签的前缀）子节点
+		  uri属性对应tld文件的<uri>子节点，<li:test/>为建议在警示牌页面上使用的标签前缀+描述自定义的TestSimpleTag标签的标签名
+	7. 实现SimpleTag接口的标签处理器类的声生命周期
+		①setJspContext(): JSP引擎将代表JSP页面的pageContext对象传递给标签处理器对象，先于doTag()，同doTag()一并一定会被JSP引擎调用
+		②setParent(): JSP引擎将父标签处理器对象传递给当前标签处理器对象。只有存在父类标签时，JSP引擎才会调用该方法
+		③setXXX(): 设置标签属性：只有定义属性才会调用该方法
+		④setJspBody(): 若存在标签体，JSP引擎把标签体封装成一个JSPFragment对象，调用setJspBody()方法将JSPFragment对象传递给标签处理器对象。若标签体为空，setJspBody()方法将不会被JSP引擎调用。
+		⑤doTag(): 容器调用标签体处理器对象的doTag()方法执行标签逻辑。 
+二、自定义标签：
+	1. HelloWorld：
+		①创建一个标签处理器类，实现SimpleTag接口
+		②在WEB-INF文件目录下新建一个.tld(标签库描述文件)为扩展名的XML文件，并考入相应的部分，并对description、display-name、tlib-version、short-name、uri进行修改
+			<?xml version="1.0" encoding="UTF-8"?>
+			<taglib xmlns="http://java.sun.com/xml/ns/javaee" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+				xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-jsptaglibrary_2_1.xsd"
+				version="2.1">
+				
+				<!-- 描述TLD文件 -->
+				<description>MyTag 1.0 core library</description>
+				<display-name>MyTag core</display-name>
+				<tlib-version>1.0</tlib-version>
+				
+				<!-- 建议在jsp页面上使用的标签的前缀 -->
+				<short-name>li</short-name>
+				<!-- 作为tld文件的id, 用来唯一标识当前的TLD文件，多个tld文件的uri不能重复， 
+				在jsp页面的taglibs标签的URI属性来引用-->
+				<uri>http://www.li.com/mytag/core</uri>
+			</taglib>
+		③在tld文件中的<taglib>节点中描述自定义的标签
+			<!-- 描述自定义的TestSimpleTag 标签 -->
+			<tag> 
+				<!-- 标签名: 在jsp页面上使用标签时的名字 -->
+				<name>test</name>
+				<!-- 标签所在的全类名 -->
+				<tag-class>com.li.cookie.tag.TestSimpleTag</tag-class>
+				<!-- 标签体的类型 -->
+				<body-content>empty</body-content>
+			</tag>
+		④在JSP页面上使用自定义标签：
+			A. 使用taglibs指令导入标签库（描述文件）：<%@ taglib prefix="li" uri="http://www.li.com/mytag/core" %>
+			B. 使用自定义标签：<li:test/>
+	2. 带属性的自定义标签
+		①先在标签处理器类中定义setter方法，建议把所有的属性类型设置为string类型
+			private String value;
+			private String count;
+			public void setValue(String value) {
+				this.value = value;
+			}
+			public void setCount(String count) {
+				this.count = count;
+			}
+			通常标签处理器类只需要继承SimpleTagSupport即可，并在标签处理器类中可以直接通过getJspContext()获取PageContext属性。
+		②在挺累的描述文件中描述属性
+			<attribute>
+				<!-- 属性名，需和标签处理器类中的setter方法定义的属性名一致 -->
+				<name>value</name>
+				<!-- 描述该属性是否为必须 -->
+				<required>true</required>
+				<!-- 当前属性是否可以接受运行时表达式的动态值 -->
+				<rtexprvalue>true</rtexprvalue>
+			</attribute>
+		③在页面中使用标签，属性名同tld中定义的名字
+	3. 带标签体的自定义标签
+		①若一个标签带有标签体：<li:jspFragment>Hello: ${param.name }</li:jspFragment>
+		②若配置了标签含有标签体，JSP引擎会调用setJspBody()方法把JspFragment传递给标签处理类，使用JSPFragment对象封装标签体的信息
+		在SimpleTagSupport中还定义了一个getJspBody()方法，用于返回JSPFragment对象。
+		③JSPFragment的invoice(Writer)方法：把标签体内容从Writer中输出，若为null，则等同于invoke(getContext().getOut),即把标签体内容输出到页面上
+		有时，可以借助StringWriter，可以在标签处理器类中先得到标签体的内容：
+			//利用StringWriter得到标签体的内容
+			StringWriter sw = new StringWriter();
+			fragment.invoke(sw);
+			//获取JSP页面上的out隐含对象，输出到页面上
+			getJspContext().getOut().print(sw.toString());
+			
+			//JspFragment.invoke(Writer): Writer即为标签体内容输出的字符流，若为null
+			//则输出到getJspContext().getOut().print()，即输出到页面上
+			fragment.invoke(null);
+		④在tld文件中使用<body-content>节点来描述标签体的类型，<body-content>的可能取值有3种，大部分情况下，取值为scriptless：
+			A. empty：没有标签体
+			B. scriptless: 标签体可以包含el表达式和JSP动作元素，但不能包含JSP的脚本元素
+			C. tagdependent：表示标签体交由标签本身去解析处理。若指定<body-content>的内容为tagdependent，在标签体中的所有代码都会原封不动的交给标签处理器类，而不会执行结果并传递给标签处理器
+	4. 带父标签的自定义标签
+		①父标签无法获取子标签的引用，父标签仅把子标签作为标签体来使用
+		②子标签可以通过getParent()方法获取父标签的引用（需继承SimpleTagSupport或自实现SimpleTagSupport接口）
+		若子标签的确有父标签，JSP引擎UI将代表父标签的引用通过setParent()赋给子标签处理器类			
+		③注意：父标签的类型是JspTag类型，该接口是一个空接口，是用于统一SimpleTag和Tag的，实际使用需要进行类型的强制转换。
+		④在tld配置文件中，无需为父标签有额外的配置，但子标签是以标签体的形式存在，所以父标签的<body-content>需要设置为scriptless
+三、练习
+	1. 实现forEach标签：
+		<li:forEach items="${requestScope.students }" var="student">
+			${student.studentId }, ${student.studentName }, ${student.phone }<br/>
+		</li:forEach>
+		①两个属性：items（集合类型，Collection），var(String 类型)
+		②doTage():
+			A. 遍历items对应的集合
+			B. 把正在遍历的对象放入pageContext中，键：var，值：正在遍历的对象
+		③比如：
+			<c:forEach items="${requestScope.students }" var="student">
+			${student.studentId }, ${student.studentName }, ${student.phone }<br>
+			</c:forEach>
+	2. 实现
+		<c:choose>
+			<c:when test="${param.age > 24 }">大学毕业</c:when>
+			<c:when test="${param.age > 20 }">高中毕业</c:when>
+			<c:otherwise>高中及以下..</c:otherwise>
+		</c:choose>
+		①开发三个标签：choose、when、otherwise
+		②其中when有一个Boolean类型的属性
+		③choose是when和otherwise的父标签，when在otherwise之前使用
+		④在父标签choose中定义一个全局的boolean类型的flag，用于判断子标签在满足条件的情况下是否执行
+			A. 若when的test为true且choose父标签的flag为true， 则执行when的标签体，同时把父标签的flag设置为false
+			B. 若when的test为true且choose父标签的flag为false，则不执行when的标签体
+			C. 若choose父标签的flag为true，执行otherwise的标签体
+四、EL自定义函数
+	1. EL自定义函数的概述
+		①EL自定义函数：在EL表达式中调用某个Java类的静态方法，这个静态方法需要在web程序中进行配置才可以被EL表达式调用
+		②EL自定义函数可以扩展EL表达式的功能，让EL表达式完成普通Java程序代码所能完成的功能
+	2. EL自定义函数的开发步骤
+		①编写EL自定义函数隐射的Java类的静态方法：这个Java类必须带有public修饰符，方法必须是这个类的带有public修饰的静态方法
+			public static String subStr(String str, int startIndex, int length) {
+				return str.substring(startIndex, startIndex+length);
+			}
+		②编写标签库描述文件（tld文件），在这个文件中描述自定义函数
+			为了能够让一个Java类的静态方法可以被EL表达式调用，需要在一个标签库描述文件（tld文件）中对EL自定义函数进行描述
+			以将Java类中的静态方法映射成一个EL自定义函数
+			<function>
+				<!-- EL自定义函数的函数名 -->
+				<name>subStr</name>
+				<!-- EL自定义函数映射的类的全类名 -->
+				<function-class>com.li.cookie.function.MyELFunction</function-class>
+				<!-- EL自定义函数映射的类中的静态方法 -->
+				<function-signature>String subStr(java.lang.String, int, int)</function-signature>
+			</function>
+		③在JSP页面中导入和使用自定义函数
+			<%@ taglib prefix="li" uri="http://www.li.com/mytag/core" %>
+			<%@ taglib prefix="fn" uri="http://java.sun.com/jsp/jstl/functions" %>
+			${li:subStr("abcdefg", 1, 5) }
+五、jstl fn函数
+	1. 为了简化在JSP页面操作字符串，JSTL中提供了一套EL自定义函数，这些自定义函数包含了JSP页面经常要用到的字符操作
+	2. 在JSTL的表达式中要使用一个函数，其格式为：${fn:methodName(args....) }
+	3. 在使用这些函数之前逆序在JSP页面中引入标准函数的声明
+		<%@ taglib prefix="fn" uri="http://java.sun.com/jsp/jstl/functions" %>
+
+
+
+
+
+
+
+
+
+
+
+
+
+			
+		

@@ -1,0 +1,383 @@
+一、JavaWeb应用的概念
+	1. 在Sun的Java Servlet规范中，对JavaWeb应用做出了这样的定义：
+		JavaWeb应用由一组Servlet、HTML页、类、以及其他可以被绑定的资源构成。它可以在各种供应商提供实现Servlet规范的Servlet容器中运行
+	2. JavaWeb应用中可以包含如下内容
+		①Servlet
+		②JSP
+		③实用类
+		④静态文档如HTML、图片等
+		⑤描述Web应用的信息（web.xml）
+	3. Servlet与Servlet容器
+		①Web浏览器发请求时是向web服务器发送请求
+		②web服务器会检索到发送请求的是静态页面还是动态页面
+		③静态页面是指HTML文档或者图片
+		④动态页面是指需要向数据服务器进行交互，需要到Servlet容器中寻找Servlet或者JSP
+	4. Servlet容器的概念：
+		①Servlet容器为Javaweb应用提供运行时环境，它负责管理Servlet和JSP的生命周期，以及管理他们的共享数据
+		②Servlet容器也称为Javaweb应用容器，或者Servlet/JSP容器
+		③目前最流行的Servlet容器软件包括：
+			A. Tomcat
+			B. Resin
+			C. J2EE服务器（如Weblogic）中也提供了内置的Servlet容器
+二、Tomcat的安装和配置
+	1. 部署和启动Tomcat服务器
+		①解压apache-tomcat-7.0.92-windows-x64.zip到D:\Program Files\apache-tomcat-7.0.92\（非中文目录下即可）
+		②配置一个环境变量，JAVA_HOME(指向JDK的根目录)或者JAR_HOME，即为配置JDK环境变量时的JAVA_HOME
+		③可以在命令行中进入D:\Program Files\apache-tomcat-7.0.92\bin中输入startup或者通过双击D:\Program Files\apache-tomcat-7.0.92\bin中的startup.bat，启动服务器
+		④可以在浏览器中输入localhost:8080来检验安装是否正确
+		⑤可以在命令行中进入D:\Program Files\apache-tomcat-7.0.92\bin中输入shutdown或者通过双击D:\Program Files\apache-tomcat-7.0.92\bin中的shutdown.bat，关闭服务器
+		⑥当Tomcat服务器没有正常关闭时，再次双击startup.bat或一闪而过，或者输入shutdown时报错
+	2. Tomcat的目录结构
+		①bin: 存放启动和关闭Tomcat的脚本文件
+		②conf: 存放Tomcat服务器的各种配置为文件
+		③lib: 存放Tomcat服务器和所有web应用程序需要访问的jar文件
+		④logs: 存放Tomcat的日志文件
+		⑤temp: 存放Tomcat运行时产生的临时文件
+		⑥webapps: 当发布web应用程序时，通常把web应用程序的目录及文件放到这个目录下
+		⑦work: Tomcat将JSP生成的Servlet源文件和字节码文件存放到这个目录下
+	3. 配置Tomcat：在conf目录下存放Tomcat服务器的各种配置为文件
+		①修改TMcat服务器的端口号：在server.xml文件的71行出有一个8080的端口号，将该端口号修改为其他的保存即可
+		②Tomcat在windows server启动时，有中文乱码的问题：
+			tomcat启动时，本身的系统日志中（不是应用程序中的日志）时出现的，主要是日期显示的月份，上下午等中文显示不出来，因为它是按照中文的时间格式显示的。
+			TOMCAT启动时的日志，是java.util.logging.Logger输出的，它的缺省配置文件是conf/logger.properties文件，在此文件的前面加上
+			java.util.logging.FileHandler.encoding=UTF-8
+			java.util.logging.SimpleFormatter.format=%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS %2$s %5$s%6$s%n
+	4. 设置Tomcat环境变量
+		①为了可以在任意目录下启动Tomcat服务器：把D:\Program Files\apache-tomcat-7.0.92\bin添加到path目录下
+		②添加成功后，若在任意目录下通过startup开启Tomcat服务器，会有提示
+			The CATALINA_HOME environment variable is not defined correctly
+			This environment variable is needed to run this program
+			即要求设置CATALINA_HOME这个环境变量
+	5. 设置CATALINA_HOME环境变量
+		①通过阅读startup.bat批处理文件，可知CATALINA_HOME环境变量下有一个bin目录，而bin目录下又有一个catalina.bat文件，由此可以CATALINA_HOME指向的应该是Tomcat的安装目录
+		②把Tomcat的根目录即D:\Program Files\apache-tomcat-7.0.92设为CATALINA_HOME的环境变量，
+		③此时即可以在任意目录下通过startup.bat和shutdown.bat开启和关闭Tomcat服务器
+		④而真正开启Tomcat服务器是catalina.bat文件，在命令行中输入catalina命令提示如下：
+			commands:
+			  debug             Start Catalina in a debugger
+			  debug -security   Debug Catalina with a security manager
+			  jpda start        Start Catalina under JPDA debugger
+			  run               Start Catalina in the current window
+			  run -security     Start in the current window with security manager
+			  start             Start Catalina in a separate window
+			  start -security   Start in a separate window with security manager
+			  stop              Stop Catalina
+			  configtest        Run a basic syntax check on server.xml
+			  version           What version of tomcat are you running?
+		⑤catalina命令有以上可选参数，但是常用的参数如下：
+			A. run: 在catalina同一个命令行窗口开启服务器
+			B. start: 开启一个新的窗口开启Tomcat服务器
+			C. stop: 关闭服务器
+		⑥最终开启服务器的方法有以下：
+			A. 在任意命令行目录下输入命令行：startup
+			B. 在任意命令行目录下输入命令行：catalina start
+			C. 在任意命令行目录下输入命令行：catalina run
+		⑦最终关闭服务器的方法有以下：
+			A. 在任意命令行目录下输入命令行：shutdown
+			B. 在任意命令行目录下输入命令行：catalina stop
+			C. 在任意命令行目录下使用快捷键：ctrl+c
+三、WEB应用程序开发
+	1. 第一个JavaWeb应用程序的开发
+		①在eclipse新建一个Java Project
+		②在Java项目下新建一个WEB开发的目录结构
+			-WebContent
+				-WEB-INFO
+					-classes(用于存放编译好后的class)
+					-lib
+					-web.xml
+				-.jsp
+				-.html
+				...
+		③复制D:\Program Files\apache-tomcat-7.0.92\webapp\docs\WEB-INFO下的web.xml到Java工程下的WEB-INFO，可以不做修改
+		④在src中新建一个测试类，里面存放少量Java代码
+		⑤手工将测试类的class文件(含包)复制到classes文件中
+			A. 可以通过修改默认的输出目录达到自动把编译好的class文件放到classes目录下
+				a. 右键Java项目
+				b. 选择build path
+				c. 选择configure build path
+				d. 选择source
+				e. 修改默认的输出目录
+		⑥在WebContent目录下新建一个JSP文件，在JSP中编写Java代码，并且需要导入Java类对应的包
+		⑦手动把WebContent复制到D:\Program Files\apache-tomcat-7.0.92\webapp下
+			A. 将WebContent自动映射到D:\Program Files\apache-tomcat-7.0.92\webapp下
+				a. 在D:\Program Files\apache-tomcat-7.0.92\conf下新建Catalina目录
+				b. 在D:\Program Files\apache-tomcat-7.0.92\conf\Catalina下新建localhost目录
+				c. 在D:\Program Files\apache-tomcat-7.0.92\conf\Catalina\localhost下新建test.xml文件
+				d. test.xml的内容如下 
+					<?xml version="1.0" encoding="UTF-8"?>
+					<Context 
+					path="/test" docBase="E:\\workspace\\javaweb\\WebContent" reloadable="true"/>
+				e. 在浏览器中输入localhost:8080/test/index.jsp即可运行Javaweb程序
+				f. test.xml内容解析：
+					a). 在浏览器中输入运行Javaweb的地址中的test目录指向的是test.xml的文件名，即两者的文件名必须一致
+					b). 在test.xml中path属性没有任何意义，即使删除也不影响程序的执行
+					c). docBace属性的属性值是该Javaweb的根目录WebContent的实际物理路径
+					d). reloadable的意义是Javaweb程序是否可以重新加载，即当该属性的值为true时，表示当Javaweb程序中的Java代码发生改变时
+					Tomcat服务器能够捕获得到，反之服务器不能捕获
+		⑧在浏览器的地址栏中输入http://localhost:8080/HelloWorld/index.jsp即可看到dos命令行中看到JSP文件中输出的内容
+	2. 使用JavaEE版本的eclipse开发动态的WEB工程（JavaWeb项目）
+		①打开eclipse
+		②将开发选项切换到JavaEE
+		③将项目工程界面切换到Package Explorer，打开window->Show View->Others->Java 找到Package Explorer，并把其拖拽到开发区的左边
+		④打开打开window->Show View->Others->Server找到Servers，在Servers界面中新建Tomcat服务器，选择的Tomcat服务器的版本必须指定其根目录
+		⑤在开发项目工程界面新建一个Dynamic Web Project，其中Target Runtime需选择Servers对应的Tomcat版本
+		⑥开发Javaweb应用
+		⑦可以通过运行.jsp来运行JavaWeb项目，右键.jsp文件，选择run on server。
+四、Servlet
+	1. Servlet简介
+		Java Servlet是和平台无关的服务器端组件，它运行在Servlet容器中。Servlet容器负责Servlet和客户的通信以及Servlet的方法，Servlet和客户地通信采用“请求/响应”的模式
+	2. Servlet可以完成如下功能
+		①创建并返回基于客户请求的动态HTML页面
+		②创建可嵌入带现有HTML页面中的部分HTML页面（HTML前段）
+		③与其他服务器资源（如数据库或者基于Java的应用程序）进行通讯
+	3. Servlet容器响应客户请求的过程
+		①Servlet引擎检查是否已经装载并创建可该Servlet的实例对象。如果是，则直接执行第④步，否则执行第③步
+		②装载并创建该Servlet的一个实例对象：调用Servlet的构造器
+		③调用Servlet实例对象的init()方法
+		④创建一个用于封装请求的ServletRequest对象和一个代表响应消息的ServletResponse对象，然后调用Servlet的service()方法并将请求和响应对象作为参数传递进去
+		⑤Web应用程序被停止或重新启动之前，Servlet引擎将卸载Servlet，并在卸载之前调用Servlet的destroy()方法
+	4. 开发Servlet的HelloWorld
+		①创建一个Servlet接口的实现类：public class TestServlet implements Servlet
+		②重写Servlet接口中的抽象方法
+		③在web.xml文件中配置和映射Servlet
+			<!-- 配置和映射Servlet -->
+			<servlet>
+				<!-- servlet注册的名字-->
+				<servlet-name>helloServlet</servlet-name>
+				<!-- Servlet的全类名-->
+				<servlet-class>com.li.javaweb.TestServlet</servlet-class>
+			</servlet>
+			
+			<servlet-mapping>
+				<!-- 需要和某一个Servlet节点的Servlet-name 子节点的文本节点一致-->
+				<servlet-name>helloServlet</servlet-name>
+				<!-- 映射具体的访问路径：/代表当前应用的根目录-->
+				<url-pattern>/hello</url-pattern>
+			</servlet-mapping>
+		④运行Servlet程序
+			在eclipse中的内置浏览器中输入: http://localhost:8080/firstJavaweb/hello
+		⑤配置文件的解析
+			A. <servlet-name>helloServlet</servlet-name>：Servlet注册的名字，可以任意命名
+			B. <servlet-class>com.li.javaweb.TestServlet</servlet-class>：必须是实现Servlet接口的全类名
+			C. <servlet-name>helloServlet</servlet-name>：需要和<servlet-name>helloServlet</servlet-name>保持一致
+			D. <url-pattern>/hello</url-pattern>：映射具体的访问路径
+				a. /代表的是当前应用的根目录，即：http://localhost:8080/firstJavaweb
+				b. hello需要和在eclipse中的内置浏览器中输入地址的hello保持一致
+			E. 在web.xml中使用servlet-name和servletclass进行注册，使用servlet-name和url-pattern进行映射
+			F. 使用url-pattern进行映射到Servlet接口实现类的全类名，进行调用方法
+	5. Servlet容器：运行Servlet、JSP、Filter等的软件环境
+		①可以用于创建Servlet，并调用Servlet的相关生命周期方法
+		②可以运行JSP，Filter，Listener，Tag...，并且其相关生命周期都是运行在Servlet容器中
+	6. Servlet生命周期方法：
+		①构造器: 只被调用一次，当第一次请求Servlet时，调用Servlet构造器，创建Servlet的示例，说明Servlet是单例的
+		②init(): 只被创建一次，在创建好示例后立即调用init()，用于初始化当前的Servlet
+		③service(): 被多次调用，每次请求Servlet是都会调用service()，实际用于响应请求的。
+		④destroy(): 只被调用一次，在当前Servlet所在的服务器被停止或者当前web应用被退出时，调用destroy()，释放Servlet所占用的资源
+	7. load-on-startup参数：
+		①配置在Servlet节点中：
+			<servlet>
+				<!-- servlet注册的名字-->
+				<servlet-name>helloServlet</servlet-name>
+				<!-- Servlet的全类名-->
+				<servlet-class>com.li.javaweb.TestServlet</servlet-class>
+				<!-- 可以知道Servlet被创建的时机 -->
+				<load-on-startup>2</load-on-startup>
+			</servlet>
+		②load-on-startup: 可以指定Servlet被创建的时机，若为负数，则在第一次请求时，Servlet被创建。
+			若为整数或者0，则在当前web应用被Servlet容器加载时加载，且该值越小越早被创建
+	8. Servlet的注册与运行
+		①Servlet程序必须通过Servlet容器来启动运行，并且存储目录有特殊要求，需要存储在<WEB应用程序目录>\WEB-INF\classes\目录中
+		②Servlet程序必须在WEB应用程序的web.xml文件中进行注册和映射其访问路径，才可以被Servlet引擎加载和被外界访问
+		③一个<servlet>元素用于注册一个Servlet，它包含两个主要的子元素：<servlet-name>和<servlet-class>，分别用于设置Servlet的注册名称和Servlet的完整类名
+		④一个<Servlet-mapping>元素用于映射一个已经注册的Servlet的一个对外访问路径，它包含两个子元素: <servlet-name>和<url-pattern>，分别用于指定Servlet的注册名称和Servlet额对外访问路径
+	9. Servlet映射的细节
+		①同一个Servlet可以被映射到多个url上，即多个<servlet-mapping>元素的<servlet-name>子元素的设置值可以是同一个Servlet的注册名
+		②在Servlet映射到url中也可以使用*通配符，但是只能有两种固定的格式
+			A. *.扩展名（不能加正斜杠）
+				<servlet-mapping>
+					<servlet-name>name</servlet-name>
+					<url-pattern>*.html</url-pattern>
+				</servlet-mapping>
+			B. 以正斜杠开头并以/*结尾
+				<servlet-mapping>
+					<servlet-name>name</servlet-name>
+					<url-pattern>/action/*</url-pattern>
+				</servlet-mapping>
+			C. 错误使用方式
+				<servlet-mapping>
+					<servlet-name>name</servlet-name>
+					<url-pattern>/*.html</url-pattern>
+				</servlet-mapping>
+	10. ServletConfig：封装了Servlet的配置信息，并且可以获取ServletContext对象
+		①配置Servlet的初始化参数，该配置信息必须在<servlet>节点里面，并且在<load-on-startup>前面
+			<init-param>
+			<param-name>user</param-name>
+			<param-value>root</param-value>
+			</init-param>
+			
+			<init-param>
+				<param-name>password</param-name>
+				<param-value>2648</param-value>
+			</init-param>
+		②获取初始化参数：
+			A. getInitParameter(String name): 获取指定参数名的初始化参数
+				String value = servletConfig.getInitParameter("user")
+			B. getInitParameterNames(): 获取参数名组成的Enumeration对象
+				Enumeration<String> enumeration = servletConfig.getInitParameterNames();
+				while (enumeration.hasMoreElements()) {
+					String parameter = enumeration.nextElement();
+					System.out.println(parameter + ": " + servletConfig.getInitParameter(parameter));
+				}
+			C. getServletName: 获取Servlet的配置名称（了解）
+				String servletName = servletConfig.getServletName();//TestServlet
+			D. getServletContext: 获取Servlet的上下文
+	11. ServletContext：ServletContext servletContext = servletConfig.getServletContext();
+		①Servlet引擎为每个WEB应用程序都创建一个对应的ServletContext对象，ServletContext对象被包含在ServletConfig对象中，调用ServletConfig对象的getServletContext方法可以返回ServletContext对象的引用
+		②由于一个WEB应用程序中的所有Servlet都共享一个ServletCOntext对象，所以，ServletContext对象被称之为application对象(WEB应用程序对象)
+		③功能
+			A. 获取WEB应用程序的初始化参数
+				a. 配置当前WEB程序的初始化参数：可以为所有的Servlet所获取，而Servlet的初始化参数只有当前Servlet对象可以获取
+					<context-param>
+						<param-name>driver</param-name>
+						<param-value>com.mysql.cj.jdbc.Driver</param-value>
+					</context-param>
+				b. getInitParameter(String name): 获取当前WEB应用程序的初始化参数
+					String driver = servletContext.getInitParameter("driver");
+					System.out.println("driver: " + driver);
+					//获取当前WEB应用的所有参数
+					Enumeration<String> enumeration = servletContext.getInitParameterNames();
+					while (enumeration.hasMoreElements()) {
+						String name = enumeration.nextElement();
+						System.out.println(name + ": " + servletContext.getInitParameter(name));
+					}
+			B. 记录日志
+			C. application域范围内的属性
+			D. 访问资源文件
+			E. getRealPath(String path):获取虚拟路径所映射的本地路径（部署在服务器上的绝对路径，而不是部署前的绝对路径）
+				String realPath = servletContext.getRealPath("/web.xml");
+				//E:\workspaceJavaWeb\.metadata\.plugins\org.eclipse.wst.server.core\tmp0\wtpwebapps\firstJavaweb\web.xml
+			F. WEB应用程序之间的访问
+			G. getContextPath(): 获取当前WEB应用的名称
+				String contextPath = servletContext.getContextPath();
+				System.out.println("contextPath: " + contextPath);
+			H. 获取当前WEB应用的某一个文件对应的输入流
+				a. 通过classLoader()获取
+					InputStream is = getClass().getClassLoader().getResourceAsStream("jdbc.properties");
+				b. 通过getResourceAsStream(String path)在当前WEB应用中获取:即在根目录下的WEB-INF/classes/下获取输入流
+					InputStream inputs = servletContext.getResourceAsStream("/WEB-INF/classes/jdbc.properties");
+			I. 和attribute相关的几个方法
+五、HTTP协议
+	1. HTTP简介：
+		①WEB浏览器与WEB服务器之间的一问一答的交互过程必须遵循一定的规则，这个规则就是HTTP协议
+		②HTTP是Hypertext Transfer Protocol（超文本传输协议）的简写，它是TCP/IP协议集中的一个应用层协议，用于定义WEB浏览器与WEB服务器之间交换数据的过程以及数据本身的格式
+		③HTTP协议的版本HTTP/1.0、HTTP/1.1、HTTP.NG
+	2. HTTP的会话方式
+		①浏览器与WEB服务器的连接过程是短暂的，每次连接只处理一个请求和响应。对每一个页面的访问，浏览器与WEB服务器都要建立一次单独的连接
+		②浏览器到WEB服务器之间的所有通讯都是完全独立分开的请求和响应对
+		③浏览器与WEB服务器连接的四个步骤
+			A. 建立连接
+			B. 发出请求信息
+			C. 回应响应信息
+			D. 关闭连接
+	3. HTTP请求/响应消息
+		①请求消息的结构：
+			一个请求行、若干个消息头、以及实体内容，其中的一些消息头和实体内容都是可选的，消息头和实体内容之间要用空行隔开
+		②响应消息的结构：
+			一个状态行、若干个消息头、以及实体内容，其中的一些消息头和实体内容都是可选的，消息头和实体内容之间要用空行隔开
+		③其他细节
+			A. 响应消息的实体内容就是网页文件的内容，也就是在浏览器中使用查看文件的方式所看到的的内容
+			B. 一个使用GET方式的请求消息中不能包含实体内容，只有使用POST、PUT和DELETE方式的请求消息才可以包含实体内容。
+	4. 使用GET和POST方式传递参数
+		①在URL地址后面可以附加一些参数
+			举例：http://localhost:8080/firstJavaweb/login.html?username=Yu&password=0829
+		②使用GET方式传递参数
+			A. 在浏览器地址栏中输入某个URL地址或者单击网页上的一个超链接时，浏览器发出的HTTP请求消息的请求方式为GET
+			B. 如果网页中的<form>表单匀速的method属性被设置为GET，浏览器提交这个FORM表单时生成的HTTP请求消息的请求方式也为GET
+			C. 使用DET请求方式给WEB服务器传递参数的格式为：
+				http://localhost:8080/firstJavaweb/login.html?username=Yu&password=0829
+			D. 使用GET方式传送的数据一般限制在1KB以下
+		③使用POST方式传递参数
+			A. POST请求方式只要用于向WEB服务器端程序提交FORM表单的数据：form表单中的method为POST
+			B. POST方式将各个表单字段元素及其数据作为HTTP消息的实体内容发送到WEB服务器，传送的数据量要比使用GET方式传送的数据量大得多
+	5. 如何在Servlet中获取请求信息：Servlet的service()方法用于响应请求，即每次请求服务器时都会调用service()方法
+		①service()的参数：
+			A. ServletRequest: 封装了请求信息，可以从中获取任何的请求信息
+			B. ServletResponse: 封装了响应信息，如果想给用户什么响应，具体可以使用该接口的方法实现
+			C. 这两个接口的实现类都是服务器给于实现的，并且在服务器调用service()时传入
+		②ServletRequest：获取请求参数
+			A. String getParameter(String name): 根据参数的名字返回参数的值，应用最多
+				String username = request.getParameter("username");
+				String password = request.getParameter("password");
+			B. String[] getParameterValues(String name): 根据请求参数的名字，返回请求参数值的数组（当请求信息包含了多选时使用该方法）
+				String[] interest = request.getParameterValues("interest");
+				for (String interesting : interest) {
+					System.out.println(interesting);
+				}
+			C. Enumeration getParameterNames(): 返回参数名对应的Enumeration对象，类似于ServletConfig或者ServletContext的getInitParameterNames()方法
+				Enumeration<String> enumeration = request.getParameterNames();
+				while (enumeration.hasMoreElements()) {
+					System.out.println(enumeration.nextElement());
+				}
+			D. Map getParameterMap(): 返回请求参数的键值对，key: 参数名，value: 参数值的数组
+				Map<String, String[]> map = request.getParameterMap();
+				for (Map.Entry<String, String[]> entry: map.entrySet()) {
+					System.out.print(entry.getKey() + ": ");
+					for (String string : entry.getValue()) {
+						System.out.print(string + " ");
+					}
+					System.out.println();
+				}
+			E. HTTPServletRequest是ServletRequest的子接口，针对HTTP请求定义，该接口封装了大量的请求相关的方法，可以通过强转ServletRequest对象获得，并调用HTTPServletRequest各种请求方法。
+				HTTPServletRequest hTTPServletRequest = (HTTPServletRequest)request
+				a. getRequestURI(): 获取Servlet请求的URI，即/firstJavaweb/loginServlet.html
+					String requestURI = servletRequest.getRequestURI();
+					System.out.println(requestURI);///firstJavaweb/loginServlet.html
+				b. getMethod(): 获取请求方式，即get/post
+					String method = servletRequest.getMethod();
+					System.out.println(method);//POST
+				c. getQueryString(): 获取请求的查询字符串，如果是GET请求，则返回的是?后面的字符串，如果是POST请求，则返回null
+					String queryString = servletRequest.getQueryString();
+					System.out.println(queryString);//null
+				d. getServletPath():获取Servlet的映射路径
+					String servletPath = servletRequest.getServletPath();
+					System.out.println(servletPath);///loginServlet.html
+			F. attribute相关的几个方法			
+	6. 	ServletResponse	
+		①getWriter(): 返回一个PrintWrite对象，调用print()方法在用户浏览器输出内容
+		②setContentType("application/msword"): 设置响应内容的类型
+		③HTTPServletResponse: ServletResponse的子接口，可以通过ServletResponse对象强转得到HTTPServletResponse接口的对象
+			A. void sendRedirect(String location): 请求重定向
+	7. GenericServlet
+		①GenericServlet是Servlet接口和ServletConfig接口的实现类，并且为抽象类，其中的service方法是抽象方法
+		②如果新建的Servlet程序直接继承GenericServlet会使开发更简洁
+		③GenericServlet的具体实现
+			A. 在GenericServlet中声明一个ServletConfig的成员变量，在init(ServletConfig)方法中对其进行初始化
+			B. 利用ServletConfig成员变量实现了ServletConfig接口的抽象方法
+			C. 定义了一个init()方法，在init(ServletConfig)方法中对其进行调用，子类可以直接覆盖init()方法并在其中完成对Servlet的初始化
+			D. 不建议直接覆盖init(ServletConfig)方法，因为如果忘记写super.init(config),而仍然使用ServletConfig接口的方法，则会出现空指针异常
+			E. 新建的init()方法并非是Servlet的生命周期，而init(ServletConfig)则是。
+	8. HTTPServlet
+		①是一个Servlet，继承自GenericServlet，针对于HTTP协议定制
+		②在service()方法中直接把ServletRequest和ServletResponse转为HTTPServletRequest和HTTPServletResponse，并调用重载的service(HTTPServletRequest,HttpServletResponse)
+			在service(HTTPServletRequest,HttpServletResponse)获取了请求方式：request.getMothod()，根据请求方式创建了doXxx()方法（xxx为具体的请求方式，比如doGet，doPost）
+		③实际开发中，直接继承HTTPServlet，并根据请求方式重写doXxx()方法
+		④好处: 直接针对性的覆盖doXxx()方法，直接使用HTTPServletRequest和HTTPServletResponse，而不需要进行强转。
+六、练习
+	1. 定义一个login.html，里面定义两个请求字段：user，password，发送请求到Servlet
+	创建一个LoginServlet（需要继承自HTTPServlet，并重写doPost方法），在其中获取请求的user，password。
+	若一致，响应Hello：xxx，若没有，响应Sorry：xxx xxx为user
+	2. 在MySql数据库中创建一个test_user数据表，添加三个字段：id，user，password，并录入几条信息
+
+
+ 
+
+
+
+
+
+
+
+
+
+			
+			

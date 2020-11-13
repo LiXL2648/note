@@ -1,0 +1,71 @@
+一、Cookie概述
+	1. 提出问题：
+		①HTTP协议是一种无状态的协议，WEB服务器本身不能识别哪些请求是同一个浏览器发出的，浏览器的每一次请求都是完全孤立的
+		②即使HTTP1.1支持持续连接。但当用户有一段时间没有提交请求，连接也会失败
+		③作为web服务器，必须能够采用一种机制来唯一地表示一个用户，同时记录用户的状态。
+	2. 会话与会话状态
+		①WEB应用中的会话是指一个客户算浏览器与WEb服务器之间持续发生的一系列请求个响应的过程
+		②WEB应用的会话状态是指WEB服务器与浏览器在会话过程中产生的状态信息，借助会话状态，WEB服务器能够把属于同一会话中的一系列的请求和响应过程关联起来
+	3. 如何实现有状态的会话
+		①WEB服务器程序要从大量的请求消息中区分哪些请求消息属于同一个会话，技能识别出来自同一个浏览器的访问请求，这需要浏览器对其发出的没饿请求消息都进行标识：
+			属于同一个会话中的请求消息都附带同样的标识号，而属于不同会话的请求消息总是附带不同的标识号，这个标识号就称之为会话ID（SessionID）
+		②在Servlet规范中，常用以下两种机制完成会话跟踪
+			A. Cookie
+			B. Session
+	4. Cookie机制
+		①Cookie机制采用的是在客户端保持HTTP状态信息的方案
+		②Cookie是在浏览器访问WEB服务器的某个资源时，由WEB服务器在HTTP响应消息头中附带传送给浏览器的一个小的文本文件
+		③一旦WEB浏览器保存了某个Cookie，那么他在以后每次访问该WEB服务器时，都会在HTTP请求头中将这个cookie回传给WEB服务器
+		④底层的实现原理：WEB服务器通过HTTP响应消息中增加Set-Cookie响应头字段将Cookie信息发送给浏览器，浏览器则通过在HTTP请求消息中增加Cookie请求头字段将Cookie回传给WEB服务器
+		⑤一个Cookie只能标识一种信息，它至少含有一个标识该信息的名称（name）和设置值（value）
+		⑥一个web站点可以给一个WEB浏览器发送多个Cookie，一个WEB浏览器也可以存储多个WEB站点提供的Cookie
+		⑦浏览器一般只允许存放300个cookie，每个站点最多存放20个cookie，每个cookie的大小限制为4KB
+	5. 在Servlet中程序中使用Cookie
+		①在ServletAPI中提供了一个Javax.servlet.hettp.Cookie类来封装Cookie信息，它包包含有生成cookie信息和提取Cookie信息的各个属性的方法
+		②Cookie类的方法：
+			A. 构造方法：public Cookie(String name, String value)
+			B. getName()
+			C. setValue()和getValue()
+			D. setMaxAge()和getMaxAge()
+			E. setPath()和getPath()
+		③HTTPServletResponse接口中定义了一个addCookie()，它用于在发送给浏览器的HTTP响应消息中增加一个Set-Cookie响应头字段将Cookie信息发送给浏览器，浏览器则通过在HTTP请求消息中增加Cookie请求头字段
+		④HTTPServletRequest接口中定义了一个getCookie()，它用于从HTTP请求消息的Cookie请求头字段中读取所有的额cookie项。
+	6. Cookie的发送
+		①创建Cookie对象
+		②设置最大时效
+		③将Cookie放入到HTTP响应头
+			A. 如果创建了一个cookie，并将它发送到浏览器，默认情况下它是一个会话级别的cookie，存储在内存当中，用户退出浏览器之后被删除，若希望浏览器将cookie存储在磁盘中，则需要使用setMax()，并给出一个以秒为单位的时间。
+			将MaxAge设置为0则是命令浏览器立即删除该cookie；将MaxAge设置为负数则是该Cookie永远不会被储存，将MaxAge设置为正数则是该Cookie保存在磁盘的秒数
+			B. 发送cookie需要使用HTTPServletResponse的addCookie(),将Cookie插入到一个Set-CookieHTTP响应头中，由于这个方法并不修改任何之前指定的Set-Cookie报头，而是创建新的报头，因此将这个方法称之为addCookie()，而非setCookie()。
+	7. 会话Cookie和持久化Cookie的区别
+		①如果不设置过期时间，则表示这和Cookie生命周期为浏览器的会话期间，只要关闭浏览器窗口，Cookie就会消失。这种生命周期为浏览器绘画器的Cookie被称为会话Cookie。会话Cookie一般不会保存在硬盘上而是保存在内存里
+		②如果设置了过期时间，浏览器就会把Cookie保存到磁盘上，关闭后再次打开浏览器，这些cookie依然有效直到超过设定的过期时间。
+		③存储在硬盘上的cookie可以在不同的浏览器进程间共享，不同的浏览器有不同的处理方式。
+	8. Cookie的读取
+		①调用request.getCookie(): 要获取浏览器发送过来的cookie，需要调用HTTPServletRequest的getCookie(),这个方法返回Cookie对象的数组，对应有HTTp请求中Cookie报头输入的值
+		②对数组进行循环遍历，调用每个cookie的getName方法直到找到感兴趣的cookie为止。
+	9. Cookie的作用路径
+		①Cookie的默认作用范围：可以作用于当前目录和当前目录的子目录，而不能作用于当前目录的上一级目录
+		②setPath()：设置Cookie的作用范围
+			A. “/”：当前站点的根目录即：http://localhost:8080/
+			B. HTTPServletRequest.getContextPath(): 当前WEB应用的项目目录。
+二、Cookie小结：
+	1. 什么是Cookie：
+		①完成会话跟踪的一种机制：采取的是客户端保持HTTP状态信息的方案
+		②Cookie是在浏览器访问WEB服务器的某个资源时，由WEB服务器在HTTP响应消息头中附带传送给浏览器的一个小的文本文件
+		③一旦WEB浏览器保存了某个Cookie，那么它以后每次访问该WEB服务器时，都会在HTTP请求头中将这个Cookie回传给WEB服务器
+		④底层实现原理：WEB服务器通过在HTTP响应消息中增加Set-Cookie响应头字段将Cookie信息发送给浏览器，浏览器则通过在HTTP请求消息中增加Cookie请求头字段将Cookie回传给WEB服务器。
+	2. Cookie的相关API：
+		①向客户端浏览器写入Cookie：
+			A. Cookie cookie = new Cookie("Book_" + book, book): 创建一个Cookie对象
+			B. setMaxAge(0): 设置Cookie的最大时效，以秒为单位，若为0表示立即删除该Cookie，若为负数表示不存储该Cookie，若为整数表示该Cookie距最新访问开始存储在硬盘的时间
+			C. setPath(): 设置Cookie的作用域范围（默认范围：可以作用于当前目录和当前目录的子目录，而不能作用于当前目录的上一级目录）
+			D. response.addCookie(cookie): 调用response的addCookie()将cookie传给客户端
+		②从客户端浏览器获取Cookie
+			A. Cookie[] cookies = request.getCookies(): 只提供获取所有Cookie的API，需要遍历获取自己感兴趣的Cookie
+			B. getName(): 获取Cookie的名字
+			C. getValue(): 获取Cookie的值
+	3. 会话Cookie和持久化Cookie：
+		①如果不设置过期时间，则表示这个Cookie生命周期为浏览器的会话期间，只要关闭浏览器窗口，Cookie就消失了，这种生命期为浏览器会话期的Cookie被称为会话Cookie，会话Cookie一般不保存在硬盘上而是保存在内存里
+		②如果设置了过期时间，则表示浏览器会把Cookie保存在硬盘上，关闭浏览器后再次打开浏览器，这些Cookie依然有效直至超过了设定的过期时间。
+	
