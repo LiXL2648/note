@@ -1,0 +1,292 @@
+一、分组查询
+	1. 语法：
+		select 分组函数, 查询列表（要求出现在group by后面的字段）
+		from 表
+		【where 筛选条件】
+		group by 分组的列表
+		【order by 字段】
+	2. 注意：
+		查询列表必须出现在分组函数和group by函数的后面的字段
+	3. 按字段分组
+		①简单分组查询
+			A. #案例一：查看每个工种的最高工资
+				SELECT MAX(salary), job_id FROM employees GROUP BY job_id;
+			B. #案例二：查询每个位置的部门总数
+				SELECT COUNT(*), location_id FROM departments GROUP BY location_id;
+		②添加了筛选条件的分组查询
+			A. #案例一：查询邮箱中包含a的，每个部门的平均工资
+				SELECT AVG(salary), department_id FROM employees WHERE email LIKE '%a%'
+				GROUP BY department_id;
+			B. #案例二：查询有奖金的，每个领导下的员工的最高工资
+				SELECT MAX(salary), manager_id FROM employees WHERE commission_pct IS NOT NULL
+				GROUP BY manager_id;
+		③添加了分组后筛选条件的分组查询
+			A. #案例：查询哪个部门的员工数>2
+				SELECT COUNT(*), department_id FROM employees
+				GROUP BY department_id HAVING COUNT(*) > 2;
+			B. #案例二：查询每个工种有奖金的员工的最高工资>12000的工种编号和最高工资
+				SELECT job_id, MAX(salary) FROM employees WHERE commission_pct IS NOT NULL
+				GROUP BY job_id HAVING MAX(salary) > 12000;
+			C. #案例三：查询每个领导编号>102的领导手下的最低工资大于5000的领导编号，以及员工的最低工资
+				SELECT manager_id, MIN(salary) FROM employees WHERE manager_id > 102
+				GROUP BY manager_id HAVING MIN(salary) > 5000;
+			D. 注：
+				Ⅰ. 分组后的筛选不能使用通过where字句查询，因为where筛选条件的字段必须是在原始表中出现的
+				Ⅱ. 在原始表中存在的字段用于筛选一般是采用where加筛选字段，放于group by子句之前
+				Ⅲ. 筛选后的字段在原始表中不存在，因此需要使用having加分组后的字段放在group by后面
+			E. 特点：
+				Ⅰ. 分组查询中的筛选条件分为两类
+									数据源			位置				关键字
+					分组前的筛选	原始表			group by子句的前面	where
+					分组后的筛选	分组后的结果集	group by子句的后面	having
+				Ⅱ. 分组函数做条件肯定是反正having子句中
+				Ⅲ. 能用分组查询前筛选，就优先考虑使用分组查询前筛选
+	4. 按表达式或者函数分组
+		①#案例：按员工的名字长度分组，查询每一组员工的个数，筛选员工数大于5的有哪一些
+			SELECT LENGTH(last_name) len_name, COUNT(*)
+			FROM employees
+			GROUP BY LENGTH(last_name)
+			HAVING COUNT(*) > 5;
+		②注：
+			A. group by后面可以加表达式或者函数
+			B. group by和having后面可以加别名，但是仅限于mysql，Oracle不支持
+	5. 按多个字段分组
+		①#案例：查询每个部门，每个工种的平均工资
+			SELECT AVG(salary), department_id, job_id
+			FROM employees
+			GROUP BY department_id, job_id;
+		②注：
+			A. 按多个字段分组，出现在group by后面的字段都可以和分组函数一起出现
+			B. 多个字段分组时同时满足多个字段的结果为一组
+			C. 不同的分组查询都可以添加排序，order by子句需要放在最后的位置
+				#案例：查询每个部门，每个工种的平均工资，并按照平均工资的降序排序，要求平均工资大于10000
+					SELECT AVG(salary), department_id, job_id
+					FROM employees
+					GROUP BY department_id, job_id
+					HAVING AVG(salary) > 10000
+					ORDER BY AVG(salary) DESC;
+二、连接查询
+	1. 连接查询的含义：
+		①连接查询又称为多表查询，当查询的字段来自于多个表时，就会用到连接查询
+		②笛卡尔乘积现象：
+			假如表一有m行，表二有n行，结果又m*n行
+		③发生原因：没有进行有效的连接条件
+		④如何避免：添加有效的连接条件
+	2. 连接条件的分类：
+		①按年代分类：
+			A. SQL92标准：在mysql中仅支持内连接
+			B. SQL99标准：在mysql中支持内连接+外连接（左外连接、右外连接）+交叉连接
+		②按功能分类：
+			A. 内连接：等值连接、非等值连接、自连接
+			B. 外连接：左外连接、右外连接、全外连接
+			C. 交叉连接：
+	3. 为表起别名：
+		①提高语句的简洁度
+		②区分多个重名的字段
+		③注：如果为表起了别名，则查询的字段就不能使用原来的表名去限定
+			#案例：查询员工名、工种号、工种名
+			SELECT last_name, e.job_id, job_title
+			FROM employees e, jobs j
+			WHERE e.`job_id` = j.`job_id`;
+	4. 	SQL92标准：
+		①等值连接：
+			A. #案例一：查询员工名和对应的部门名
+				SELECT last_name, department_name FROM employees, departments
+				WHERE employees.`department_id` = departments.`department_id`
+			B. #案例二：查询员工名、工种号、工种名
+				SELECT last_name, employees.job_id, job_title FROM employees, jobs
+				WHERE employees.`job_id` = jobs.`job_id`;
+			C. 特点：
+				Ⅰ. 多表等值连接的结果为多表的交集部分
+				Ⅱ. n表连接，至少需要n-1个连接条件
+				Ⅲ. 多表连接时，表与表之间的顺序没有要求
+				Ⅳ. 多表连接时，一般需要为表起别名
+				Ⅴ. 可以搭配所有的子句使用，比如：排序、分组、筛选
+		②非等值连接
+			#案例，查看员工工资的等级
+				SELECT salary, grade_level FROM employees e, job_grades j
+				WHERE e.`salary` BETWEEN j.`lowest_sal` AND j.`highest_sal`;
+		③自连接：
+			#案例：查询员工名以及其上级领导名字
+				SELECT e.`employee_id`, e.`last_name`, e.`manager_id`, m.`last_name`
+				FROM employees e, employees m WHERE e.`manager_id` = m.`employee_id`;
+	5. SQL9标准
+		①语法：
+			select 查询列表
+			from 表1 别名【连接类型】
+			join 表2 别名
+			on 连接条件
+			【where 分组前筛选条件】
+			【group by 分组】
+			【having 分组后筛选条件】
+			【order by 排序列表】
+		②连接类型：
+			A. 内连接：inner
+				Ⅰ. 语法：
+					select 查询列表
+					from 表1 别名 inner
+					join 表2 别名
+					on 连接条件
+				Ⅱ. 分类：
+					等值连接、非等值连接、自连接
+			B. 外连接：
+				Ⅰ. 左外连接：left【outer】
+				Ⅱ. 右外连接：right【outer】
+				Ⅲ. 全外连接：full【outer】
+				Ⅳ. 应用场景：用于查询一个表中有，另一个表中没有的记录
+				Ⅴ. 特点
+					1.外连接的查询结果为主表中的所有记录
+						如果从表中有与主表中匹配的，则显示该匹配的信息
+						如果从表没有与主表中匹配的，则该内容显示为null
+						外连接的查询结果=内连接的结果+主表中有而从表中没有的记录	
+					2.左外连接：left  outer join左边的是主表
+					3.右外连接：right outer join右边的是主表
+					4.左外和右外廖欢两个表的顺序，可以实现同样的效果
+					5.一般查询的字段位于哪个表，那个表即为主表，其余的表即为从表
+					6.查询外连接除去内连接完整的查询部分的方法是在判断条件中某个主键的字段值为null值
+					7.全外连接的查询结果 = 内连接的结果+表一有二表二没有的记录+表一没有二表二有的记录
+				#案例一：查询男朋友 不在男生表中的女生名（左外连接）
+				SELECT b.name FROM beauty b LEFT OUTER JOIN boys bo
+				ON b.`boyfriend_id` = bo.`id` WHERE bo.`id` IS NULL;
+				#案例二：查询男朋友 不在男生表中的女生名(右外连接)
+				SELECT b.name FROM boys bo RIGHT OUTER JOIN beauty b
+				ON b.`boyfriend_id` = bo.`id` WHERE bo.`id` IS NULL;
+				#全外连接
+				SELECT 表一.*, 表二.* FROM 表一 FULL JOIN 表二
+				ON 表一.外键=表二.主键 WHERE 表一.主键 IS NULL OR 表二.主键 IS NULL;
+			C.  交叉连接：cross，交叉乘积实际上是笛卡尔乘积
+三、子查询
+	1. 概念：
+		①出现在其他语句内部的select语句，称为子查询或者内查询
+		②内部嵌套其他select语句的查询，称为外查询或者子查询
+	2. 举例：
+		select first_name from employees where department_id in(
+			seelct department_id from departments where location_id = 1700
+		)
+	3. 分类：
+		①按子查询出现的位置：
+			A. select后面：仅仅支持标量子查询
+			B. from后面：支持表子查询
+			C. where或者having后面（主要）：支持
+				Ⅰ. 标量子查询（主要）
+				Ⅱ. 列子查询（主要）
+				Ⅲ. 行子查询
+			D. exists后面（相关子查询）：支持表子查询
+		②按结果集的行列数不同：
+			A. 标量子查询：结果集只有一行一列
+			B. 列子查询：结果集只有一列多行
+			C. 行子查询：结果只有一行多列
+			D. 表子查询：结果集一般为多行多列
+	4. where或者having后面：
+		A. 标量子查询（单行子查询），一般搭配单行操作符使用>、<、>=、<=、=、<>
+			#案例一：谁的工资比Abel高(where后面的标量子查询)
+			SELECT last_name, salary FROM employees WHERE salary > (
+				SELECT salary FROM employees WHERE last_name = 'Abel'
+			);
+			#案例四：查询最低工资大于50号部门最低工资的部门id和其最低工资(使用分组查询的单行子查询)
+			SELECT department_id, MIN(salary) FROM employees GROUP BY department_id HAVING MIN(salary) > (
+				SELECT MIN(salary) FROM employees WHERE department_id = 50
+			);
+		B. 列子查询（多行子查询），一般搭配多行操作符使用in、any/some、all
+			a in() <=> a=any() || a not in() <=> a!=all()
+			a>any() <=> a>min()|| a<any() <=> a<max()
+			a>all() <=> a>max()|| a<all() <=> a<min()
+			#案例一：返回location_id是1400或者1700的部门中的所以员工姓名(使用in)
+			SELECT last_name FROM employees WHERE department_id IN(
+				SELECT department_id FROM departments WHERE location_id IN(1400, 1700)
+			);
+			#案例二：返回其他工种中比job_id为‘IT_PROC’工种任一工资低的员工的员工号、姓名、job_id以及salary(使用any)
+			SELECT employee_id, last_name, job_id, salary FROM employees WHERE salary < ANY(
+				SELECT DISTINCT salary FROM employees WHERE job_id = 'IT_PROG'
+			) AND job_id <> 'IT_PROG';
+		C. 行子查询（多行多列子查询）	
+			#案例：查询员工编号最小并且工资最大的员工信息
+			SELECT * FROM employees WHERE(employee_id, salary) = (
+				SELECT MIN(employee_id), MAX(salary) FROM employees
+			);
+		D. 特点：
+			①子查询放在小括号里面
+			②子查询一般放在条件的右侧
+			③标量子查询，一般搭配单行操作符使用>、<、>=、<=、=、<>
+				列子查询，一般搭配多行操作符使用in、any/some、all
+			④子查询的执行优先于主查询，主查询的条件用到了子查询到的结果
+		E. 非法使用标量子查询的情况：
+			Ⅰ. 子查询的结果为多行子查询，而单行操作符只能搭配标量子查询
+			Ⅱ. 子查询的结果集为空
+	5. select后面：仅仅支持标量子查询
+		#案例：查询员工号等于102的部门名
+		SELECT (
+			SELECT department_name FROM departments d WHERE d.`department_id` = e.department_id
+		)部门名 FROM employees e WHERE e.employee_id = 102;
+	6. from后面：支持表子查询，将子查询的结果充当一张新的表，要求必须起别名
+		#案例：查询每个部门的平均工资的工资等级
+		SELECT avg_sal.*, g.`grade_level`  FROM (
+			SELECT AVG(salary) ag, department_id FROM employees GROUP BY department_id
+		)avg_sal INNER JOIN job_grades g
+		ON avg_sal.ag BETWEEN g.`lowest_sal` AND g.`highest_sal`
+	7. exists后面（相关子查询）：一般使用exists判断是否存在，可使用in代替
+		#案例一：查询有员工的部门名（exists）
+		SELECT department_name FROM departments d WHERE EXISTS(
+			SELECT department_id FROM employees e WHERE e.`department_id` = d.`department_id`
+		);
+四、分页查询
+	1. 语法：
+		select 查询列表 from 表
+		【join type join 表2 on 连接条件 where 分组前筛选条件 group by 分组字段
+		having 分组后筛选条件 order by 排序字段】limit offset, size
+	2. SQL语句的执行顺序：
+		from 表、join type join、on 连接条件、where 分组前筛选、group by 分组字段、
+		having 分组后筛选条件、select 查询列表、order by 排序字段、limit
+	3. offset、size
+		①offer：要显示条目的起始索引（索引从0开始）
+		②size：要显示的条目个数
+	4. 特点：
+		①limit子句放在查询语句的最后位置，执行顺序也是最后一个被执行的子句
+		②公式：起始条目=(page-1)*size
+	5. 案例：
+		#案例查询公司有奖金的工资最高的前十名成员
+		SELECT *  FROM employees  WHERE commission_pct IS NOT NULL
+		ORDER BY salary DESC LIMIT 10;
+五、联合查询
+	1. 语法：
+		查询语句1
+		union
+		查询语句2
+		...
+	2. 应用场景
+		要查询的结果来自于多个表，且多个表没有直接的连接关系，但查询的信息一致时
+	3. 特点：
+		①要求多条查询语句的查询列数是一致的
+		②要求多条查询语句的字段类型顺序最好保持一致
+		③union关键字默认去重，使用union all可以包含重复项
+		
+	4. 案例
+		#案例一：查询部门编号大于90或者员工邮箱中包含a的员工信息
+		SELECT * FROM employees WHERE department_id > 90
+		UNION
+		SELECT * FROM employees WHERE email LIKE '%a%';
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		
+
+
+
+
+				

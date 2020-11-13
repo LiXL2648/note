@@ -1,0 +1,119 @@
+一、数据持久化
+	1. 数据持久化：把数据保存到可掉电式存储设备中以供之后使用。数据持久化意味着将内存中的数据保存到磁盘上加以“固化”，
+					而持久化的实现过程大多数通过各种关系数据库来完成
+	2. 持久化的只要应用是将内存中的数据存储早关系数据库中，当然也可以存储在磁盘文件中、XML数据文件中
+二、Java中的数据存储技术
+	1. 在Java中，数据存储技术可以分为以下几类
+		①JDBC直接访问数据库
+		②JDO技术
+		③第三方O/R工具，如Hibernate、ibatis等
+	2. JDBC是Java访问数据库的基石，JDO、Hibernate等只是更好的封装了JDBC
+三、JDBC基础
+	1. JDBC(Java Datebase Connectivity)：是一个独立于特定数据库管理系统、通用的SQL数据库存取和操作的公共接口（一组API），
+		定义了用来访问数据库的标准Java类库，使用这个类库可以以一种标准的方法、方便地访问数据库资源
+	2. JDBC为访问不同数据库提供了一种统一的途径，为开发者屏蔽了一些细节问题
+	3. JDBC的目标是使Java程序员使用JDBC可以连接任何提供了JDBC驱动程序的数据库系统，这样就使得程序员无需对特定的数据库系统
+		的特点有过多了解，从而大大简化和加快了开发的过程
+四、JDBC体系结构 
+	1. JDBC接口（API）包括两个层次：
+		①面向应用的API：抽象接口，供应用程序开发人员使用（连接数据库，执行SQL语句，获得结果）
+		②面向数据库的API：Java Driver API，供开发商开发数据库驱动程序用
+五、JDBC驱动分类
+	1. JDBC驱动程序：各个数据库厂商根据JDBC的规范制作的JDBC实现类的类库
+	2. JDBC驱动程序总共有四种类型：
+		①第一类：JDBC—ODBC桥
+		②第二类：部分本地API部分Java的驱动程序
+		③第三类：JDBC网络纯Java驱动程序
+		④第四类：本地协议的纯Java驱动程序
+		注：第三、第四两类都是纯Java的驱动程序，因此，对于Java开发者来说，他们的性能、可移植性、功能等方面都有优势
+六、JDBC API
+	1. JDBC API：是一系列的接口，它使得应用程序能够进行数据库连接、执行SQL语句、并返回结果
+	2. Driver接口：
+		①Java.sql.Driver接口是所有JDBC驱动程序需要实现的接口。这个接口是提供给数据库厂商使用的，不同数据库厂商提供不同的实现
+		②在程序中不需要直接去访问实现了Driver接口的类，而是由驱动程序管理器类（java.sql.DriverManager）去调用这些Driver实现
+七、建立连接：
+	1. 可以调用DriverManager类的getConnection()方法建立到数据库的连接
+	2. JDBC URL用于标识一个被注册的驱动程序，驱动程序管理器通过这个URL选择正确的驱动程序，从而建立到数据库的连接
+	3. JDBC URL的标准由三部分组成，各部分之间需要用冒号隔离
+		①jdbc:<子协议>:<自名称>
+		②协议：JDBC URL中额协议总是jdbc
+		③子协议：子协议用于表示一个数据库驱动程序
+		④自名称：一种标识数据库的方法，自名称可以依据不同子协议而变化，用自名称的目的是为了定位数据库提供足够的信息
+	4. 几种常用数据库的JDBC URL
+		①Oracle：jdbc:oracle:thin:@localhost:1521:sid
+		②SQLServer：jdbc:microsoft:sqlserver//localhost:1433;DatabaseName=sid
+		③MySQL：jdbc:mysql://localhost:3306/test
+八、获取数据库连接
+	1. 加入MySQL驱动
+		①进入官网：https://dev.mysql.com/downloads/connector/j/
+		②从官网下载mysql-connector-java-8.0.13.zip
+		③解压MySQL驱动
+		④在当前项目工程下新建lib目录
+		⑤将解压的MySQL驱动目录下的mysql-connector-java-8.0.13.jar复制到lib目录下
+		⑥右键点击lib目录下的mysql-connector-java-8.0.13.jar，选择build path，选择add to lib加入到类路径下
+	2. Driver
+		(1)Driver：
+			Driver 是一个接口：数据库厂商必须实现的接口，能从其中获取数据库连接
+		(2)通过Driver建立数据库连接
+			①准备连接数据库的四个字符串
+				A. 创建Properties对象
+					Properties properties = new Properties();
+				B. 获取jdbc.properties对应的输入流
+					InputStream is = this.getClass().getClassLoader().getResourceAsStream("jdbc.properties");
+				C. 加载对应的输入流
+					properties.load(is);
+				D. 获取驱动全类名、url、user、password四个字符串
+					String driverClass = properties.getProperty("driver");
+					String url = properties.getProperty("url");
+					String user = properties.getProperty("user");
+					String password = properties.getProperty("password");
+			②通过反射加载Driver并创建Driver的对象
+				Driver driver = (Driver)Class.forName(driverClass).newInstance();
+			③创建Properties对象info，将user和password加载到info对象中
+				Properties info = new Properties();
+				info.put("user", user);
+				info.put("password", password);
+			④通过Driver的对象调用connect(url, info)方法获取数据库连接
+				Connection connection = driver.connect(url, info);
+	3. DriverManager
+		(1)DriverManager：是驱动的管理类 
+			①可以通过重载的getConnection()方法获取数据库连接，较为方便
+			②可以同时管理多个驱动程序
+		(2)通过DriverManager建立数据库连接
+			①准备连接数据库的四个字符串
+				A. 创建Properties对象
+					Properties properties = new Properties();
+				B. 获取jdbc.properties对应的输入流
+					InputStream is = this.getClass().getClassLoader().getResourceAsStream("jdbc.properties");
+				C. 加载对应的输入流
+					properties.load(is);
+				D. 获取驱动全类名、url、user、password四个字符串
+					String driverClass = properties.getProperty("driver");
+					String url = properties.getProperty("url");
+					String user = properties.getProperty("user");
+					String password = properties.getProperty("password");
+			②加载数据库驱动程序（对应的Driver实现类中有注册驱动的静态代码块）
+				Class.froName(driver);
+			③通过DriverManager的getConnection(url, user, password)方法获取数据库连接
+				Connection connect = DriverManager.getConnection(url, user, password);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		

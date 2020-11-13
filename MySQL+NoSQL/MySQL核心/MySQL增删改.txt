@@ -1,0 +1,346 @@
+一、DML语言（数据操作语言）：
+	1. insert：插入
+	2. update：修改
+	3. delete：删除
+二、插入语句：
+	1. 语法：
+		①方式一
+			insert into 表名(列名,....) values(值1,....)
+		②方式二
+			insert into 表名 set 列名 = 值,.....
+	2. 特点：
+		①插入值的类型要与列的类型一致或者兼容
+		②不可以为null的列必须插入值，可以为null的列有以下的方式插入值
+			A. 如果允许null的列有列举出来，那么必须插入值，而该值可以用null代替
+			B. 如果允许null的列不列举出来，那么不能插入该列的值，并且该列会插入默认值
+		③列的顺序可以调换，那么插入的值顺序需要根据列的顺序插入
+		④列数和值得个数必须一致
+		⑤可以省略列名，默认为表中的所有列，而且列的顺序和表中列的顺序一致，因此插入值
+			时要求所有的列的值都需要插入，允许为null的列的值可以用null代替
+	3. 插入的方式比较
+		①方式一支持插入多行，而方式二不支持插入多行
+			举例：
+				insert into 表名(列1, 列2, 列3, ...)
+				values(值1, 值2, 值3, ...), (值1, 值2, 值3, ...), .....
+		②方式一支持子查询，而方式二不支持插入多行
+			举例：
+				insert into 表名(列1,列2,列3,...)
+				select 字段一, 字段二, 字段三, ... from 表名 [where 筛选条件]
+	4. 案例：
+		#案例：在男生表中插入张飞
+		INSERT INTO boys(id, boyName, userCP) VALUES(5, '张飞', '100');
+三、修改语句：
+	1. 修改单表的记录
+		①语法：
+			update 表名 set 列名1 = 新值1, 列名2 = 新值2, ..... where 筛选条件
+		②案例：
+			#案例：修改男生表中张飞的userCP值为200
+			UPDATE boys SET userCP = 200 WHERE boyName = '张飞';
+	2. 修改多表的记录
+		①SQL92标准语法：
+			update 表1, 表2 
+			set 列名1 = 新值1, 列名2 = 新值2, ..... 
+			where 连接条件 and 筛选条件
+		②SQL99标准语法：
+			update 表1
+			inner |left outer |right outer 表2 
+			on 连接条件
+			set 列名1 = 新值1, 列名2 = 新值2, ..... 
+			where 筛选条件
+		③案例：
+			#案例：将女生表中没有男朋友的女生男朋友改为张飞
+			UPDATE beauty b LEFT JOIN boys bo ON b.`boyfriend_id` = bo.`id`
+			SET b.`boyfriend_id` = (
+				SELECT id FROM boys WHERE boyName = '张飞'
+			)
+			WHERE bo.id IS NULL;
+四、删除语句
+	1. delete：删除单行记录
+		①单表删除
+			A. 语法：
+				delete from 表名 where 筛选条件
+			B. 案例：
+				#案例：删除张飞的信息
+				DELETE FROM boys WHERE boyName = '张飞';
+		②多表删除
+			A. SQL92标准
+				Ⅰ. 语法：
+					delete [别名1],[别名2] from 表1 别名1, 表2 别名2 where 连接条件 and 筛选条件
+				Ⅱ. 举例
+					#案例一：删除黄晓明和他女朋友的信息
+					DELETE bo, b FROM boys bo, beauty b
+					WHERE b.boyfriend_id = bo.id AND boyName = '黄晓明';
+			B. SQL99标准
+				Ⅰ. 语法：
+					delete [别名1],[别名2] from 表1 别名1 inner |left outer |right outer 表2 别名2
+					on 连接条件 where 筛选条件
+				Ⅱ. 举例：
+					#案例二：删除没有男朋友的女生的信息
+					DELETE b FROM beauty b
+					LEFT JOIN boys bo ON b.boyfriend_id = bo.id
+					WHERE bo.id IS NULL
+	2. truncate：删除表格所有的记录
+		语法：
+			truncate table 表名
+	3. delete与truncate的比较
+		①delete可以加where 筛选条件，而truncate不允许
+		②truncate删除的效率比delete稍高
+		③假如要删除的表中有自增长列，
+			使用delete删除表中的数据，再插入数据，自增长列的值从断点（删除前该列的值得下一个）开始
+			使用truncate删除表中的数据，再插入数据，自增长列的值从1开始
+		④truncate删除表中的数据后没有返回值，而delete删除表中的数据后有返回值
+		⑤truncate删除没有事务回滚，而delete删除可以回滚
+五、DDL语言（数据库定义语言）：
+	1. 库的管理
+		①创建
+			A. 创建库一般语法：
+				drop database if exists 库名 
+				create database 库名
+			B. 创建前判断是否存在：create database if not exists 库名
+		②修改
+			A. 修改库名：不支持
+			B. 更改字符集：
+				alter database 库名 character set 字符集名
+		③删除
+			A. 删除库一般语法：drop database 库名
+			B. 删除前判断是否存在：drop database if exists 库名
+	2. 表的管理
+		①创建
+			语法：
+				drop table if if exists 表名
+				create table 表名(
+					列名 列的类型 [(长度) 约束],
+					......,
+					列名 列的类型 [(长度) 约束]
+				);
+		②修改：alter table 表名 change（修改列名）|modify（修改类型或者约束）|
+								add（添加列）|drop（删除列）| column 列名 [列类型 约束]
+			A. 修改列名
+				ALTER TABLE books CHANGE COLUMN publicshDate publicsh_date DATETIME;
+			B. 修改类的约束或者类型
+				ALTER TABLE books MODIFY COLUMN publicsh_date TIMESTAMP;
+			C. 添加列
+				ALTER TABLE author ADD COLUMN annual DOUBLE;
+			D. 删除列
+				ALTER TABLE author DROP COLUMN annual;
+			E. 修改表名
+				ALTER TABLE books RENAME TO book;
+		③删除
+			drop table if if exists 表名
+	3. 关键字
+		①创建：create
+		②修改：alter
+		③删除：drop
+	4. 表的复制
+		①复制表的结构
+			create table 新表 like 原始表
+		②复制表的结构+数据
+			create table 新表 select * from 原始表
+		③复制表的结构+部分数据
+			create table 新表 select 字段名 from 原始表 where 筛选条件
+		④复制表中的某些字段
+			create table 新表 select 字段名 from 原始表 where 0;
+六、数据类型
+	1. 分类
+		①数值型
+			A. 整数型
+			B. 小数：定点数、浮点数
+		②字符型
+			A. 较短的文本：char、varchar
+			B. 较长的文本：text、blob（较长的二进制数据）
+		③日期型
+	
+
+	2. 整数型：
+		①分类：
+			A. tinyint：1
+			B. smallint：2
+			C. mediumint：3
+			D. int/integer：4
+			E. bigint：8
+		②特点：
+			A. 整数型的数据类型分有符号，还是无符号
+			B. 如果不设置无符号还有有符号，默认是有符号，如果想设置无符号，则需要在数据类型后面加unsigned关键字
+			C. 如果插入的数据超过了整数型的范围，会报out of range异常，并且插入该数据类型的临界值的
+			D. 如果不设置数据类型的长度，会自动设置默认的长度
+			E. 长度是指该数据显示的最大的宽度，如果数据的宽度没达到指定的宽度，会在数据的左边填充，但是必须搭配
+				zerofill使用才能够显示，此时数据类型变为无符号
+	3. 小数：
+		①分类：
+			A. float(M, D)：4
+			B. double(M, D)：8
+			C. decimal(M, D)：M+2
+		②特点
+			A. M和D：
+				M：整数部分+小数部分，如果总位数超出M，则会取该位数的最大临界值
+				D：小数部分，如果小数的位数超出了D，则会将小数部分四舍五入
+			B. M和D可以省略：
+				decimal：默认M为10，D为0
+				float/double：根据插入数据的长度决定精度
+			C. 	定点型与浮点型的比较
+				浮点型的精度较低，用于保存一般的数据
+				定点型的精度较高，如果要求插入数值的精度较高比如货币的运算等则优先选择
+		③数据类型选择原则：所选择的类型越简单越好，在保存数据的范围内，选择长度最小的数据类型
+	4. 字符型
+		①较短的文本：
+			A. char(M)和varchar(M)比较：
+				（1）M：代表最大的字符数
+				（2）char是固定长度的字符，而varchar是可变的字符长度
+				（3）char对空间比较耗费，而varchar对空间比较节省
+				（4）char的效率相对较高，varchar的效率相对较低
+				（5）char适合保存固定字符长度的数据比如性别，varchar比较适合保存可变字符长度比如名字
+			B. binary和varbinary：保存较短的二进制文本，而不能处理其他字符
+			C. enum和set：不区分大小写，默认显示都为小写
+				（1）enum：用于保存枚举，比如 列 enum('a', 'b', 'c')，列的结果只能为a，b，或者c
+				（2）set：用于保存集合，比如 列 set('a', 'b', 'c')，列的结果可以为a，b，c或者abc的任意组合
+		②较长的文本：text和blob
+	5. 日期类型：
+		①分类：
+			日期和时间类型	字节	最小值				最大值
+			date			4		1000-01-01			9999-12-31
+			time			3		-838:59:59			838:59:59
+			year			1		1901				2155
+			datetime		8		1000-01-01 00:00:00	9999-12-31 23:59:59
+			timestamp		4		19700101080001		2038年的某个时刻
+		②特点：
+			A. date只保存日期，time只保存时间，year只保存年份
+			B. datetime：保存日期和时间，占了8个字节，时间范围从1000-01-01 00:00:00到9999-12-31 23:59:59，不受时区的影响
+			C. timestamp：保存日期和时间，占了4个字节，时间范围从19700101080001到2038年的某个时刻，受时区的影响（较常用）
+		③查看当前的时区的方法是：show variables like 'time_zero'#查看当前的系统时区
+		④修改当前的时区的方法是：set time_zero = '+9:00'#修改当前的系统时区为东九区
+七、约束：
+	1. 分类：六大约束
+		①not null：非空，用于保证该字段的值不能为空，比如姓名、学号等
+		②default：添加默认值，用于保证该字段有默认值，比如姓名
+		③primary key：主键，用于保证该字段的值具有唯一性，并且非空
+		④unique：唯一。用于保证该字段的值具有唯一性，可以为空
+		⑤check：检查约束（mysql不支持），用于检查一个字段的值是否准确
+		⑥foreign key：外键，用于限制两个表的关系，用于保证该字段的值来自于另一个表，一般在从表中添加外键
+	2. 添加约束的时机：
+		①在表的创建时
+		②在表的修改时
+	3. 约束的添加分类：
+		①列级约束：六大约束语法中都支持，但是外键约束没有效果
+		②表级约束：除去非空、默认约束，其余约束都支持
+		③语法：
+			create table 表名(
+				字段名 字段类型 列级约束,
+				字段名 字段类型,
+				......
+				表级约束
+			);
+	4. 列级约束：
+		①语法：直接在字段名和字段类型后面加约束类型
+		②支持：主键、非空、唯一、默认，而检查（check）和外键（references）不支持
+		③举例：CREATE TABLE stuinfo(
+					id INT PRIMARY KEY,
+					stuName VARCHAR(20) NOT NULL,
+					gender CHAR(1) CHECK(gander IN('男', '女')),#不支持
+					seat INT UNIQUE,
+					age INT DEFAULT 18,
+					majobId INT REFERENCES majob(id)#不支持
+				);
+		④可以添加多个列级约束，约束之间无顺序要求
+	5. 表级约束：
+		①语法：添加在所有的字段名之后，【constraint 约束名】约束类型(字段名)
+		②支持：主键、外键、唯一、检查（mysql不支持）
+		③举例：CREATE TABLE stuinfo(
+					id INT PRIMARY KEY,
+					stuName VARCHAR(20) NOT NULL,
+					gender CHAR(1) CHECK(gender = '男' OR gender = '女'),
+					seat INT UNIQUE,
+					age INT DEFAULT 18,
+					majobId INT,
+
+					CONSTRAINT fk_stuinfo_majob FOREIGN KEY(majobId) REFERENCES majob(id)
+				);
+		④查看表的结构
+			A. 查看表的结构
+			DESC stuinfo;
+			B. 查看表的所有索引，包括主键、外键、唯一和自己添加的索引
+			SHOW INDEX FROM stuinfo;
+	6. 主键和唯一性的区别：
+		①主键和唯一约束都保证了唯一性
+		②主键不允许为空，而唯一约束允许为空但是只能出现一次
+		③主键在表中只能出现在一个字段，而唯一约束能够出现在多个字段
+		④主键和唯一约束均允许组合（组合指的是多个字段设置在同一个约束中，必须满足多个字段同时相同才触发约束）
+				保证唯一性	是否允许空值	表中允许多个	是否允许组合
+		主键：	是			否				否				是，但是不推荐
+		唯一：	是			是				是				是，但是不推荐
+	7. 外键：
+		①要求在从表设置外键关系
+		②从表的外键列的类型和主表的关联列的类型要求一会或者兼容，但是名称无要求
+		③主表的关联列必须是一个key(一般是主键，再接着就是唯一)
+		④插入数据时，要求先插入主表的数据，再插入从表的数据
+		⑤删除数据时，要求先删除从表的数据，再删除主表的数据
+		⑥表中可以添加多个外键约束
+	8. 修改
+		①添加约束:
+			A. 添加列级约束:alter table 表名 modify 字段名 字段类型 新约束
+			B. 添加表级约束:alter table 表名 add 【constraint 约束名】 新约束(字段名)
+			C. 举例：
+				#添加非空约束
+				ALTER TABLE stuinfo MODIFY COLUMN stuName VARCHAR(20) NOT NULL;
+
+				#添加默认约束
+				ALTER TABLE stuinfo MODIFY COLUMN age INT DEFAULT 18;
+
+				#添加主键约束
+				#列级约束
+				ALTER TABLE stuinfo MODIFY COLUMN id INT PRIMARY KEY;
+				#表级约束
+				ALTER TABLE stuinfo ADD CONSTRAINT pk PRIMARY KEY(id);
+
+				#添加唯一约束
+				#列级约束
+				ALTER TABLE stuinfo MODIFY COLUMN seat INT UNIQUE;
+				#表级约束
+				ALTER TABLE stuinfo ADD CONSTRAINT un UNIQUE(seat);
+
+				#添加外键约束
+				ALTER TABLE stuinfo ADD CONSTRAINT fk_stuinfo_major FOREIGN KEY(majobId) REFERENCES majob(id);
+		②删除约束
+			A. 删除列级约束：alter table 表名 modify 字段名 字段类型 [null];
+			B. 删除表级约束：alter table 表名 drop index 约束名
+			C. 删除主键约束：alter table 表名 drop primary key;
+			D. 举例：
+				#删除非空约束
+				ALTER TABLE stuinfo MODIFY COLUMN stuName VARCHAR(20) NULL;
+				#删除默认约束
+				ALTER TABLE stuinfo MODIFY COLUMN age INT;
+				#删除主键
+				ALTER TABLE stuinfo DROP PRIMARY KEY;
+				#删除唯一
+				ALTER TABLE stuinfo DROP INDEX un;
+				#删除外键约束
+				ALTER TABLE stuinfo DROP INDEX fk_stuinfo_major;
+	9. 标识列
+		①定义：称为自增长列，可以不用手动插入数值，系统提供默认的序列值
+		②特点
+			A. 标识列必须搭配键使用，可以是主键和唯一键
+			B. 表中至多只能有一个标识列
+			C. 标识列只能是数值型，可以是int、float、double
+			D. 标识列可以通过show variables like '%auto_increment%'查看标识类的起始值和步长
+				通过修改set auto_increment_increment变量设置步长，通过插入表中的第一条记录的
+				的标识列值作为标识列的起始值。
+		③创建表时设置标识列
+			DROP TABLE IF EXISTS book;
+			CREATE TABLE book(
+				id INT PRIMARY KEY AUTO_INCREMENT,
+				bookName VARCHAR(20)
+			);
+		④修改表时设置标识列
+			ALTER TABLE book MODIFY COLUMN id INT PRIMARY KEY;
+			#可以在主键约束的基础上添加标识列
+			ALTER TABLE book MODIFY COLUMN id INT AUTO_INCREMENT;
+		⑤修改表时删除标识列
+			ALTER TABLE book MODIFY COLUMN id INT;
+			#删除主键约束
+			ALTER TABLE book DROP PRIMARY KEY;
+			#删除非空约束
+			ALTER TABLE book MODIFY COLUMN id INT NULL;
+
+
+
+
+

@@ -1,0 +1,208 @@
+一、MySQL简介
+	1. 概述
+		①MySQL是一个关系型数据库管理系统（传统的rDBMS），由瑞典MySQL AB公司开发，先隶属于Oracle公司
+		②MySQL是一种关联数据库管理系统，将数据保存在不同的表中，而不是将所有的数据放在一个大仓库中，这样就增加了速度并提高了灵活性
+		③MySQL是开源的，不需要支付额外的费用
+		④MySQL使用标准的SQL数据语言形式
+		⑤MySQL允许安装在多个系统上，并且支持多种语言，这些语言包括C、C++、Python、Java、Perl、PHP、Eiffel、Ruby和Tcl等
+		⑥MySQL对PHP有很好的支持，PHP目前是最流行的Web开发语言
+		⑦MySQL支持大型数据库，支持5000万条记录的数据仓库，32位系统表文件最大可支持4GB，64位系统支持最大的表文件为8TB
+		⑧MySQL是可以定制的，采用了GPL协议，可以修改数据库的额源代码来开发自己的MySQL系统
+	2. 高级MySQL：完整的mysql优化需要很深的功底，大公司甚至需要专门的DBA写下述
+		①MySQL内核：编码、优化、改写
+		②sql优化攻城狮：建立索引、修改配置文件
+		③MySQL服务器的优化：配置文件中的参数、字符集的修改
+		④各种参数常量设定
+		⑤查询语句优化
+		⑥主从复制
+		⑦软硬件升级
+		⑧容灾备份
+		⑨SQL编程
+	3. 重要内容：
+		①MySQL高级的核心：立足于Java开发工程师写出高性能的SQL的相关知识，如提升则可是DBA的学习内容
+		②基于Windows系统的MySQL是比较基础的，而MySQL的内容易学难精。
+		③MySQL除了create table和create datebase，还有建立函数、存储过程、建立索引和触发器等
+		④DBA的工作内容有：MySQL内核的编码、优化和改写。
+		⑤从事Java工程师可转型为DBA和数据运维，专注后台数据的操作，因为服务器是一个程序的最根本的部分
+		⑥现在的互联网已经从IT时代转变为DT（数据）时代，可结合大数据和云计算。
+		⑦算法是从事数据挖掘和数据分析
+二、MySQL在Linux版本的安装：由于CentOS7以后，默认的数据库不在是MySQL，而是MariaDB，因此选用CentOS6版本进行学习此内容
+	1. 下载地址：https://dev.mysql.com/downloads/mysql/5.5.html#downloads
+		A. mysql服务器：MySQL-server-5.5.48-1.linux2.6.i386.rpm
+		B. mysql客户端：MySQL-client-5.5.48-1.linux2.6.i386.rpm
+	2. 检查当前系统是否安装过mysql
+		rpm -qa | grep mysql
+		① 检查不出安装信息即是没有安装，可进入安装程序
+		② 如果安装过mysql, 则需要先删除才可以安装
+			删除命令：rpm -e 软件包名（该名字是上一个命令查出来的名字）   //普通删除模式
+			rpm -e --nodeps mysql_libs    // 强力删除模式，如果使用上面命令删除时，
+			提示有依赖的其它文件，则用该命令可以对其进行强力删除
+		③ 进入mysql的相关安装：以下内容在CentOS7版本中无效
+			A. 安装mysql-server: rpm -ivh MySQL-server-5.5.48-1.linux2.6.i386.rpm
+				a. 当使用上述命令时，可能产生下述的错误
+				libaio.so.1 被 MySQL-server-5.5.48-1.linux2.6.i386 需要
+				libaio.so.1(LIBAIO_0.1) 被 MySQL-server-5.5.48-1.linux2.6.i386 需要
+				libaio.so.1(LIBAIO_0.4) 被 MySQL-server-5.5.48-1.linux2.6.i386 需要
+				b. 解决方法一：在安装命令后面加上: 在后面加上  --nodeps --force
+				如：rpm -ivh MySQL-server-5.5.48-1.linux2.6.i386.rpm   --nodeps --force
+				c. 解决方法二：下载32位的libaio, 查看libaio的版本：yum list libaio，选择：libaio.i686版本
+				安装命令：yum install libaio.i686
+				d. 安装成功后会提示
+			B. 安装mysql-client: rpm -ivh MySQL-client-5.5.48-1.linux2.6.i386.rpm
+				a. 当使用上述命令时，可能产生下述的错误
+				libaio.so.1 被 MySQL-client-5.5.48-1.linux2.6.i386 需要
+				b. 解决方法：在安装命令后面加上: 在后面加上  --nodeps --force
+				如：rpm -ivh MySQL-client-5.5.48-1.linux2.6.i386.rpm   --nodeps --force
+				c. 安装成功后会提示
+			C. 查看MySQL安装时创建的MySQL用户和MySQL组（该方式可以查看mysql安装是否成功）
+				a. 查看MySQLcat用户：cat /etc/passwd | grep mysql
+				b. 查看MySQL组：cat /etc/group | grep mysql
+			D. 查看mysql安装是否成功：
+				a. 使用mysqladmin --version
+				b. 若出现错误为：libgcc_s.so.1 must be installed for pthread_cancel to work 已放弃(吐核)
+				c. 说明是RTC使用了32位的libgcc库，而这个库在64位的Linux机器里没有安装。
+				d. 下载32位的libgcc, 查看libgcc的版本：yum list libgcc，选择：libgcc.i686版本
+				e. 安装命令：yum install libgcc.i686
+		④ mysql服务的开启和停止
+			A. 看mysql服务是否启动：ps -ef | grep mysql
+			B. 开启mysql服务：service mysql start
+			C. 关闭mysql服务：service mysql stop
+		⑤ mysql服务开启后，开始连接：
+			A. 首次连接成功：直接输入mysql即连接成功，因为MySQL默认没有密码。
+			B. 设置MySQL的登录密码：/usr/bin/mysqladmin -u root password ****
+			C. 再次连接MySQL需要账号和密码：mysql -uroot -p****
+		⑥ 设置mysql的开机自启动
+			A. 查看mysql的自启动列表：chkconfig --list mysql
+			B. 设置mysql的自启动列表：chkconfig[ --level N] mysql on
+			C. 查看Linux的运行级别：cat /etc/inittab, 即不正常启动的情况下不需要为mysql设置自启动
+			D. 使用客户端自启动服务：ntsysv，找到mysql服务，如果带有*则说明是开机自启动
+		⑦ Linux下查看安装目录：ps -ef | grep mysql 
+			A. mysql数据库文件的存放路径：/usr/local/mysql/data(/var/lib/mysql)，比如：myemployees、mysql等
+			B. mysql数据库的配置文件存放路径：/usr/local/mysql/support-files(/usr/share/mysql)，比如：mysql.server、my.cf
+			C. mysql数据库的相关命令：/usr/local/mysql/bin(/usr/bin)，比如：mysqladmin、mysql
+			D. mysql数据库的启停脚本：/etc/init.d/mysql，比如：/etc/init.d/mysql start/stop
+			E. mysql数据库的安装路径为：/usr/local/mysql
+		⑧ 修改配置文件的位置
+			A. /etc/目录存放了各种启动服务依赖的各种配置文件，因此mysql启动时会事先查看/etc/目录下是否有my.cnf
+			B. 与redis一样，一般需要对总配置文件进行备份，保留原始的版本，在拷贝版进行重新设置
+			C. ls -l /etc/ | grep my.cnf，查看etc/目录下是否存在my.cnf，如果存在，则重命名
+			D. 如果存在，则重命名，接着将mysql安装路径下的my.cof总配置文件拷贝到/etc/目录下
+			cp /usr/local/mysql/my.cnf /etc/my.cnf
+			E. 当前5.5版本的总配置文件为/usr/share/my-huge.cnf,而5.6版本的总配置文件为/usr/share/my-default.cnf
+		⑨修改字符集
+			A. 在5.6版本中，mysql服务器与客户端的字符集编码已经修改为utf-8，并且在配置文件中都是默认配置
+			B. 在5.5版本中，character_set_database和character_set_server的默认字符集还是latin1。
+			因此当插入中文时会出现乱码等现象，所以需要通过修改配置文件的方式，解决中文乱码问题‘
+				a. 在[client]字段里加入default-character-set=utf8，如下：
+					[client]
+					port = 3306
+					socket = /var/lib/mysql/mysql.sock
+					default-character-set=utf8
+				b. 在[mysqld]字段里加入character-set-server=utf8等，如下：
+					[mysqld]
+					port = 3306
+					socket = /var/lib/mysql/mysql.sock
+					character_set_server=utf8
+					character_set_client=utf8
+					collation-server=utf8_general_ci
+				c. 在[mysql]字段里加入default-character-set=utf8，如下：
+					[mysql]
+					no-auto-rehash
+					default-character-set=utf8
+				d. 修改完成之后，保存退出，重新启动mysql服务，如果启动的过程中没有问题，说明配置文件修改没问题
+				e. 在修改配置文件之前创建的数据库仍有乱码问题，当修改之后再创建数据库时，乱码问题已经全部解决。
+三、MySQL配置文件：
+	1. 二进制文件log-bin：主要作用是用于主从复制
+	2. 错误日志log-error：默认是关闭的，记录严重的警告和错误信息，记录每次启动和关闭的详细信息等
+	3. 查询日志log: 默认是关闭的，记录查询的SQL语句，如果开启会降低mysql的整体性能，因为记录日志也是需要消耗系统资源的
+	4. 数据文件：
+		① 两系统数据库文件
+			A. Windows：数据存放目录下的data目录（数据存放位置可以看配置文件）
+			B. Linux：默认路径：/usr/local/mysql/data
+		② frm文件：存放表的结构（图书馆）
+		③ myd文件：存放的是表数据（数据）
+		④ myi文件：查找数据的表索引（标签）
+	5. 如何配置：
+		① Windows：安装目录下的my.ini文件
+		② Linux：/etc/my.cnf
+	注：mysql为了性能的高效和优化，出厂设置时很多高级的功能都是默认关闭的。
+四、MySQL的逻辑架构简介
+	1. 概括：和其他数据库相比，MySQL优点与众不同，它的架构可以在多种不同场景中应用并发挥良好的作用。主要体现在架构上，“插件式的
+	存储引擎架构将查询处理和其他的系统任务以及数据的存储提取相分离。”这种架构可以根据业务的需求和实际选择合适的存储引擎。
+	2. 连接层：
+		① 最上层数一些客户端和连接服务，包含本地sock通信和大多数基于客户端/服务端工具实现类似于tcp/ip的通信，主要完成一些类似于
+		连接处理、授权认证、及相关的安全方案，在该层上引入了线程池的概念，为通过认证安全接入的客户端提供线程，同样在改成上可以
+		实现基于SSL的安全连接。服务器也会为安全接入的每个客户验证它所具有的操作权限。
+		② Connection：Native C API、JDBC、ODBC、.NET、PHP、Perl、Python、Ruby、Cobol
+		③ 类似于开发中的连接层。
+	3. 服务层（以下层级均属于mysql server层）：
+		① 第二程架构主要完成大多数的核心服务功能，如SQL接口，并完成缓存的查询，SQL的分析和优化及部分内置函数的执行。所有跨存储引
+		擎的功能实现也再这一层实现，如过程、函数等，在该层，服务器会解析查询并创建相应的内部解析树，并对其完成相应的优化如确定
+		查询表的顺序，是否利用所以等，最后生成相应的执行操作，如果是select语句，服务器还会查询内部的缓存，如果缓存的空间足够大，
+		这样在解决大量读写操作的环境中能够很好的提升系统的性能
+		② 与客户端/服务端实现通信连接的是线程connection pool：Authentication、Thread Reuse、Connection Limits、Check Memory、Caches
+		③ 提供客户端/服务端实现通信连接的工具Management Services & Utils: Backup（备份）、Recovery（容灾恢复）、Security（安全）
+		复制、集群等等
+		④ SQL Interface：DML、DDL Stored Procedures(存储过程)、Views、Triggers(触发器)、etc，主要是查询语更新语句
+		⑤ 解析转换Parser: Query Transtation（查询事务）、Object Privatege（对象权限），解析读写操作，辨析注释、加载语句，重组过滤解析
+		⑥ Optimizer: mysql优化器，Access Paths、Statistics。mysql自带的，会按照mysql最优的方式，完成相应的优化操作。它会按照其最优
+		的方式而不是按照DBA的方案优化，两次优化导致性能降低，因此在极端情况下可以移除该组件。索引失效，性能降低可能与其花挂钩
+		⑦ Cashe & Buffers: 存储与缓冲，结合my.cnf。
+		⑧ 该层级相当于业务逻辑处理层
+	4. 引擎层:
+		① 存储引擎层，存储引擎真正的复制了MySQL中数据的存储和提取，服务器通过API与存货从引擎进行通信。不同的存储引擎具有的功能不
+		相同，这样我们可以根据自己的实际需要进行选取。主要的存储引擎是MyISAM和InnoDB，后面细讲。
+		② Pluggable storage engines: 支持多种数据库引擎，MyISAM、InnoDB（主流数据库引擎、支持行锁和事务）、NDB、Archive、Federated、
+		Memory、Merge、Partner、Community、Custorm等
+	5. 存储层：
+		① 数据存储层，主要是将数据在运行于裸设备的文件系统之上，并完成与存储引擎的交互。
+		② File system：文件系统
+		③ File & logs：文件与日志
+六、MySQL存储引擎
+	1. 使用命令查看mysql使用的数据库存储引擎
+		①查看mysql数据库提供的存储引擎：show engines;
+		②查看没有mysql当前的默认存储引擎：show variables like '%storage_engine%'
+	2. MyISAM和InnoDB的对比：
+		对比项			MyISAM			InnoDB
+		主外键			不支持			支持
+		事务			不支持事务		支持
+		行表锁			表锁			行锁		
+		缓存			只缓存索引		缓存索引和真实数据
+		表空间			小				大
+		关注点			性能			事务
+		默认安装		安装			安装
+		① MyISAM：只支持表锁，即使操作一条数据也会锁住整个表，不适合高并发的操作；MyISAM只缓存索引，不缓存真实数据
+		② InnoDB：支持行锁，操作时只锁住某一行，不对其他行有影响，适合做高并发的操作；InnoDB不仅缓存索引还有真实数据，
+		对内存的要求极高，而且内存的大小对性能有决定性的影响。
+	3. 阿里巴巴、淘宝试用什么版本的数据库
+		①Percona为mysql数据库服务器进行了改进，在功能和性能上交MySQL有着显著的提升。该版本提升了在高负载情况下的InnoDB
+		的性能，为DBA提供了一些非常有用的性能诊断工具；另外有更多的参数和命令来控制服务器行为。
+		②该公司新建了一款存储引擎脚xtradb完全代替innodb，并且在性能和并发上做得更好。
+		③阿里巴巴大部分mysql数据库其实试用的是Percona的原型加以修改
+		④阿里巴巴为社区提供了两个开源的数据库：AliSql+AliRedis
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		
+		

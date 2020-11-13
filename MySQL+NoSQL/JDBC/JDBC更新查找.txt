@@ -1,0 +1,259 @@
+一、通过Statement执行更新操作
+	1. Statement：用于执行SQL语句的对象
+		①通过Connection的createStatement()来获取Statement对象
+			Connection con = getDriverManagerConnection();
+			Statement sta = con.createStatement();
+		②编写SQL语句，通过字符串的形式保存在sql中
+			String sql = "INSERT INTO stuinfo(`name`, gender) VALUES('Li', '男');";
+		③通过executeUpdate(sql)可以执行SQL语句
+			sta.executeUpdate(sql);
+		④传入的SQL可以是insert、update和delete，但是不能传入select
+	2. Connection、Statement都是应用程序和数据库服务器的连接资源，使用后一定需要关闭
+		需要在finally中关闭Connection、Statement的对象。
+		sta.close();
+		con.close();
+	3. 关闭的顺序是：先关闭后获取的，即先关闭Statement后关闭Connection
+二、ResultSet
+	1. 通过调用Statement对象的executeQuery()方法创建ResultSet对象
+		ResultSet rs = sm.executeQuery(sql);
+	2. ResultSet对象以逻辑表格的形式封装了执行数据库操作的结果集，ResultSet接口由数据库厂商实现
+	3. ResultSet对象维护了一个指向当前数据行的游标，初始的时候，游标在第一行之前，可以通过ResultSet对象的next()方法移动到下一行
+	4. ResultSet接口的常用方法为
+		①boolean next()
+		②getInt(int columnIndex | String columnName)
+		③getString(int columnIndex | String columnName)
+		④getDate(int columnIndex | String columnName)
+	5. ResultSet对象同样需要关闭
+三、PreparedStatement
+	1. 为什么使用PreparedStatement
+		①使用Statement需要进行SQL拼接
+		②拼接SQL时，麻烦、复杂、容易出错以及不易于维护
+	2. 什么是PreparedStatement：
+		①PreparedStatement是Statement的子接口
+		②可以传入带占位符的SQL语句
+		③提供补充占位符变量的方法
+	3. 使用PreparedStatement的步骤：
+		①创建数据库连接对象
+		②编写带占位符的SQL
+			String sql = "INSERT INTO examstudent VALUES(?,?,?,?,?,?,?)";
+		③创建PreparedStatement：通过Connection对象调用preparedStatement(sql)
+			Connection con = JDBCTools.getConnection();
+			PreparedStatement ps = con.prepareStatement(sql);
+		③调用PreparedStatement的setXxx(index index, Object value)方法设置占位符的值
+			ps.setInt(1, 10);
+		④执行SQL语句：executeUpdate()或者executeQuery()
+			ps.executeUpdate();
+		⑤注：
+			A. PreparedStatement对象需要进行关闭操作
+			B. 进行执行SQL语句操作不需要传入SQL
+			C. 关闭PreparedStatement对象时可以直接调用JDBCTools.release(Connection con, Statement sm)，因为PreparedStatement是Statement的子接口
+			D. setXxx(index index, Object value)方法的索引值是从1开始
+	4. 	PreparedStatement的好处：
+		①增强代码的可读性和可维护性
+			A. 创建一个带可变参数的通用更新数据库的方法
+				public static void update(String sql,Object...args) {
+			B. 创建数据库连接对象以及PreparedStatement对象
+				Connection connection = getConnection();
+				PreparedStatement preparedStatement = connection.prepareStatement(sql);
+			C. 将可变参数作为数组，利用for循环遍历数组，调用setObject()为SQL设置占位符的值
+				for (int i = 0; i < args.length; i++) {
+					preparedStatement.setObject(i + 1, args[i]);
+				}
+			D. 调用executeUpdate()执行SQL语句
+				preparedStatement.executeUpdate();
+		②可以有效禁止SQL注入
+			A. SQL注入是利用某些系统没有对用户输入的数据进行充分的检查，而在用户输入数据中注入非法的SQL语句
+				或者命令，从而利用系统的SQL引擎完成恶意行为的做法
+			B. 举例：	
+				(1)SELECT * FROM login WHERE username = 'a' OR PASSWORD = ' AND `password` = ' OR '1' = '1';
+				(2)
+					String username = "a' OR PASSWORD = ";
+					String password =  " OR '1' = '1";
+					String sql = "SELECT * FROM login WHERE username = '"
+					+ username + "' AND `password` = '"
+					+ password + "';";
+			C. 对于Java来说，要防止SQL注入，只要用PreparedStatement取代Statement即可
+				//创建两个变量用于保存SQL注入的值
+				String username = "a' OR PASSWORD = ";
+				String password =  " OR '1' = '1";
+				//使用占位符创建SQL语句
+				String sql = "SELECT * FROM login WHERE username = ? AND `password` = ?;";
+				//创建PreparedStatement对象
+				ps = con.prepareStatement(sql);
+				//设置占位符的值，将带有SQL注入的值传给SQL，但是由于在数据表中不存在该类型的用户，因此注入失败
+				ps.setString(1, username);
+				ps.setString(2, password);
+		③能最大可能的提高性能
+			A. DBServer会对预编译语句提高性能优化。因为预编译语句有可能被重用，所以语句在被DBServer的编译器变异后的执行代码
+				缓存下来，那么下次调用时只要是相同的预编译语句就不需要重新编译，只要将参数直接传入编译过的语句执行代码就会得到执行
+			B. 在statement语句中，即使是相同操作但因为数据内容不一样，因此整个语句本身不能匹配，没有缓存的意义，事实是没有数据库会对
+				普通语句编译的执行代码缓存。这样没执行一次都要对传入的语句编译一次。
+			C. 语法检查、语意检查、翻译成二进制、缓存。
+四、利用反射及JDBC元数据编写通用的查询方法
+	1. 使用JDBC驱动程序处理元数据
+		①Java通过JDBC获得连接后，得到一个Connection对象，可以从这个对象获得有关数据库管理系统的各种信息，包括数据库中的各个表，表中的各个列，
+			数据类型，触发器，存储过程等各方面的信息。根据这些表，JDBC可以访问一个实现事先并不了解的数据库
+		②获得这些数据信息的方法都是在DatabaseMetaData类的对象上实现的，而DatabaseMetaData类的对象是在Connection对象上获得的
+		③具体方法：
+			A. getCoulmnLabel()
+			B. getColumnCount()
+		④常用的类：
+			A. DatabaseMetaData：提供了许多方法用于获得数据源的各种信息，通过这些方法可以非常详细的了解数据库的信息：
+				(1)getURL()：返回一个字符串，代表数据库的URL
+				(2)getUserName()：返回当前连接数据管理系统的用户名
+				(3)IDReadOnly()：返回一个boolean值，指示数据库是否只允许读操作
+				(4)getDatabaseProductName()：返回数据库产品的名称
+				(5)getDatabaseProductVersion()：返回数据库的版本号
+				(6)getDriverName()：返回驱动程序的名称
+				(7)getDriverVersion()：返回驱动程序的版本号。
+				(8)getCatalogs()：获取数据库管理系统中的数据库
+			B. ResultSetMetaData：可以用于获取关于ResultSet对象中的类型和属性信息的对象
+				(1)getCoulmnLabel(int columnIndex)：获取结果集数据表中的别名
+				(2)getCoulmnName(int columnIndex)：获取结果集数据表中的列名
+				(3)getColumnTypeName(int columnIndex)：检索指定类的数据库特定的类型名称
+				(4)getColumnCount()：返回当前ResultSet对象的列数
+				(5)getCoulmnDisplaySize()：指示指定列的最大标准宽度，以字符为单位
+				(6)isNullable(int columnIndex)：指示指定列中的值是否为null
+				(7)isAutoIncrement(int columnIndex)：指示是否为指定利列进行编号，这样这些列仍然是自读的
+				
+	2. 具体步骤：
+		①编写带占位符的SQL语句，要求列的别名和Class对应的类的属性名相同
+			String sql = "SELECT flowId, `type`, idCard, examCard, studentName, location, grade " + 
+					"FROM examstudent " + 
+					"WHERE flowId = ?;";
+		②执行查询语句，得到ResultSet对象
+			con = JDBCTools.getConnection();
+			ps = con.prepareStatement(sql);
+			ps.setInt(1, 5);
+			rs = ps.executeQuery();
+		③调用ResultSet对象的getMetaData()方法获取ResultSetMetaData对象，可以知道SQL语句查询了哪些列，以及数据表中对应类的别名和值
+			ResultSetMetaData rsmd =  rs.getMetaData();
+			Map<String, Object> values = new HashMap<String, Object>();
+			if (rs.next()) {
+				for (int i = 0; i < rsmd.getColumnCount(); i++) {
+					String columnLabel = rsmd.getColumnLabel(i+1);
+					Object columnValue = rs.getObject(columnLabel);
+					values.put(columnLabel, columnValue);
+					//System.out.println(columnLabel + ": " + columnValue);
+				}
+			}
+		④Class对象通过反射创建Class对应类的对象
+			Class clazz = ExamStudent.class;
+			Object object = clazz.newInstance();
+		⑤通过通过类的对象、属性名、属性值得到一个完整的对象
+			for (Map.Entry<String, Object> entry : values.entrySet()) {
+				String fieldName = entry.getKey();
+				Object firldValue = entry.getValue();
+				ReflectionUtils.setFieldValue(object, fieldName, firldValue);
+			}
+			System.out.println(object);
+五、DAO设计模式
+	1. DAO：Data Access Object
+		①定义
+			访问数据信息的类，包含了对数据的CRUD（Create，Read，Update，Delete），而不包含任何业务相关的信息
+		②使用DAO设计的好处：
+			A. 实现功能的模块化，更有利于代码的维护和升级
+			B. DAO可以被子类继承或者字节使用
+		③使用可能情况
+			A. void update(String sql, Object ... args);
+			B. <T> T getObject(Class<T> clzz, String sql, Object ... orgs);
+			C. <T> List<T> getListObject(Class<T> clzz, String sql, Object ... orgs);
+			D. <E> E getValue(String sql, Object ... args);
+	2. Java类的属性
+		①属性的定义
+			A. 在JavaEE中，Java属性通过getter和setter来定义
+			B. 在get(或者set)方法中，除去get(或者set)后，字母首字母小写，该结果即为属性
+			C. 而类的成员变量则称之为属性
+			D. 一般情况下字段名和属性名一致
+		②beanutils：操作Java的属性
+			A. 下载官网：http://commons.apache.org/
+			B. 进入官网->选择beanutils->选择左边导航栏的Download，下载Commons-beanutils-1.9.3-bin.zip和Commons-beanutils-1.9.3-src.zip
+			C. 搭建环境：
+				(1)将下载好的commons-beanutils-1.9.3.jar和commons-logging-1.2.jar（下载方式参考beanutils）拷贝到当前工程下的目录
+				(2)将该jar包添加到当前工程的环境中，即可直接调用工具类中的方法对类的属性进行赋值
+			D. 常用的方法
+				(1)setProperty()
+					BeanUtils.setProperty(student, "studentName", "Li");
+				(2)getProperty()
+					BeanUtils.getProperty(student, "studentName");
+六、获取插入记录的主键值
+	1. 方法：getGeneratedKeys()
+	2. 步骤：
+		①编写插入的SQL语句
+		②使用重载的prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)生成PrepareStatement的对象
+		②getGeneratedKeys()方法获取新插入数据主键值的ResultSet
+		④该结果集只有一行一列，列名为GENERATED_KEY
+七、处理blob
+	1. Oracle LOB
+		①LOB，即Large Object(大对象)，是用来存储大量的二进制和文本数据的一种数据类型(一个LOB字段可存储多达4GB的数据)
+		②LOB分为两种类型：
+			A. 内部LOB
+				(1)内部LOB将 数据以字节流的形式存储在数据库的内部。因为，内部LOB的许许多多操作都可以参与事务，也可以向处理普通数据一样对其进行备份和恢复操作
+				(2)Oracle支持的三种类型的内部LOB：
+					BLOB：二进制数据
+					CLOB单字节字符数据
+					NCLOB多字节字符数据
+				(3) CLOB和NCLOB类型适用于存储超长文本数据，BLOB字段适用于存储大量的二进制数据，如图片、视频、音频、文件等
+			B. 外部LOB：目前只支持一种外部LOB类型，即BFILE类型
+				在数据库内，该类型仅存储数据在操作系统中的位置信息，而数据的实体以外部文件的形式存在于操作系统的文件系统中。因而，该类型所表示的数据是只读的，不参与事务
+				该类型可帮助用户管理大量的由外部程序访问的文件
+	2. MySQL类型介绍
+		①MySQL中，BLOB是一个二进制大型对象，是一个可以存储大量数据的容器，它能容纳不同大小的数据
+		②MySQL的四种BLOB类型（除了在存储的最大信息量上不同外，他们是等同的）
+			类型		大小（单位，字节）
+			TinyBLOB	最大255b
+			Blob		最大65K
+			MediumBLOB	最大16M
+			LongBLOB	最大4G
+		③实际使用中根据需要存入的数据大小定义不同的BLOB类型，需要注意的是：如果存储的文件过大，数据库的性能会下降
+	3. 处理BLOB
+		①插入BLOB类型的数据必须使用PreparedStatement，因为BLOB类型的数据是无法使用字符串拼接
+		②使用preparedStatement对SQL占位符进行赋值时对于BLOB对象使用的是setBlob(int columnIndex, InputStream inputStrea)
+			InputStream inputStream = new BufferedInputStream(new FileInputStream(new File("img/xiuzhi.jpg")));
+			preparedStatement.setBlob(4, inputStream);
+		③读取Blob类型的值时使用的是ResultSet的getBlob(int columnIndex | String columnName)
+		④Blob类型的数据需要调用getBinaryStream()转化为输入流，进而将二进制数据转化为输出流写入文件中
+			InputStream is = resultSet.getBlob(4).getBinaryStream();
+			OutputStream os = new BufferedOutputStream(new FileOutputStream(new File("img/pei.jpg")));
+			byte[] b = new byte[1024];
+			int len;
+			while((len = is.read(b)) != -1) {
+				os.write(b, 0, len);
+			}
+八、JDBC事务处理
+	1. 事务:指构成单个逻辑工作单位的操作集合
+	2. 事务处理：保证所有事务都作为一个工作单位来执行，即使出现了故障，都不能改变这种执行方式。当在一个事务中执行多个操作时，要么
+					所有的事务都被提交(commit)，要么整个事务回滚(rollback)到最初状态
+	3. 当一个连接对象被创建时，默认情况下是自动提交事务：每次执行一个SQL语句时，如果执行成功，就会自动向数据库提交，而不能回滚
+	4. 为了让多个SQL语句作为一个事务执行
+		①调用Connection对象的setAutoCommit(false)以取消自动提交事务
+			connection.setAutoCommit(false);
+		②在所有的SQL语句都执行成功后，调用commit()方法提交事务，该方法在执行完所有SQL语句时调用
+			connection.commit();
+		③在出现异常时，调用rollback()方法回滚，该方法在catch块中调用
+			connection.rollback();
+		④若此时Connection没有被关闭，则需要恢复其自动提交状态   
+			connection.setAutoCommit(true);
+		⑤注：如果多个操作使用的是不同的连接，而事务无法保证
+	5. 事务的隔离级别
+		①在MySQL中设置隔离级别
+			A. 每启动一个MySQL程序，就会获得一个单独的数据库连接，每个数据库连接都有一个全局变量@@tx_isolation，表示当前的事务隔离级别
+			B. MySQL的默认隔离级别为Repeatable Read
+			C. 查看当前的隔离级别：SELECT @@tx_isolation
+			D. 设置当前MySQL连接的隔离级别：set transaction isolation level read committed;
+			E. 设置数据库系统的全局的隔离级别：set global transaction isolation level read committed;
+		②在JDBC程序中设置隔离级别
+			A. 使用setTransactionIsolation()来设置事务的隔离级别
+
+
+
+
+
+
+
+
+
+
+
+
+			

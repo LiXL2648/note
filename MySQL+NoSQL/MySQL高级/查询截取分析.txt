@@ -1,0 +1,361 @@
+一、查询优化：
+	1. 分析：
+		① 观察：至少运行系统一天，查看生产的慢SQL情况
+		② 开启慢查询日志：设置阙值：比如超过五秒钟的就是慢SQL，并将它抓取出来
+		③ explain + 慢SQL分析，此时能得出80%的结论
+		④ show profile，此时能得出99%的结论
+		⑤ 运维经理 or DBA，进行SQL数据库服务器的参数调优
+	2. 总结：
+		① 慢查询的开启并捕获
+		② explain + 慢SQL分析
+		③ show profile查询SQL在MySQL服务器里面的执行细节和生命周期情况
+		④ SQL数据库服务器的参数调优
+	3. 永远小表驱动大表：类似于嵌套循环Nested Loop
+		① 在数据库服务器中，下面情况
+			for(int i = 5; ...){
+				for(int j = 10000; ...){
+				}
+			}
+			优于
+			for(int i = 10000; ...){
+				for(int j = 5; ...){
+				}
+			}
+		② 优化原则：小表驱动大表，即小的数据集驱动大的数据集
+			A. 原理（RBO）
+				a. in 优于 exists的情况：
+					select * from  A where id in(select id from B)
+					等价于
+					for select id from B
+					for select * from A where A.id = B.id
+					当表A的数据集大于表B的数据集时，使用 in 优于使用 exists。
+				b. exists 优于 in 的情况：
+					select * from A exists (select 1 from B where A.id = B.id)
+					等价于
+					for select * from A
+					for select * from B where A.id = B.id
+					当表A的数据集小于表B的数据集时，使用 exists 优于使用 in 
+				c. 注意：A表与B表的ID字段应建立索引
+		③ EXISTS：
+			A. 语法：SLECT .... FROM TABLE WHERE EXISTS (subquery)
+			B. 该语法可以理解为：
+				a. 将主查询的数据，放到子查询中做条件验证，根据验证结果（true or false）来决定主查询的数据结果是否得意保留
+				b. 提示：
+					（1）EXISTS(subquery)只返回TRUE或者FALSE，因此子查询中的SELECT * 也可以是SELECT 1或者其他，官方说法是实际执行时会忽略SELCT清单，因此没有区别
+					（2）EXISTS子查询的实际执行过程可能经过了优化而不是我们理解上的逐条比对，如果担忧效率问题，可进行实际检验以确定是否属效率问题
+					（3）EXISTS子查询往往也可以用条件表达式，其他子查询或者JOIN来替代，何种最优需要具体问题具体分析
+	4. order by关键字优化：
+		① ORDER BY 子句：尽量使用Index方式排序，避免使用FileSort方式排序
+			A. MySQL支持两种方式排序，FileSort和Index，Index的效率高，它指MySQL扫描索引本身完成排序。FileSort方式效率低
+			B. ORDER BY满足两种情况，会使用Index方式排序
+				a. Order By 语句使用索引最左前列
+				b. 使用WHERE子句与Order by 子句条件列组合满足最左前列
+		② 尽量在索引列上完成排序操作，遵照索引建立的最佳左前缀法则
+		③ 如果不在索引列上，filesort有两种算法：mysql就要启动双路排序和单路排序
+			A. 双路排序
+				a. MySQL4.1之前是使用双路排序，字面上意思就是两次扫描磁盘，最终得到数据。
+				读取行指针和orderby列，对他们进行排序，然后扫描已经排序好的列表，按照列表中的值重新从列表中读取对应的数据输出
+				b. 从磁盘取排序字段，在buffer进行排序，再从磁盘取其他字段
+			B. 取一批数据，要对磁盘进行两次扫描，众所周知，I/O是很耗时的，所以在MySQL4.1之后，出现第二种改进的算法，就是单路排序
+			C. 单路算法：
+				从磁盘读取查询需要的所有列，按照orderby列在buffer对他们进行排序，然后扫描排序后的列表进行输出，它的效率更快一些，
+				避免了第二次读取数据。并且把随机IO变成了顺序IO，但是它会使用了更多的空间，因为它把每一行数据都保存在内存中。
+			D. 结论及引申出的问题
+				a. 由于单路算法是后出的，总体而言的性能好过双路
+				b. 但是单路有问题
+					在sort_buffer中，单路算法比双路算法要多占用很多空间，因为单路算法是把所有字段都取出，所以有可能取出的数据的总大小超出
+					sort_buffer的容量，导致每次只能取sort_buffer容量大小的数据进行排序（创建tmp文件，多路合并），排完再取sort_buffer容量的大小
+					，再排......从而多次I/O
+					本来想省一次I/O操作，反而导致了大量的I/O操作，反而得不偿失	
+		④ 优化策略：
+			A. 增大sort_buffer_size参数的设置
+			B. 增大max_length_for_sort_data参数的设置
+			C. why：提高ORDER by的速度
+				a. order by 时select * 是一个大忌，只query需要的字段，这点非常非常重要，在这里额影响是：
+					（1）当Query的字段大小总和小于max_length_for_sort_data而且排序字段不是text或者blob类型时，会用改进的算法——单路算法排序，否则使用多路算法
+					（2）两种算法的数据都可能超出sort_buffer的容量，超出之后，会创建tmp文件进行合并排序，导致多次IO，但是用单路排序算法的风险会更大一些，所以
+					需要提供sort_buffer_size
+				b. 尝试提高sort_buffer_size：不管用哪种算法，提供这个参数都会提高效率，当然，要根据系统的能力去提高，因为这个参数是针对每个进程的
+				c. 尝试提供max_length_for_sort_data：提供这个参数，会增加用改进算法的效率，但是如果设得太高，数据总量超过sort_buffer_size的概率就增大，明显症状是
+				高的磁盘IO活动和低的处理器使用率
+		⑤ 小总结：为排序使用索引
+			A. MySQL 的两种排序方式：文件排序（using filesort）或扫描有序索引排序（using index）
+			B. MySQL能为排序与查询使用相同的索引
+			C. KEY a_b_c(a, b, c)
+			D. order by 能适应索引的最左前缀
+				a. order by a
+				b. order by a, b
+				c. order by a, b, c
+				d. order by a desc, b desc, c desc（同时升序或同时降序）
+			E.  如果where使用的最左前缀定义为常量，则order by能使用索引
+				a. WHERE a = const order by b, c
+				b. WHERE a = const, b = const order by c
+				c. WHERE a = const, b 》 const order by b, c
+			F. 不能使用索引进行排序
+				a. order by a desc, b asc, c desc（排序不一致）
+				b. where d = const order by b, c（丢失a索引）
+				c. where a = const order by c（丢失索引b）
+				d. where a = const order by a, d（都不是索引的一部分）
+				e. where a in(...) order by b, c（对于排序来说，多个相等条件也是范围查找）
+	5. group by关键字优化
+		① group by实质是先排序后进行分组，遵循索引建立的最佳左前缀
+		② 当无法使用索引列时，增大max_length_for_sort_data参数的设置+增大sort_buffer_size参数的设置
+		③ where高于having，能写在where限定的条件就不要去having限定
+二、慢查询日志
+	1. 慢查询日志是什么
+		① MySQL的慢查询日志是MySQL提供的一种日志记录，它用来记录在MySQL中响应时间超过阙值的语句，具体运行时间
+		超过long_query_time值的SQL，则会被记录到慢查询日志中
+		② 具体运行时间超过long_query_time值的SQL，则会被记录到慢查询日志中。long_query_time的默认值为10，意思
+		是运行10秒以上的语句。
+		③ 由慢查询日志来查看哪些SQL超出额我们的最大忍耐时间值，比如一条SQL执行时间超过了5秒钟，我们就算是慢SQL，
+		希望能收集超过5秒钟的SQL，结合之前的explain进行全面分析
+	2. 如何使用慢查询日志
+		① 说明：
+			A. 默认情况下，MySQL数据库没有开启慢查询日志，需要手动设置该参数
+			B. 如果不是调优需要的话，一般不建议开启慢查询日志，因为开启慢查询日志或多或少带来一定的性能影响，慢查询
+			日志支持将日志写入文件中
+		② 查看是否开启即如何开启
+			A. 查看默认：show variables like 'slow_query_log'
+				----------------+-------+
+				| Variable_name  | Value |
+				+----------------+-------+
+				| slow_query_log | OFF   |
+				+----------------+-------+
+				默认情况下slow_query_log的值为OFF，表示慢查询日志是禁用的
+			B. 如何开启：set global slow_query_log = 1;
+				a. 使用set global slow_query_log = 1开启了慢查询日志只对当前数据库生效，如果MySQL重启后则会失效
+				b. 如果要永久生效，就必须修改配置文件my.cnf（其他系统变量也是如此）
+				c. 修改my.cnf文件，[mysqld]下增加或者修改参数，然后重启MySQL服务
+					slow_query_log=1
+					slow_query_log_file=/var/lib/mysql/host_name-slow.log
+				d. 关于慢查询日志的参数slow_query_log_file，它指定慢查询日志文件的存放路径，如果没有 指定参数
+				slow_query_log_file的值的话，系统会，偶人生成一个缺省文件host_name-slow.log
+				e. 查看慢日志文件：show variables like '%slow_query_log_file%';
+			C. 开启了慢查询日志后，怎么样的SQL会记录到慢查询日志里面呢
+				a. 这个参数是由long_query_time控制的，默认情况下long_query_time的值为10秒
+				b. 命令：show variables like '%long_query_time%'
+					+-----------------+-----------+
+					| Variable_name   | Value     |
+					+-----------------+-----------+
+					| long_query_time | 10.000000 |
+					+-----------------+-----------+
+				c. 可以使用命令修改，也可以在my.cnf文件的参数里面修改
+				d. 假如运行时间刚好等于long_query_time的情况，并不会被记录下来。也就是说，在mysql源码中判断大于
+				long_query_time，而非大于等于。
+			D. CASE
+				a. 查看当前多少秒算慢：show variables like '%long_query_time%'
+				b. 设置慢的阙值时间：set global long_query_time = 3（修改为阙值时间到3秒钟就是慢SQL）
+				c. 为什么设置后看不出变化？
+					（1）修改了变量long_query_time，单数查看变量long_query_time仍为修改前
+					（2）需要重新连接或者新开一个会话才能看到修改值
+					（3）或者show global variables like '%long_query_time%'
+				d. 记录慢SQL并后续分析
+				e. 查询当前系统中有多少条慢查询日志记录：show global status like '%slow_queries%'
+					+---------------+-------+
+					| Variable_name | Value |
+					+---------------+-------+
+					| Slow_queries  | 1     |
+					+---------------+-------+
+			E. 配置版：
+				[mysqld]下配置
+				slow_query_log=1
+				slow_query_log_file=/usr/local/mysql/data/Ke-slow.log
+				long_query_time=3
+				log_output=FILE
+	3. 日志分析工具mysqldumpslow
+		① 在生产环境中，如果要手工分析日志，查找、分析SQL，显然是个体力活，MySQL提供了日志分析工具mysqldumpslow
+		② 查看mysqldumpslow的帮助信息
+			A. 命令：mysqldumpslow --help
+			B. s: 是表示按照何种方式排序
+			C. c: 访问的次数
+			D. l: 锁定时间
+			E. r: 返回记录
+			F. t: 查询时间
+			G. al:平均锁定时间
+			H. ar:平均返回记录数
+			I. at:平均查询时间
+			J. t: 即为返回前面多少条数据
+			K. g: 后边搭配一个正则匹配模式，大小不敏感
+		③ 工作常用参考
+			A. 得到返回记录集最多的10条SQL
+			mysqldumpslow -s r -t 10 /local/mysql/data/Ke-slow
+			B. 得到访问次数最多的10个SQL
+			mysqldumpslow -s c -t 10 /local/mysql/data/Ke-slow
+			C. 得到按照时间排序的前10条里面含有左连接的查询语句
+			mysqldumpslow -s t -t 10 -g "left join" /local/mysql/data/Ke-slow
+			D. 另外建议在使用这些命令时结合| 和 more使用，否则有可能出现爆屏的情况
+			mysqldumpslow -s r -t 10 /local/mysql/data/Ke-slow | more
+	4. 批量插入数据
+		① 建表
+			A. dept
+			create table dept( 
+				id int unsigned primary key auto_increment, 
+				deptno mediumint unsigned not null default 0, 
+				dname varchar(20) not null default '', 
+				loc varchar(13) not null default ''
+			)engine=innodb default charset=gbk;
+			B. emp
+			create table if not exists emp(
+				id int unsigned primary key auto_increment,
+				empno mediumint unsigned not null default 0,/*编号*/
+				empname varchar(20) not null default '',/*员工名*/
+				job varchar(9) not null default '',/*工作*/
+				mg mediumint unsigned not null default 0,/*领导编号*/
+				hiredate date not null,/*入职时间*/
+				sal decimal(7,2) not null,/*薪水*/
+				comm decimal(7,2) not null,/*红利*/
+				deptno mediumint unsigned not null default 0/*部门编号*/
+			)engine=innodb default charset=gbk;
+		② 设置参数log_bin_trust_function_creators
+			A. 创建函数，假如报错：This function has none of deterministic....
+				a. 由于开启慢查询日志，因为我们开启了bin-log，我们就必须为我们的function指定一个参数
+					（1）show variables like '%log_bin_trust_function_creators%';
+					+---------------------------------+-------+
+					| Variable_name                   | Value |
+					+---------------------------------+-------+
+					| log_bin_trust_function_creators | OFF   |
+					+---------------------------------+-------+
+					（2）set global log_bin_trust_function_creators = 1;
+				b. 这样添加了参数以后，如果重启mysqld，上述参数又会消失，永久办法
+					（1）windows下my.ini[mysqld]加上：log_bin_trust_function_creators=1
+					（2）Linux下/etc/my.cnf[mysqld]加上：log_bin_trust_function_creators=1
+		③ 创建函数，保证每条数据都不同
+			A. 随机产生字符串
+				DELIMITER $/*设置结束标志*/
+				CREATE FUNCTION rand_string(n INT) RETURNS VARCHAR(255)/*创建函数*/
+				BEGIN
+					DECLARE chars_str VARCHAR(100) DEFAULT 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-$';/*设置a-zA-Z0-9_-$长字符串*/
+					DECLARE return_str VARCHAR(255) DEFAULT '';/*返回的字符串*/
+					DECLARE i INT DEFAULT 0;/*循环的初始值*/
+					WHILE i < n DO
+						SET return_str = CONCAT(return_str, SUBSTRING(chars_str, FLOOR(1 + RAND() * 65), 1));/*每次循环增加的字符*/
+						SET i = i + 1;
+					END WHILE;/*结束循环*/
+					RETURN return_str;/*返回随机字符串*/
+				END $/*结束函数体*/
+				SELECT rand_string(6) FROM DUAL;/*调用函数*/
+			B. 随机产生部门编号
+				DELIMITER $
+				CREATE FUNCTION rand_num() RETURNS INT(5)
+				BEGIN
+					DECLARE num INT DEFAULT 0;
+					SET num = FLOOR(100 + RAND() * 10);
+					RETURN num;
+				END$
+				SELECT rand_num() FROM DUAL;
+		④ 创建存储过程
+			A. 创建往emp 表中插入数据的存储过程
+			DELIMITER $
+			CREATE PROCEDURE insert_emp(IN start_num INT(10), IN max_num INT(10))
+			BEGIN
+				DECLARE i INT DEFAULT 0;
+				SET autocommit=0;
+				START TRANSACTION;
+				REPEAT
+					INSERT INTO emp(empno,empname,job,mg,hiredate,sal,comm,deptno)
+					VALUES(start_num + i,rand_string(12),'SALESMAN',0001,CURDATE(),2000,400,rand_num());
+					SET i = i + 1;
+				UNTIL i=max_num
+				END REPEAT;
+				COMMIT;
+			END$
+			B. 创建往dept表中插入数据的存储过程
+			DELIMITER $
+			CREATE PROCEDURE insert_dept(IN start_num INT(10), IN max_num INT(10))
+			BEGIN
+				DECLARE i INT DEFAULT 0;
+				SET autocommit=0;
+				START TRANSACTION;
+				REPEAT
+					INSERT INTO dept(deptno, dname, loc) VALUES(start_num + i, rand_string(10), rand_string(8));
+					SET i = i + 1;
+				UNTIL i=max_num
+				END REPEAT;
+				COMMIT;
+			END$
+		⑤调用存储过程
+			A. 调用insert_dept存储过程插入10条记录
+			CALL insert_dept(100, 10);
+			B. 调用insert_emp 存储过程插入50万条记录
+			CALL insert_emp(10000, 500000);
+	5. 用show profile进行SQL分析
+		① show profile是什么：是mysql提供可以用来分析当前会话中语句执行的资源消耗情况，可以用于SQL的调优的测量
+		② 默认情况下，参数处于关闭状态，并保存最近15次的运行情况
+		③ 分析步骤：
+			A. 是否支持：查看当前的mysql版本是否支持
+				show variables like 'profiling'
+				+---------------+-------+
+				| Variable_name | Value |
+				+---------------+-------+
+				| profiling     | OFF   |
+				+---------------+-------+
+				默认是关闭的
+			B. 开启功能：默认是关闭的，使用前需要开启
+				set profiling=on;
+				+---------------+-------+
+				| Variable_name | Value |
+				+---------------+-------+
+				| profiling     | ON    |
+				+---------------+-------+
+			C. 运行SQL
+				a. select e.*, d.* from emp e inner join dept d on e.deptno = d.deptno;
+				b. select * from dept limit 10;
+			D. 查看结果，show profile
+				+----------+------------+--------------------------------+
+				| Query_ID | Duration   | Query                          |
+				+----------+------------+--------------------------------+
+				|        1 | 0.02345825 | select * from emp limit 10000  |
+				|        2 | 0.20890600 | select * from emp limit 100000 |
+				+----------+------------+--------------------------------+
+			E. 诊断SQL，show profile CPU， block IO for query 上一步前面的问题SQL数字号码
+				show profile CPU,block IO for query 1;
+				+----------------------+----------+----------+------------+--------------+---------------+
+				| Status               | Duration | CPU_user | CPU_system | Block_ops_in | Block_ops_out |
+				+----------------------+----------+----------+------------+--------------+---------------+
+				| starting             | 0.000040 | 0.000000 |   0.000000 |            0 |             0 |
+				| checking permissions | 0.000005 | 0.000000 |   0.000000 |            0 |             0 |
+				| Opening tables       | 0.000054 | 0.000000 |   0.000000 |            0 |             0 |
+				| init                 | 0.000093 | 0.000000 |   0.000000 |            0 |             0 |
+				| System lock          | 0.000009 | 0.000000 |   0.000000 |            0 |             0 |
+				| optimizing           | 0.000004 | 0.000000 |   0.000000 |            0 |             0 |
+				| statistics           | 0.000010 | 0.000000 |   0.000000 |            0 |             0 |
+				| preparing            | 0.000008 | 0.000000 |   0.000000 |            0 |             0 |
+				| executing            | 0.000002 | 0.000000 |   0.000000 |            0 |             0 |
+				| Sending data         | 0.023151 | 0.022996 |   0.000000 |            0 |             0 |
+				| end                  | 0.000011 | 0.000000 |   0.000000 |            0 |             0 |
+				| query end            | 0.000007 | 0.000000 |   0.000000 |            0 |             0 |
+				| closing tables       | 0.000043 | 0.000000 |   0.000000 |            0 |             0 |
+				| freeing items        | 0.000015 | 0.000000 |   0.000000 |            0 |             0 |
+				| cleaning up          | 0.000010 | 0.000000 |   0.000000 |            0 |             0 |
+				+----------------------+----------+----------+------------+--------------+---------------+
+				参数备注 type：
+					a. All：显示所有的开销信息
+					b. BLOCK IO: 显示块IO相关开销
+					c. CONTEXT SWITCH: 上下文切换相关开销
+					d. cpu: 显示CPU相关开销信息
+					e. IPC：显示发送和接收相关开销信息
+					f. memory: 显示内存相关开销信息
+					g. PAGE FAULTS：显示页面错误相关开销信息
+					h. source: 显示和source_function, source_file, source_line相关的开销信息
+					i. swaps: 显示交换次数开销信息
+			F. 日常开发需要注意的结论
+				a. converting heap to myisam：查询结果太大，内存都不够用了，只能往磁盘上搬了。
+				b. Creating tmp table：创建爱你临时表，拷贝到临时表→用完再删除
+				c. Coping to tmp table on disk: 把内存中临时表复制到磁盘中，危险！！！
+				d. locked
+	6. 全局查询日志
+		① 配置启用：在MySQL的my.cnf或者my.ini中，设置如下：
+			A. 开启：general_log=1
+			B. 记录日志文件的路径：general_log_file=/path/logfile
+			C. 输出格式：log_output=file
+		② 编码启用
+			A. 开启：set global general_log=1;
+			B. 输出格式：set global log_output='table';
+			C. 所编写的SQL语句，将会记录在mysql库中的general_log表，可以用以下的命令查看
+			select * from mysql.general_log;
+		③ 永远不要在生产环境中开启这个功能
+
+
+
+
+				

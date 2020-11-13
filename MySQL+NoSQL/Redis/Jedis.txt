@@ -1,0 +1,263 @@
+一、Redis的Java客户端Jedis
+	1. Windows环境下连接redis
+		①将Jedis所需要的jar包添加到当前工程的lib目录，后期可以通过maven进行管理
+			A. commons-pool-1.6.jar
+			B. jedis-2.1.0.jar
+		② 将添加进去的jar Add to build path
+		③ 创建连接实例
+			Jedis jedis = new Jedis("192.168.107.129", 6379);
+			System.out.println(jedis.ping());
+			刚开始会出现
+			Exception in thread "main" redis.clients.jedis.exceptions.JedisConnectionException: java.net.SocketTimeoutException: 
+			connect timed out的连接异常
+		④错误分析
+			A. 首先可能是redis的6379端口无法访问，请先在cmd中输入命令 telnet 127.0.0.1 6379
+				如不能访问，意味外网不能访问该端口号，需要在远程机器关掉防火墙或者添加允许通过 
+			B. redis开启了protected mode，这也是Redis3.2加入的新特性，开启保护模式的redis只允许本机登录
+				在redis.conf中的配置项：protected-mode yes
+				yes代表开启了保护模式，即只允许本机登录，后面可以填密码也可以填no代表关闭
+			C. bind 后加的是允许访问的ip 
+				bind 127.0.0.1代表只有本机可以访问，可以将允许访问的ip加入，也可以直接注释掉这一行，这样所有机器都可以外网访问。
+		⑤解决方法
+			A. 开放端口号：
+				a. 执行查看zones firewall-cmd --get-active-zones 
+				firewall-cmd --permanent --zone=public --list-ports指令
+				b. 执行开放端口号 firewall-cmd --zone=public --add-port=6379/tcp --permanent 指令
+				c. 执行重启防火墙 firewall-cmd --reload 指令
+				d. 执行查看端口号是否开启 firewall-cmd --query-port=6379/tcp 指令
+			B. 修改redis.conf配置文件
+				a. 在CentOS7的/myredis/目录下 执行 cp /myredis/redis6379.conf /myredis/redis_jedis 指令，备份一份最新的redis.conf
+				b. 使用 vim /myredis/redis_jedis.conf 进入redis.conf对配置文件进行修改
+				c. 切换至插入模式将bind 127.0.0.1注掉，即允许使用其他机器访问redis
+				d. 将配置项 protected-mode yes 该为 no 或者 设置访问redis 的密码 requirepass 2648
+				e. 切换一般模式，再切换至命令模式，保存退出
+		⑥最终结果
+			A. 如果在redis.conf中设置了密码，则在连接Redis时还需设置连接的密码才可以访问
+			B. jedis.auth("2648");
+			C. 最终输入pong。
+	2. Jedis常用操作
+		①5+1
+			A. 一个key
+			B. 五大数据类型
+			C. 实例：
+				Jedis jedis = new Jedis("127.0.0.1",6379);
+			     //key
+			     Set<String> keys = jedis.keys("*");
+			     for (Iterator iterator = keys.iterator(); iterator.hasNext();) {
+			       String key = (String) iterator.next();
+			       System.out.println(key);
+			     }
+			     System.out.println("jedis.exists====>"+jedis.exists("k2"));
+			     System.out.println(jedis.ttl("k1"));
+			     //String
+			     //jedis.append("k1","myreids");
+			     System.out.println(jedis.get("k1"));
+			     jedis.set("k4","k4_redis");
+			     System.out.println("----------------------------------------");
+			     jedis.mset("str1","v1","str2","v2","str3","v3");
+			     System.out.println(jedis.mget("str1","str2","str3"));
+			     //list
+			     System.out.println("----------------------------------------");
+			     //jedis.lpush("mylist","v1","v2","v3","v4","v5");
+			     List<String> list = jedis.lrange("mylist",0,-1);
+			     for (String element : list) {
+			       System.out.println(element);
+			     }
+			     //set
+			     jedis.sadd("orders","jd001");
+			     jedis.sadd("orders","jd002");
+			     jedis.sadd("orders","jd003");
+			     Set<String> set1 = jedis.smembers("orders");
+			     for (Iterator iterator = set1.iterator(); iterator.hasNext();) {
+			       String string = (String) iterator.next();
+			       System.out.println(string);
+			     }
+			     jedis.srem("orders","jd002");
+			     System.out.println(jedis.smembers("orders").size());
+			     //hash
+			     jedis.hset("hash1","userName","lisi");
+			     System.out.println(jedis.hget("hash1","userName"));
+			     Map<String,String> map = new HashMap<String,String>();
+			     map.put("telphone","13811814763");
+			     map.put("address","atguigu");
+			     map.put("email","abc@163.com");
+			     jedis.hmset("hash2",map);
+			     List<String> result = jedis.hmget("hash2", "telphone","email");
+			     for (String element : result) {
+			       System.out.println(element);
+			     }
+			     //zset
+			     jedis.zadd("zset01",60d,"v1");
+			     jedis.zadd("zset01",70d,"v2");
+			     jedis.zadd("zset01",80d,"v3");
+			     jedis.zadd("zset01",90d,"v4");
+			     
+			     Set<String> s1 = jedis.zrange("zset01",0,-1);
+			     for (Iterator iterator = s1.iterator(); iterator.hasNext();) {
+			       String string = (String) iterator.next();
+			       System.out.println(string);
+			     }
+		③事务提交
+			A. 正常操作
+				@Test
+				public void case1() {
+					Transaction transaction = jedis.multi();
+					transaction.set("k8", "v8");
+					transaction.set("k9", "v9");
+					transaction.exec();
+				}
+
+				@Test
+				public void case2() {
+					Transaction transaction = jedis.multi();
+					transaction.set("k88", "v8");
+					transaction.set("k98", "v9");
+					transaction.discard();
+				}
+
+				@Test
+				public void case3() {
+					Transaction transaction = jedis.multi();
+					transaction.incrBy("k9", 10);//错误操作，但是不报编译异常
+					transaction.set("k11", "v11");
+					transaction.set("k12", "v12");
+					transaction.exec();
+				}
+			B. 加锁
+				int increment = 10;// 实刷余额
+
+				jedis.watch("balance");// 监控balance
+				try {
+					Thread.sleep(5000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				// 判断余额是否可以扣费
+				if (Integer.parseInt(jedis.get("balance")) < increment) {
+					jedis.unwatch();// 取消监控
+					System.out.println("balance is not enough");
+					return;
+				} else {
+					Transaction transaction = jedis.multi();//开启事务
+					transaction.incrBy("debt", increment);
+					transaction.decrBy("balance", increment);
+					transaction.exec();
+					
+					System.out.println("successful");
+				}
+		④主从复制
+			A. 修改相应的redis.conf配置文件，以及开放端口
+			B. 6379,6380启动，先各自先独立
+			C. 主写
+			D. 从读
+			E. 实例
+				@BeforeClass
+				public static void getJedis() {
+					master = new Jedis("192.168.107.129", 6379);
+					slave = new Jedis("192.168.107.129", 6380);
+				}
+				
+				@Test
+				public void getset() {
+					slave.slaveof("192.168.107.129", 6379);
+					master.set("k13", "v13");
+					String result = slave.get("v13");
+					System.out.println(result);
+				}
+	3. JedisPool
+		① 获取Jedis实例需要从JedisPool中获取
+		② 用完Jedis实例需要返还给JedisPool
+		③ 如果Jedis在使用过程中出错，则也需要还给JedisPool
+		④ 案例见代码
+			import redis.clients.jedis.Jedis;
+			import redis.clients.jedis.JedisPool;
+			import redis.clients.jedis.JedisPoolConfig;
+
+			public class JedisPoolUtil {
+				//被volatile修饰的变量不会被本地线程缓存，对该变量的读写都是直接操作共享内存。
+				private static volatile JedisPoolUtil instence = null;
+				
+				private static volatile JedisPool jedisPool = null;
+				
+				static {
+					JedisPoolConfig poolConfig = new JedisPoolConfig();
+					poolConfig.setMaxActive(1000);
+					poolConfig.setMaxIdle(32);
+					poolConfig.setMaxWait(100 * 1000);
+					poolConfig.setTestOnBorrow(true);
+					
+					jedisPool = new JedisPool(poolConfig, "192.168.107.129", 6379);
+				}
+				
+				private JedisPoolUtil() {}
+				
+				public static JedisPoolUtil getInstence() {
+					if (instence == null) {
+						synchronized (JedisPoolUtil.class) {
+							if (instence == null) {
+								instence = new JedisPoolUtil();
+							}
+						}
+					}
+					return instence;
+				}
+				
+				public JedisPool getJedisPool() {
+					return jedisPool;
+				}
+				
+				public void release(JedisPool jedisPool, Jedis jedis) {
+					if (jedis != null) {
+						jedisPool.returnResourceObject(jedis);
+					}
+				}
+			}
+			
+			@Test
+			public void getJedisPool() {
+				JedisPool jedisPool = null;
+				Jedis jedis = null;
+				try {
+					jedisPool = JedisPoolUtil.getInstence().getJedisPool();
+					jedis = jedisPool.getResource();
+					System.out.println(jedis.ping());
+				} catch (Exception e) {
+					e.printStackTrace();
+				} finally {
+					JedisPoolUtil.getInstence().release(jedisPool, jedis);
+				}
+			}
+		⑤ 配置总结all
+			JedisPool的配置参数大部分是由JedisPoolConfig的对应项来赋值的。
+			maxActive：控制一个pool可分配多少个jedis实例，通过pool.getResource()来获取；如果赋值为-1，则表示不限制；如果pool已经分配了maxActive个jedis实例，则此时pool的状态为exhausted。
+			maxIdle：控制一个pool最多有多少个状态为idle(空闲)的jedis实例；
+			maxWait：表示当borrow一个jedis实例时，最大的等待时间，如果超过等待时间，则直接抛JedisConnectionException；
+			testOnBorrow：获得一个jedis实例的时候是否检查连接可用性（ping()）；如果为true，则得到的jedis实例均是可用的；
+
+			whenExhaustedAction：表示当pool中的jedis实例都被allocated完时，pool要采取的操作；默认有三种。
+				WHEN_EXHAUSTED_FAIL --> 表示无jedis实例时，直接抛出NoSuchElementException；
+				WHEN_EXHAUSTED_BLOCK --> 则表示阻塞住，或者达到maxWait时抛出JedisConnectionException；
+				WHEN_EXHAUSTED_GROW --> 则表示新建一个jedis实例，也就说设置的maxActive无用；
+			
+			testOnReturn：return 一个jedis实例给pool时，是否检查连接可用性（ping()）；
+			testWhileIdle：如果为true，表示有一个idle object evitor线程对idle object进行扫描，如果validate失败，此object会被从pool中drop掉；这一项只有在timeBetweenEvictionRunsMillis大于0时才有意义；
+			timeBetweenEvictionRunsMillis：表示idle object evitor两次扫描之间要sleep的毫秒数；
+			numTestsPerEvictionRun：表示idle object evitor每次扫描的最多的对象数；
+			minEvictableIdleTimeMillis：表示一个对象至少停留在idle状态的最短时间，然后才能被idle object evitor扫描并驱逐；这一项只有在timeBetweenEvictionRunsMillis大于0时才有意义；
+			softMinEvictableIdleTimeMillis：在minEvictableIdleTimeMillis基础上，加入了至少minIdle个对象已经在pool里面了。如果为-1，evicted不会根据idle time驱逐任何对象。如果minEvictableIdleTimeMillis>0，则此项设置无意义，且只有在timeBetweenEvictionRunsMillis大于0时才有意义；
+			lifo：borrowObject返回对象时，是采用DEFAULT_LIFO（last in first out，即类似cache的最频繁使用队列），如果为False，则表示FIFO队列；
+			==================================================================================================================
+			其中JedisPoolConfig对一些参数的默认设置如下：
+			testWhileIdle=true
+			minEvictableIdleTimeMills=60000
+			timeBetweenEvictionRunsMillis=30000
+			numTestsPerEvictionRun=-1
+
+
+
+
+
+
+
+
+		

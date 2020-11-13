@@ -1,0 +1,471 @@
+一、为什么要学习数据库
+	1. 储存数据的容器
+		①内存
+			A. 数组
+			B. 集合
+		②外部文件：I/O
+	2. 使用数据库的好处
+		①实现数据的持久化
+		②使用完整的管理系统统一管理，易于查询
+二、数据库的概念
+	1. DB：数据库（database），存储数据的‘仓库’。它保存了一系列有组织的数据
+	2. DBMS：数据库管理系统（Database Managerment System）。数据库是通过DBMS创建和操作的容器
+		①常见的操作：
+			A. 检索数据
+			B. 插入数据
+			C. 更新数据
+			D. 删除数据
+		②常见的数据库管理系统：MySQL、Oracle、DB2、SQLServer
+	3. SQL：结构化查询语句（Structure Query Language）：专门用来与数据库通信的语言
+	4. SQL的优点：
+		①不是某个特定数据库供应商专有的语言，几乎所有DBMS都支持SQL
+		②简单易学
+		③虽然简单，但实际上是一种强有力的语言，灵活使用其他语言元素，可以进行非常复杂
+			和高级的数据库操作
+	5. 数据库存储数据的特点
+		①将数据放到表中，表再放到库中
+		②一个数据库中可以有多个表，每个表都有一个名字，用来标识自己。表明具有唯一性
+		③表具有一些特性，这些特性定义了数据库在表中如何存储，类似于Java中‘类’的设计
+		④表由列组成，我们也称为字段，所有表都是由一个或者多个列组成的，类似于Java中的‘属性’
+		⑤表中的数据是按行存储的，每一行类似于Java的对象
+三、MySQL产品的特点
+	1. MySQL数据库隶属于MySQLAB公司，总部位于瑞典，创始人Monty,于2008年先被Sun公司收购，2009年
+		Sun公司被Oracle公司收购，因此MySQL数据库现属于Oracle公司
+	2. 优点：
+		①成本低：开放源代码，一般可以免费试用
+		②性能高：执行很快
+		③简单容量小：很容易安装和试用
+	3. DBMS分为两类：
+		①基于共享文件系统的DBMS（Access）
+		基于客户机-服务器的DBMS（MySQL、Oracle、SQLServer）
+	4. MySQL的版本
+		①社区版（免费）
+		②企业版（收费，但成本低）
+		③Windows平台下载：http://dev.mysql.com/downloads/mysql
+		④目前可下载的版本
+			A. 5.5：推荐试用
+			B. 5.6
+			C. 5.7
+			D. 8.0测试版
+四、MySQL的安装配置
+	1. 安装
+	2. 卸载
+	3. MySQL的配置
+		①[mysql]：配置客户端
+		②[mysqld]：配置服务器
+			A. 打开MySQL安装目录下的my.ini文件
+			B. 修改端口号
+				# The TCP/IP Port the MySQL Server will listen on
+				port=3306
+			C. 安装目录
+				#Path to installation directory. All paths are usually resolved relative to this.
+				basedir="D:/Program Files (x86)/MySQL/MySQL Server 5.5/"
+			D. 数据存储的路径
+				#Path to the database root
+				datadir="C:/ProgramData/MySQL/MySQL Server 5.5/Data/"
+			E. 修改字符集
+				# created and no character set is defined
+				character-set-server=utf8
+			F. 数据使用的存储引擎
+				# The default storage engine that will be used when create new tables when
+				default-storage-engine=INNODB
+			G.  最大的连接数
+				# connection limit has been reached.
+				max_connections=100
+	4. MySQL服务的启动和停止
+		①方式一：右击我的电脑->管理->服务和应用程序->服务->MySQL/MySQL
+			A. 启动类型为自动，因为安装的时候默认开机自启，如果想关闭开机自启：双击启动类型：自动
+				->启动类型：手动->确定
+			B. 停止MySQL服务：右击MySQL->停止
+			C. 启动MySQL服务：右击MySQL->启动
+			D. 关闭自动开启MySQL服务时，开机需要手动启动MySQL服务
+		②方式二：右击左下角开始菜单->打开Windows PowerShell(管理员)
+			A. 停止MySQL服务：net stop mysql
+			B. 开启MySQL服务：net start mysql
+	5. MySQL服务端的登录和退出
+		①登录MySQL服务之前必须先开启MySQL的服务
+		②登录MySQL服务器的方式：
+			A. 方式一：使用MySQL自带的客户端，以root身份进入数据库
+				Ⅰ. 打开MySQL自带的客户端，输入登陆密码，即可进行增删改查操作
+				Ⅱ. 输入exit或者ctrl+c退出客户端
+				Ⅲ.该用户不推荐使用，因为该方式只允许root进行
+			B. 方式二：使用windows自带的doc命令行窗口进行数据库，该方式允许其他用户进入
+				Ⅰ. win+r打开运行窗口，输入cmd，进入DOC命令行窗口，或者右击开启菜单点击Windows PowerShell(管理员)
+					进入DOC命令行窗口
+				Ⅱ. mysql [-h[ ]主机名 -P[ ]端口号] -u[ ]用户名 -p密码
+					比如：输入mysql -h localhost -P 3306 -u root -p密码回车
+					或者mysql -h localhost -P 3306 -u root -p回车后输入密码
+					如果连接的是本地的数据库则可简写为：mysql -u root -p密码回车
+				Ⅲ. 登陆后即可对数据库进行增删改查
+				Ⅳ. exit或者ctr+c退出数据库
+				Ⅴ. 命令解释：
+					1. mysql：不是MySQL服务名，而是执行MySQL的命令语句
+					2. -h：代表的是主机名，当在本地开启MySQL服务，则默认为localhost，中间空格可加可不加
+					3. -P：代表MySQL服务的端口号，P必须大写，中间空格可加可不加
+					4. -u：用户名，如果最高管理员进入则是root，中间空格可加可不加
+					5. -p：密码，p必须为小写，密码为用户名root对应的密码，如果在-p后面输入密码，则不能加空格
+						如果-p后面不加密码，则回车后必须输入密码才能登陆数据库
+	6. 配置环境变量：
+		①如果在安装时，没有配置环境变量，则需要手动配置
+		②打开MySQL的安装路径下的bin目录，复制完整的路径名
+		③右击我的电脑->属性->高级系统设置->环境变量->系统变量->找到Path变量打开->新建
+		④将复制的MySQL的安装路径下的bin目录的完整路径粘贴在新建的编辑栏下，上移到最上面
+		⑤确定后，关闭DOS命令行，重新开启服务并且登陆
+五、MySQL的常见命令
+	注：每一条语句后面加分号，或者\g，表示语句的结束
+	1. show databases;：查看数据库中存在哪些数据库
+		①information_schema：保存源数据信息
+		②mysql：保存用户信息
+		③performance_schema：搜集性能信息，性能参数
+		④test：代表测试信息，默认为空
+		⑤一般在test数据库中添加表格，也可以修改和删除test数据库，另外三个数据库不允许改变
+	2.打开指定的库
+		use 库名
+	3.查看当前库的所有表
+		show tables;
+	4.查看其它库的所有表
+		show tables from 库名;
+	5.创建表
+		create table 表名(
+
+			列名 列类型,
+			列名 列类型，
+			。。。
+		);
+	6.查看表结构
+		desc 表名;
+	7.查看服务器的版本
+		方式一：登录到mysql服务端
+		select version();
+		方式二：没有登录到mysql服务端
+		mysql --version或mysql --V
+六、MySQL的语法规范
+	1. 不区分大小写，但建议关键字大写，表名、字段名小写
+	2. 每条命令最好用;结尾
+	3. 每条命令根据需要，可以进行缩进和换行，建议关键字在一行，非关键字在一行
+	4. 注释
+		①单行注释：#注释文字
+		②单行注释：-- 注释文字
+		③多行注释：/* 注释文字  */
+	5. 每次在操作数据库时，需要使用use 数据库名打开数据库
+七、基础查询
+	1. 语法:
+		select 查询列表 from 表名;
+		类似于：System.out.println();
+	2. 特点
+		①查询列表可以是：表中的字段、常量值、表达式、函数
+		②查询的结果是一个虚拟的表格
+	3. 查询列表：
+		①查询表中的单个字段
+			SELECT 字段名 FROM 表名;
+		②查询表中的多个字段
+			SELECT 字段名, ... FROM 表名
+		③查询表中的所有字段
+			SELECT * FROM 表名
+		④查询常量值
+			SELECT 1000;
+			SELECT 'abc';字符用单引号括起来，不区分字符和字符串
+		⑤查询表达式
+			SELECT 26*48;
+		⑥查询函数
+			SELECT vision();//查询的结果是返回函数的返回值
+	4. 起别名：
+		①方式一：使用AS 
+		SELECT last_name AS 姓 FROM employees;
+		②方式二：使用空格
+		#案例：查看员工表中的last_name，并取别名为姓
+		SELECT last_name 姓 FROM employees;
+		③如果别名有特殊符号比如#、空格，需要使用双引号或者单引号括起来，建议使用双引号
+	5. 去重：
+		#案例：查询员工表中有所的部门编号
+		SELECT DISTINCT department FROM employees
+	6. 注：
+		①在查询时，需要打开相应的数据库，use 数据库名打开数据库
+		②通过双击表中的字段名会自动获取字段名，使用着重号标明，是用于标明
+			是否为字段，该着重号可以去除
+		③采用f12可以格式化查询语句
+		④选中想要运行的查询语句点击运行按钮或者f9，格式化代码也是同样的操作
+	7. +号的作用：
+		①Java中+号的作用：
+			A. 运算符，两个操作数都为数值型
+			B. 连接符，只要有一个操作数为字符串
+		②mysql中的作用：仅仅是运算符
+			A. 如果两个操作数都为数值型，则直接做加法运算
+			B. 如果有一方为字符型，则会将字符型数值转换为数值型，如果转换成功，则继续做加法运算
+				如果转换失败，则将字符型数值转化为0继续做加法运算
+			C. 只要其中一方为null，则结果必为null。
+	8. concat()：专门用于拼接字符
+		SELECT CONCATE(last_name, first_name) AS 姓名 FROM employees;
+八、条件查询
+	1. 语法：
+		SELECT 查询列表 FROM 表名 WHERE 筛选条件;
+	2. 分类：
+		①按条件表达式筛选
+			A. 简单条件运算符：> < = !=（支持） <>（SQL，推荐使用） >= <=
+			B. 
+				#案例一：查询工资大于12000的员工信息
+				SELECT * FROM employees WHERE salary>12000;
+				
+				#案例二：查询部门编号部位90的员工名和部门编号
+				SELECT last_name, department_id FROM employees WHERE department_id <> 90;
+		②按逻辑表达式筛选
+			A. 逻辑运算符：&& || !（支持），and or not（SQL，推荐使用）
+			B. 作用：连接多个条件表达式
+			C. 
+				#案例一：查询工资在10000到20000之间的员工名，工资以及奖金
+				SELECT last_name, salary, commission_pct FROM employees
+				WHERE salary>10000 AND salary<20000;
+
+				#案例二：查询部门编号不在90和110之间，或者工资高于15000的员工信息
+				SELECT * FROM employees 
+				WHERE department_id <90 OR department_id>110 OR salary >15000;
+		③模糊查询
+			①复杂条件运算符：like，between and，in，is null
+			②like：一般和通配符搭配使用
+				#案例一：查询员工名包含a的员工信息
+				SELECT * FROM employees WHERE last_name LIKE '%a%';
+					
+				#案例二：查询员工名中第三个字符为c，第五个h的员工信息
+				SELECT * FROM employees WHERE last_name LIKE '__c_h%';
+				
+				#案例三：查询员工名中有_的员工信息
+				SELECT * FROM employees WHERE last_name LIKE '%$_%' ESCAPE '$';
+			③between and：
+				特点：
+					A. 完全等价于>= and <=
+					B. 可以提高语句的简洁性
+					C. 包含两个临界值
+					D. 两个临界值不能调换顺序
+					E. 
+					SELECT last_name, salary, commission_pct
+					FROM employees WHERE salary BETWEEN 10000 AND 20000;
+			④in
+				特点：
+					A. 它完全等价于or
+					B. 使用in代替or，课件提高语句的简洁度
+					C. in列表的值类型必须是统一或者兼容
+					D. in列表不可以使用通配符标识。
+					E. 
+			⑤is null
+				特点：
+					A. 算术运算符=、>、<、!=、>=、<=不能用于判断null
+					B. is null和is not null可以用于判断null值
+					C. 
+						#案例一：查询没有奖金的员工信息
+						SELECT * FROM employees WHERE commission_pct IS NULL;
+						#案例二：查询有奖金的员工信息
+						SELECT * FROM employees WHERE commission_pct IS NOT NULL;
+			⑥安全等于：<=>
+				A. 可以用于判断null值，也可以用于判断普通的数值
+				B. 可读性较弱，建议使用is null来判断null值
+	3. 通配符：
+		①%：代表的是任意多个字符，包含0个字符
+		②_：代表的是任意单个字符，仅仅1个字符
+		③如果一个字符中包含通配符，则需要将该通配符转义
+			A. \：支持使用反斜线进行转义
+			B. escape '任意字符'：可以使用escape后面加任意字符表示该字符为转义符，再将该字符作为
+				转义字符进行转义
+九、排序查询
+	1. 语法：
+		select 查询列表 from 表 [where 筛选条件] order by 排序列表 [asc|desc]
+	2. 特点：
+		①order by：排序
+		②asc：代表的是升序
+		③desc：代表的是降序
+		④如果不写关键字，则默认是升序
+		⑤order by子句一般都是放在查询语句的最后面，limit子句除外
+	3. 排序列表
+		①按照单个字段排序
+		②按照表达式排序
+		③按照别名排序
+		④按照函数排序
+		⑤按照多个字段排序
+	#案例一：将员工表按照工资降序排序输出
+		SELECT * FROM employees ORDER BY salary DESC;
+	#案例二：将员工表的年薪，和员工信息按照年薪降序排序（按照表达式排序）
+		SELECT 
+			*,salary*12*(1+commission_pct) AS 年薪
+		FROM
+			employees
+		ORDER BY
+			salary*12*(1+commission_pct) DESC;
+	#案例三：将员工表的年薪，和员工信息按照年薪降序排序（按照别名排序）
+		SELECT 
+			*,salary*12*(1+commission_pct) AS 年薪
+		FROM
+			employees
+		ORDER BY
+			年薪 DESC;
+	#案例四：将员工表按照名字的字符长度降序排序（按照函数排序）
+		SELECT
+			*, LENGTH(last_name) AS 字符长度
+		FROM
+			employees
+		ORDER BY 
+			LENGTH(last_name) DESC;
+	#案例五：将员工表先按照入职年份从早到晚排序，再按照年薪降序排序
+		SELECT *
+		FROM employees
+		ORDER BY hiredate, salary*12*(1+commission_pct) DESC;
+十、常见的函数介绍
+	1. 介绍：
+		①概念：类似于Java中的方法，将一组逻辑语句封装在方法体中，对外暴露方法名
+		②好处：
+			A. 隐藏了实现额细节
+			B. 提高了代码的重用性
+		③调用函数：
+			select 函数名(实参列表)[from 表名 where...]
+		④函数的特点：
+			A. 函数名
+			B. 函数的功能
+		分类：
+			1. 单行函数
+				如：concat、length、vision、ifnull
+			2. 分组函数
+				功能：做统计使用，又称为统计函数、聚合函数、组函数
+	2. 单行函数：
+		①字符函数：字符的索引从1开始
+			A. length(str)：获取某个参数的字节个数
+				select length('李晓亮') as out_put;#9
+				select length('lixiaoliang') as out_put;//11
+			B. concat(str1, str2,...)：拼接字符串,null和任何值连接的结果都是null
+			C. upper(str)、lower(str)：将字母变成大写或者小写
+			D. substr()/substring()：两个方法的功能都是一样的，用于切割字符串
+				Ⅰ. substr(str, num)：截取从指定的索引位置开始到后面的所有字符
+				Ⅱ. substr(str, num1, num2)：从指定索引位置开始，截取指定个数的字符
+			E. instr(string, str)：返回子串str第一次在string中出现的索引，如果不存在则返回0。
+			F. trim()：可以去除空格或者指定的字符
+				Ⅰ. trim(str)：默认去除字符左右两边的空格
+				Ⅱ. trim(str1 from str2):去除字符str2左右两边指定的str1字符
+			G. lpad(str1, num, str2)、rpad(str1, num, str2)：向左/右用指定的字符str2填充指定长度num的字符str1
+			H. replace(str1, str2, str3)：用指定的字符str3替换字符str1中的str2
+		②数学函数
+			A. round()：四舍五入
+				Ⅰ. round(num)：不保留小数点
+				Ⅱ. round(num, d)：保留小数点后d位
+			B. ceil(num)：向上取整，返回大于等于该参数的最小整数
+			C. floor(num)：向下取整，返回小于等于该参数的最大整数
+			D. truncate(num, d)：截取小数点后d位，不四舍五入
+			E. mod(a, b)：a对b取余，mod(a, b)=a-a/b*b
+		③日期函数
+			A. now()：获取当前的系统日期+时间
+			B. curdate()：获取当前的系统日期，没有时间
+			C. curtime()：获取当前的系统时间，没有日期
+			D. year(),month(),....：可以获取指定的部分年、月、日、小时、分钟、秒
+			H. monthname()：获取月份的英文单词
+			E. str_to_date(str, format)：将字符格式的日期转化为指定格式的日期类型的日期
+				Ⅰ. 参数：
+					str：表示的是日期字符串
+					format：表示的是解析字符日期格式的字符
+				Ⅱ. 举例
+					查询入职日期为1992-4-3的员工信息
+					select * from employees where hiredate = str_to_date('4-3 1992', '%c-%d %Y');
+			F. date_format(date, format)：将日期格式的日期转化为指定字符格式的字符
+				Ⅰ. 参数：
+					date：表示的是日期格式的日期
+					format：表示的是想要转换的日期格式字符
+				Ⅱ. 举例
+					查询有奖金的员工名和入职日期（xx月/xx日 xx年）
+					select last_name date_format(hiredate, '%m月/%d日 %y年') 入职时间 
+					from employees where commission_pct is not null;
+			H. datediff(date1, date2)：过去date2日期距当前date1日期的天数
+			G. 
+				%Y：四位的年份
+				%y：两位的年份
+				%m：月份（01，02，03，...）
+				%c：月份（1，2，3，....）
+				%d：日（01，02，03，...）
+				%H：小时（24小时制）
+				%h：小时（12小时制）
+				%i：分钟（00，01，02，....）
+				%s：秒（00，01，02，....）
+		④其他函数
+			A. version()：查看当前的版本号
+			B. database()：查看当前的数据库
+			C. user()：查看当前的用户
+		⑤流程控制函数
+			A. if()：
+				Ⅰ. if函数，if...else的效果
+				Ⅱ. 语法：if(表达式, exp1, exp2)
+				Ⅲ. 流程：执行表达式，如果为true，则执行exp1，反之，则执行exp2
+				Ⅳ.#查询员工表中的工资，如果有奖金也输出‘有奖金，嘻嘻’，如果没有奖金则输出‘没奖金，呵呵’
+					SELECT salary, commission_pct, IF(commission_pct IS NOT NULL, '有奖金，嘻嘻', '没奖金，呵呵') AS out_put
+					FROM employees;
+			B. case：
+				Ⅰ. 用法一：类似于Java中的switch...case语句
+					语法：
+					case 要判断的字段或者表达式
+					when 常量一 then 要显示的值一或者语句一;（如果执行的是语句则后面需要加;如果执行的是值一则不需要加;）
+					when 常量二 then 要显示的值二或者语句二;
+					...
+					else 要显示的值n或者语句n;
+					end
+					案例：查询员工的工资，要求
+					部门编号为30，显示的工资为1.1倍
+					部门编号为40，显示的工资为1.2倍
+					部门编号为50，显示的工资为1.3倍
+					其余的为原工资
+					*/
+					SELECT department_id, salary 原始工资, 
+					CASE department_id
+					WHEN 30 THEN salary*1.1
+					WHEN 40 THEN salary*1.2
+					WHEN 50 THEN salary*1.3
+					ELSE salary
+					END AS 新工资 
+					FROM employees
+					ORDER BY department_id;
+				Ⅱ. 用法二：类似于Java中的多重if语句
+					语法：
+					case
+					when 表达式一 then 要显示的值一或者执行语句一;（如果执行的是语句则后面需要加;如果执行的是值一则不需要加;）
+					when 表达式二 then 要显示的值一或者执行语句二;
+					...
+					else 要显示的值n或者执行语句n;
+					end
+					案例：查询员工的工资情况
+					如果工资大于20000，则显示A级别
+					如果工资大于15000，则显示B级别
+					如果工资大于10000，则显示C级别
+					否则，则显示D级别
+					*/
+					SELECT employee_id, last_name, salary,
+					CASE
+					WHEN salary > 20000 THEN 'A级别'
+					WHEN salary > 15000 THEN 'B级别'
+					WHEN salary > 10000 THEN 'C级别'
+					ELSE 'D级别'
+					END AS 员工级别
+					FROM employees
+					ORDER BY salary DESC;
+	3. 分组函数	：
+		①类型：
+			A. sum()：求和
+			B. avg()：求平均值
+			C. max()：求最大值
+			D. min()：求最小值
+			E. count()：求总数
+			#案例：求员工的总工资，平均工资，工资的最大值，工资的最小值，总员工数
+			SELECT 
+				SUM(salary) 总工资,
+				ROUND(AVG(salary), 2) 平均工资,
+				MAX(salary) 最高工资,
+				MIN(salary) 最低工资,
+				COUNT(salary) 员工总数
+			FROM employees;
+		②特点：
+			A. sum、avg函数一般只用于处理数值，而max、min、count可以处理任意类型的数值
+			B. 以上分组函数都忽略null值
+			C. 分组函数可以和distinct搭配使用，实现去重运算	，一般和count和sum搭配较多
+			D. 和分组函数一同查询的字段要求是group by之后
+		③count函数：
+			A. 一般使用count(*)统计行数
+			B. 可以使用count(1)统计函数，效果和count(*)一样
+			C. 在MYISAM存储引擎下，count(*)的效率最高
+			D. 在INNODB存储引擎下，count(*)和count(1)的效率一样，而count(字段名)的效率最低
+
+
+
+
+		
+			

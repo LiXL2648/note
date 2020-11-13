@@ -1,0 +1,225 @@
+一、批量处理：批量处理JDBC语句提高处理速度
+	1. 当需要成批插入或者更新记录时，可以采取Java的批量处理更新机制，这一机制允许多条语句一次性提交给数据库批量处理。
+		通常这种情况下比单独提交处理更有效
+	2. JDBC的批量处理语句包括下面两个方法
+		①addBatch(String sql): 添加需要批量处理额SQL语句或者是参数
+		②executeBatch(): 执行批量处理语句
+	3. 通常我们会遇到两种批量执行SQL语句的情况
+		多条SQL语句的批量处理：
+			statement.addBatch(sql);
+			statement.executeBatch();
+			statement.clearBatch();
+		一条SQL语句的批量处理：
+			prepareStatement.addBatch();
+			executeBatch();
+			clearBatch();
+二、数据库连接池
+	1. JDBC数据库连接池的必要性
+		①在使用开发基于数据库的web程序时，传统的模式基本是按以下步骤
+			A. 在主程序（如servlet、beans）中建立数据库连接
+			B. 断开数据库连接
+		②这种开发模式，存在的问题
+			A. 普通的JDBC数据库连接池使用DriverManager来获取，每次向数据库建议连接的时候都要将Connection加载到内存中，再验证
+				用户名和密码（得花费0.05~1s的时间）。需要数据库连接时就向数据库请求一个，执行完再断开连接，这样将会消耗大量的
+				时间和资源，数据库连接资源并没有得到很好的重复利用。若同时又大量请求，频繁的进行数据库连接操作将占有很多系统资源
+				严重的情况将会造成服务器崩溃
+			B. 对于每次数据库连接，使用完都得断开。否则，如果程序出现异常而未能关闭，将会导致数据库系统中内存泄露，最终导致重启数据库
+			C. 这种开发不能控制被创建连接对象的个数，系统资源会被毫无顾忌的分配出去，如连接过多，也可能导致内存泄露，服务器崩溃
+	2. 数据库连接池(connection pool)
+		A. 为解决传统开发中的数据库连接问题，可以采取数据库连接池技术。
+		B. 数据库连接池的基本思想就是为数据库连接建立一个“缓冲池”。预先在缓冲池中放入一定数据的连接，当需要建立数据库连接时，只需要从
+			“缓冲池”中取出一个，使用完毕之后再放回去
+		C. 数据库连接池负责分配、管理和释放数据库连接，它允许应用程序重复使用一个现有的数据库连接池，而不是重新建立一个
+		D. 数据库连接池的初始化时将创建一定数量的数据库连接放到连接池中，这些数据库连接的数量是由最小数据库连接数来设定的。无论这些数据
+			库连接是否被使用，连接池都将一直保证至少拥有这么多链接数量。连接池的最大数据库连接数量限定了这个连接池能占有多少个最大连接数，
+			当应用程序向数据库连接池请求的链接数量超过最大连接数是，请求将被添加到请求队列中 
+	3. 两种开源的数据库连接池
+		①JDBC的数据库连接池使用javax.sql.DataSource来表示，DataSource只是一个接口，该接口通常由服务器（Weblogic，WebSphere，Tomcat）提供，也有一些开源组织提供实现
+			A. DBCP数据库连接池
+			B. C3P0数据库连接词
+		②DataSource通常被称为数据源，它包含连接池和连接池管理两部分，习惯上也经常把DataSource称为连接池
+	4. DBCP数据源
+		①DBCP是Apache软件基金组织的开源连接池实现，该连接池依赖该组织的另一个开源系统：Common-pool，如需使用该连接池实现，应在系统中添加两个jar文件
+			A. commons-dbcp.jar: 连接池的实现
+			B. commons-pool.jar: 连接池实现的依赖库
+		②Tomcat的连接池正是采用该连接池爱实现的。该数据库连接池既可以与应用服务器整合使用，也可以由应用程序独立使用
+		③DBCP的使用步骤：
+			A. 初次使用DBCP需要注意的事项
+				(1. 下载commons-dbcp.jar：http://commons.apache.org/proper/commons-dbcp/download_dbcp.cgi
+				(2. 下载commons-pool.jar：http://commons.apache.org/proper/commons-pool/download_pool.cgi
+			B. 复制commons-dbcp.jar和commons-pool.jar到项目下的lib目录
+			C. 加载commons-pool.jar和commons-pool.jar到path环境中
+			B. 直接创建数据源对象
+				(1. 创建DSCP数据源实例
+				BasicDataSource dataSource = new BasicDataSource();
+				(2. 为数据源实例指定必须的属性
+				dataSource.setUsername("root");
+				dataSource.setPassword("2648");
+				dataSource.setUrl("jdbc:mysql://localhost:3306/test");
+				dataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
+				(3. 指定数据源一些可选的属性，并且具有一定意义
+				1). 指定数据库连接池中初始化连接的个数
+				dataSource.setInitialSize(10);
+				2). 指定数据库连接池中最大的连接数：同一时刻可以向数据库申请的连接数
+				dataSource.setMaxTotal(50);
+				3). 指定最小连接数：在数据库连接池中保存的最少空闲连接的数量
+				dataSource.setMinIdle(5);
+				4). 等待数据库连接池分配连接的最长时间，单位为毫秒
+				dataSource.setMaxWaitMillis(1000 *5);
+			B.  使用工厂创建数据库连接池
+				(1. 加载dbcp的properties文件：
+				Properties properties = new Properties();
+				InputStream is = this.getClass().getClassLoader().getResourceAsStream("dbcp.properties");
+				properties.load(is);
+				(2. 调用BasicDataSourceFactory的createDataSource将配置文件传进去创建数据库连接池
+				DataSource dataSource = BasicDataSourceFactory.createDataSource(properties);
+				(3. 创建配置文件，将一些常用的设置在配置文件中配置(配置文件中的键需要来自于basicDataSource中的属性)
+				username=root
+				password=2648
+				driverClassName=com.mysql.cj.jdbc.Driver
+				url=jdbc:mysql://localhost:3306/test
+				initialSize=10
+				maxTotal=5
+				minIdle=5
+				maxWaitMillis=5000
+				(4. 从数据库连接池中获取数据库连接
+	5. C3P0数据源
+		①C3P0的性能还不错，Hibernate官方推荐使用的数据库连接池就是C3P0
+		②该连接池需要使用两个jar包：
+			A. c3p0-0.9.5.2.jar
+			B. mchange-commons-java-0.2.11.jar
+		③C3P0数据源的搭建步骤
+			A. 初次使用C3P0数据源需要注意的事项：
+				(1. 下载c3p0-0.9.5.2.bin.zip：https://sourceforge.net/projects/c3p0/
+				(2. 解压c3p0-0.9.5.2.bin.zip可以得到以下: 
+					1). c3p0-0.9.5.2.jar
+					2). mchange-commons-java-0.2.11.jar
+					3). API
+				(3. 复制c3p0-0.9.5.2.jar和mchange-commons-java-0.2.11.jar到当前工程下lib目录
+				(4. 添加c3p0-0.9.5.2.jar和mchange-commons-java-0.2.11.jar到当前工程的path build中
+			B. 直接创建C3P0数据源对象
+				//创建数据源对象
+				ComboPooledDataSource cpds = new ComboPooledDataSource();
+				//为数据源实例指定必须的属性
+				cpds.setDriverClass("com.mysql.cj.jdbc.Driver");
+				cpds.setJdbcUrl("jdbc:mysql://localhost:3306/test");
+				cpds.setUser("root");
+				cpds.setPassword("2648");
+				
+				//当数据库连接池中的连接使用完后，一次向数据库获取连接的个数
+				cpds.setAcquireIncrement(10);
+				//初始化数据库连接池连接的数量
+				cpds.setInitialPoolSize(10);
+				//数据库连接池中最少的连接数
+				cpds.setMinPoolSize(5);
+				//数据库连接池中的最大连接数
+				cpds.setMaxPoolSize(10);
+				
+				//数据库连接池中可以维护的statement对象的个数
+				cpds.setMaxStatements(20);
+				//每个连接可以同时使用statement对象的个数
+				cpds.setMaxStatementsPerConnection(5);
+			C. 使用配置文件创建数据源对象
+				(1. C3P0推荐使用XML配置文件
+				(2. 在src目录下创建XML配置文件，文件名为c3p0-config.xml
+				(3. 在配置文件中为数据源实例指定连接数据库的属性
+					<property name="user">root</property>
+					<property name="password">2648</property>
+					<property name="driverClass">com.mysql.cj.jdbc.Driver</property>
+					<property name="jdbcUrl">jdbc:mysql://localhost:3306/test</property>
+				(4. 在配置文件中为数据源实例指定配置连接池的属性
+					1). 若数据库中连接数不足时, 一次向数据库服务器申请多少个连接
+					<property name="acquireIncrement">10</property>
+					2). 初始化数据库连接池时连接的数量
+					<property name="initialPoolSize">10</property>
+					3). 数据库连接池中的最小的数据库连接数
+					<property name="minPoolSize">5</property>
+					4). 数据库连接池中的最大的数据库连接数
+					<property name="maxPoolSize">10</property>
+
+					5). C3P0 数据库连接池可以维护的 Statement 的个数
+					<property name="maxStatements">20</property>
+					6). 每个连接同时可以使用的 Statement 对象的个数
+					<property name="maxStatementsPerConnection">5</property>
+	6. 使用数据连接池的注意事项：
+		①在配置文件中设置数据库连接属性以及数据库连接池的属性时，属性名必须和ComboPooledDataSource属性名一致，即去掉set第一个字母小写
+		②数据库连接池应该只需要被创建一次，因此将数据库连接池声明为私有静态的，保证数据库连接池只能创建一次
+		③当获取到的数据库连接对象释放时，其实是将数据库连接对象归还到数据库连接池中
+三、Apache-DBUtils简介
+	1. commons-dbutils是Apache组织提供的一个开源JDBC工具类库，它是对JDBC的简单封装，学习成本低，并且使用dbutils能极大简化JDBC编码的工作量，同时也不会影响程序的性能
+	2. API介绍：
+		①org.apache.commons.dbutils.QueryRunner
+		②org.apache.commons.dbutils.ResultSetHandler
+		③工具类：
+			org.apache.commons.dbutils.DbUtils.
+	3. QueryRunner
+		①QueryRunner是线程安全的，因此仅创建一次即可
+		②QueryRunner中常用的两个方法：
+			A. update()：可以进行insert、update、delete操作
+			B. query()：可以进行select操作
+			C. 该方法均有不同的重载的方法
+	4.  Handler：
+		①BeanHandler：通过反射机制将结果集转换为创建BeanHandler对象时传入Class对应的对象
+		②BeanListHandler：通过反射机制将结果集转换为创建BeanHandler对象时传入Class对应的集合，该集合不为null
+		③MapHandler: 返回结果集第一条记录对应的Map，键：结果集的列名（不是别名），值：结果集的列值
+		④MapListHandler: 返回的的是多条记录对应的Map集合，Map对应结果集中的一条记录，键：结果集的列名，值：结果集的列值，
+		⑤ScalarHandler: 返回的是一个任意类型的数值，一般查询的结果集中只有一行一列，当存在多列，则返回第一列
+四、调用函数和存储过程
+	1. 查看存储过程和函数
+		①SHOW STATUS语句可以查看存储过程和函数的状态
+			A. 其基本的语法结构如下:
+				SHOW { PROCEDURE | FUNCTION } STATUS [ LIKE 'pattern' ]
+			B. 举例：
+				SHOW PROCEDURE STATUS LIKE 'my_while1';
+				SHOW FUNCTION STATUS LIKE 'my_f1';
+		②查看存储过程和函数的定义
+			A. 其基本的语法结构如下:
+				SHOW CREATE { PROCEDURE | FUNCTION } sp_name
+			B. 举例
+				SHOW CREATE PROCEDURE my_repeat1;
+		③查看存储过程和函数的信息
+			A. 在MySQL中，存储过程和函数的信息存储在information_schema数据库下的Routines表中，可以通过查询该表的记录来查询存储过程和函数的信息
+			B. 其基本的语法形式如下:
+				SELECT * FROM information_schema.Routines WHERE ROUTINE_NAME = 'p_name' ;
+			C. 举例
+				SELECT * FROM information_schema.Routines WHERE LOWER(ROUTINE_NAME) = 'my_f1';
+	2. 执行存储过程和函数的SQL
+		①函数：{?=call function_name(arg1, arg2, ..., argn)}
+		②存储过程：{call procedure_name(arg1, arg2, ..., argn)}
+	3. CallbleStatement：执行存储过程和函数
+		①存储过程
+			//获取数据库连接
+			connection = JDBCTools.getConnection();
+			//通过Connection对象的prepareCall(sql)创建一个CallableStatement对象
+			callableStatement = connection.prepareCall(sql);
+			//调用CallableStatement对象的registerOutParameter(parameterIndex, sqlType)注册OUT参数
+			callableStatement.registerOutParameter(2, Types.NUMERIC);
+			callableStatement.registerOutParameter(3, Types.NUMERIC);
+			//调用CallableStatement对象的setXxx(parameterIndex, xxx)设定In或者INOUT参数
+			callableStatement.setInt(1, 80);
+			//通过CallableStatement对象的execute()执行SQL存储过程
+			callableStatement.execute();
+			//通过CallableStatement对象的getXxx()获取其带out的返回值
+			long sum_emp = callableStatement.getInt(2);
+			double avg_sal = callableStatement.getDouble(3);
+		②函数
+			//获取数据库连接
+			connection = JDBCTools.getConnection();
+			//通过Connection对象的prepareCall(sql)创建一个CallableStatement对象
+			callableStatement = connection.prepareCall(sql);
+			//调用CallableStatement对象的registerOutParameter(parameterIndex, sqlType)注册OUT参数
+			callableStatement.registerOutParameter(1, Types.NUMERIC);
+			//调用CallableStatement对象的setXxx(parameterIndex, xxx)设定In或者INOUT参数
+			callableStatement.setInt(2, 80);
+			//通过CallableStatement对象的execute()执行SQL存储函数
+			callableStatement.execute();
+			//通过CallableStatement对象的getXxx()获取其带out的返回值
+			double avg_sal = callableStatement.getDouble(1);
+			
+
+
+
+
+
+
+			

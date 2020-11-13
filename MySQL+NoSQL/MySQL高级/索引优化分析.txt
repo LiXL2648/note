@@ -1,0 +1,586 @@
+一、性能下降SQL慢：执行时间长、等待时间长 
+	1. 查询语句性能太低
+	2. 索引失效
+		①单值索引
+			A. 建立索引：create index idx_user_name on user(name);
+			B. 索引: 建立索引之后，会对该索引的数据进行排序，而且查询是在排序的基础上，因此查询速度变得更快
+		②复合索引
+			A. 建立索引：create index idx_user_nameEmail on user(name, email);
+	3. 关联查询太多join（设计缺陷或不得已的需求）
+	4. 服务器调优及各个参数设置（缓冲、线程数等）
+二、常见通用的Join查询
+	1. SQL执行加载顺序
+		① 手写：
+			SELECT DISTINCT <select_list> FROM <left_table> <join_type> JOIN <right_table> ON <join_condition>
+			WHERE <where_condition> GROUP BY <group_by_list> HAVING <having_condition> ORDER BY <order by_condition>
+			LIMIT <limit_number>
+		② 机读
+			FROM <left_table> <join_type> JOIN <right_table> ON <join_condition>WHERE <where_condition> GROUP BY <group_by_list> 
+			HAVING <having_condition>SELECT DISTINCT <select_list>ORDER BY <order by_condition> LIMIT <limit_number>
+		③ 总结
+			SQL解析 → FROM 笛卡尔积 → ON 主表保留 → JOIN 不符合ON也添加 → WHERE 非聚合 非SELECT别名 → GROUP BY 改变对表的引用 → 
+			HAVING 只作用分组后 → SELECT DISTINCT → ORDER BY 可使用SELECT别名 → LIMIT rows offset
+	2. SQL JOIN
+		① 内连接(inner join): SELECT <select_list> FROM TableA A INNER JOIN tableB B on A.key = B.key
+		select d.department_name,l.* from departments d inner join locations l on d.location_id = l.location_id;
+		② 左连接(LEFT[ OUTER] JOIN): SELECT <select_list> FROM TableA A LEFT JOIN tableB B on A.key = B.key
+		select d.department_name,l.* from departments d left join locations l on d.location_id = l.location_id;
+		③ 右连接(RIGHT[ OUTER] JOIN): SELECT <select_list> FROM TableA A RIGHT JOIN tableB B on A.key = B.key
+		select d.department_name,l.* from departments d right join locations l on d.location_id = l.location_id;
+		④ 左连接去除重复部分：SELECT <select_list> FROM TableA A LEFT JOIN tableB B on A.key = B.key WHERE B IS NULL
+		select d.department_name,l.* from departments d left join locations l on d.location_id = l.location_id where l.location_id is null;
+		⑤ 右连接去除重复部分：SELECT <select_list> FROM TableA A RIGHT JOIN tableB B on A.key = B.key WHERE A IS NULL
+		select d.department_name,l.* from departments d right join locations l on d.location_id = l.location_id where d.department_name is null;
+		⑥ 全连接(FULL[ OUTER] JOIN) SELECT <select_list> FROM TableA A FULL OUTER JOIN tableB B on A.key = B.key
+		FULL[ OUTER] JOIN在Oracle中支持，在MySQL中并不支持，因此使用如下方式：使用联合查询union，该查询既联合也去重
+		SELECT <select_list> FROM TableA A LEFT JOIN tableB B on A.key = B.key
+		union
+		SELECT <select_list> FROM TableA A RIGHT JOIN tableB B on A.key = B.key
+		select d.department_name,l.* from departments d right join locations l on d.location_id = l.location_id union select d.department_name,l.* 
+		from departmentt join locations l on d.location_id = l.location_id;
+		⑦全连接去除重复部分：
+		SELECT <select_list> FROM TableA A LEFT JOIN tableB B on A.key = B.key WHERE B IS NULL
+		union
+		SELECT <select_list> FROM TableA A RIGHT JOIN tableB B on A.key = B.key WHERE A IS NULL
+		select d.department_name,l.* from departments d right join locations l on d.location_id = l.location_id where d.department_name is null 
+		union select d.department_name,l.* from departments d left join locations l on d.location_id = l.location_id where l.location_id is null;
+		⑧交叉连接(CROSS JOIN): 即笛卡尔乘积
+三、索引简介
+	1. 索引是什么：
+		① MySQL官方对索引的定义为：索引（index）是帮助MySQL高效获取数据的数据结构。
+		② 可以得出的结论是索引是数据结构
+		③ MySQL之后的索引与数组中的下标、Git中的暂存区是相同的概念
+		④ 索引的目的在于提高查询效率，可以类比于词典，可以简单理解为：排好序的快速查找的吧数据结构。 
+		详情：
+		在数据之外，数据系统还维护着满足特定查找算法的数据结构，这些数据结构以某种方式引用（指向）数据，
+		这样就可以在这些数据上实现高级查找算法。这种数据结构，就是索引。
+		⑤ 一般来说索引本身也很大，不可能全部存储在内存中，因此索引往往以索引文件的形式存储在磁盘中
+		⑥ 我们平时所说的所有，如果没有特殊说明，都是指B树（多路搜索树，并不一定是二叉树）结构组织的索引。
+		其中聚集索引、次要索引、覆盖索引、符合索引、前缀索引、唯一索引都是使用B+树索引，当然除了B+树这种
+		索引之外，还有哈希索引（Hash index）
+	2. 优势：
+		① 类似于大学图书馆建书目录索引，提供数据检索的效率，降低数据库的IO成本
+		② 通过索引列对数据进行排序，降低了数据排序的成本，降低了CPU的消耗
+	3. 劣势：
+		① 实际上索引也是一张表，该表保存了主键与索引字段，并指向实体表的记录，所以索引列也是要占空间的
+		② 虽然索引大大提高了查询速度，同时也会减低更新表的速度，如对表进行INSERT、UPDATE和DELETE。因为更新表时，
+		MySQL不仅要保存数据，海奥保存一下索引文件每次更新添加了索引字段，都会调整因为更新所带来的键值变化后的索引信息。
+		③ 索引只是提高效率的一个因素，如果你的MySQL有大数据量的表，就需要花时间研究建立最优秀的索引，或优化查询条件。
+	4. 索引的分类: 
+		① 单值索引：即一个索引只包含单个列，一个表可以有多个单列索引，但中规中矩，一张表最多建立五个索引
+		② 唯一索引：索引类的值必须唯一，但允许有空值
+		③ 符合索引：即一个索引包含多个列
+		④ 基本语法：
+			A. 创建：
+				a. create[ unique] index indexName on mytable(columnName(length));
+				b. Alter table mytable add[ unique] index [indexName] (coulumnName(length));
+			B. 删除：drop index [indexName] on mytable;
+			C. 查看：show index from table_name/G;
+			D. 使用alter命令
+				a. alter table tableName add primary key (columnNameList): 该语句添加一个逐渐，这意味着索引值必须是唯一，并且不重复
+				b. alter table tableName add unique indexName(columnList): 这条语句创建索引的值必须是唯一的（除了null之外，null可能会出多次）。
+				c. alter table tableName add index indexName(culumnList): 添加普通索引，索引的值可能出现多次
+				d. alter table tableName add fulltext indexName(columnList): 这条语句指定了索引为fulltext，用于全文索引。
+	5. mysql的索引结构
+		①BTree索引
+		检索原理：
+			A. 初始化介绍
+				a. 一个b+树，浅蓝色的快我们称之为磁盘块，可以看到每个磁盘块包含几个数据项（浅蓝色所示）和指针（黄色所示），如磁盘块1包含数据项17和35，
+				包含P1、P2、P3。
+				b. P1表示小于17的磁盘块，P2表示在17和35之间的磁盘块，P3表示大于35的磁盘块。
+				c. 真实的数据存再子夜子节点即3、5、9、10、13、15P1表示小于17的磁盘块，P2表示在17和35之间的磁盘块，P3表示大于35的磁盘块。真实的数据存再子夜子节点即3、5、9、10、13、15
+				28、29、36、60、75、79、90、99。
+				d. 非叶子节点不存真实的数据，只存储指引搜索方向的数据项，如17、35并不是真实存在于数据表中
+			B. 查看过程：
+				如果查找数据项29，那么首先会把磁盘块1由磁盘加载到内存中，此时发生一次IO，在内存中用二分查找确定29在17和35之间，锁定磁盘块1的P2peye.com指针，内存时间非常短（相比磁盘的IO）
+				可以忽略不计，通过磁盘块1的P2指针的磁盘地址把磁盘块3由磁盘加载到内存中，发生第二次IO，29在26和30之间，锁定磁盘块3的P2指针，通过指针加载磁盘块8到内存中，发生第三次IO，同时
+				内存中做二分查找找到29，结束查询，总计三次IO。
+			C. 比较：
+				该B+树的层级只有三层，尽量减少树的层级，横向扩展，真实的情况是，3层的B+树可以表示上百万的数据，如果上百万的数据查找只需要三次IO，性能提高是巨大的，如果没有索引，每个数据项
+				都要发生一次IO，那么总共需要百万次的IO，显然成本是非常高的。
+		②Hash索引
+		③full-text全文索引
+		④R-Tree索引
+	6. 哪些情况需要创建索引
+		① 主键自动建议唯一索引
+		② 频繁作为查询条件的字段应该创建索引
+		③ 查询中与替他表关联的字段，外加关系建立索引
+		④ 频繁更新的字段不适合创建索引，因为每次更新不单单是更新记录还会更新索引
+		⑤ where条件用不到的字段不要创建索引
+		⑥ 单键/组合索引的选择问题，在高并发下倾向于创建组合索引
+		⑦ 查询中排序的字段，排序字段若通过去访问索引将大大提高排序的速度
+		⑧ 查询中统计或者分组字段
+	7. 哪些情况不需要太创建索引
+		① 表的记录太少
+		② 经常增删改的表。提高了查找的速度，同时却降低了更新表的速度，如对表进行INSERT、UPDATE和DELETE。因为更新表时，MySQL不仅要保存数据，还要保存一下索引文件。
+		③ 数据重复且分布均匀的表字段，因此应该只为最经常查询和最经常排序的数据列建立索引。
+		注意：如果某个数据列包含许多重复的内容，为它建立索引并没有太大的实际效果。
+		假如一个表由10万条记录，有一个字段A只有T和F两种值，且每个值的分布概率大约有50%，那么对这种表A字段建立索引一般不会提供数据库查询的速度
+		索引的选择性是指索引列中不同值的数目与表中记录数的比。如果一个表中有2000条数据，表索引列有1980个不同的值，那么这个索引的选择性就是1980/2000=0.99.
+		一个索引的选择性余额接近于1，这个索引的效率就越高 
+四、性能分析
+	1. MySQL Query Optimizer: MySQL服务架构中位于第二层的MySQL自带的查询优化器
+		① MySQL中有专门负责优化SELECT语句的优化器模块，主要功能：通过计算分析系统中收集到的统计信息，为客户端请求的Query提供MySQL认为最优的执行计划，MySQL认为最
+		优的检索方式，但不见得是DBA认为最优的，这部分是最耗费时间的。
+		② 当客户端向MySQL请求一条QUery，命令解析器模块完成请求分类，区别出世SELECT并转发给MySQL Query Optimizer时，MySQL Query Optimizer首先会对整条Query进行优化，
+		处理掉一些常量表达式的预算，直接换算成常量值。并对Query中的查询条件进行简化和转换，如去除掉一些无用或者显而易见的条件，结构调整等。然后分析Query中的Hint信息
+		（如果有），看显示Hint信息是否可以完全确定该Query的执行计划。如果没有Hint信息还不足以完全确定执行计划，则会读取所涉及对象的统计信息，根据Query进行写响应的计算分析，
+		然后再得出最后的执行计划。
+	2. MySQL的常见瓶颈：
+		① CPU：CPU在饱和的时候一般会发生在数据装入内存或从磁盘上读取数据的时候
+		② IO：磁盘IO瓶颈发生在装入数据远大于内存容量的时候
+		③ 服务器硬件的性能瓶颈：top，free，iostat和vmstat来查看系统的性能状态。
+	3. Explain：
+		① 是什么：简称执行计划
+			A. 使用explain关键字可以模拟优化器执行SQL查询语句，从而知道MySQL是如何处理你的SQL语句的。分析你的查询语句或是表结构的性能瓶颈
+			B. 理论知识均来自官网。
+		② 能干嘛
+			A. 表的读取顺序
+			B. 数据读取操作的操作类型
+			C. 哪些所有可以使用
+			D. 哪些所有被实际使用
+			E. 表之间的引用
+			F. 每张表有多少行被优化器查询
+		③  怎么用
+			A. Explain + SQL语句
+			B. 执行计划包含的信息：
+			+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+
+			| id | select_type  | table   |  type   | possible_keys| key| key_len | ref| rows    | Extra   |
+			+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+
+		④ 字段解释：
+			A. id
+				a. select查询的序列号，包含一组数字，表示查询中执行select子句或者操作数的顺序
+				b. 三种情况：
+					（1）id相同，执行顺序由上到下
+					（2）id不同，如果是子查询，id的序号会递增，id值越大者优先级越高，越先被执行
+					（3）id相同不同，同时存在
+						（a）id如果相同，可以认为是同一组，从上往下顺序执行
+						（b）在所有组中，id值越大，优先级越高，越线被执行
+						（c）derived = 衍生：derived + num, num=id，代表是id为num的组衍生得到的。
+			B. select_type
+				 a. 有哪些：simple、primary、subquery、derived、union、union Result
+				 b. 查询的类型，主要是用于区别普通查询、联合查询、子查询等的复杂查询
+					（1）simple：简单的select查询，查询中不包含子查询或者union
+					（2）primary：查询中若包含任何复杂的子查询，最外层则被标记为primary
+					（3）subquery：在select或者where列表中包含子查询
+					（4）derived：在from列表中包含的子查询被标记为derived（衍生），MySQL会递归执行这些子查询，包结果放在临时表里。
+					（5）union：若第二个select出现在union之后，则被标记为union，若union包含在from子句的子查询中，外层的select被标记为：derived
+					（6）union result：从union表中获取结果的select。
+			C. table: 显示这一行的数据是关于哪张表的
+			D. type：
+				a. 所有查询使用的类型
+				+-----+----+----+----+----+-----+----+----+----+----+----+------+
+				| All |  index  |  range  | ref | eq_ref  | const,system | null |
+				+-----+----+----+----+----+-----+----+----+----+----+----+------+
+				b. 访问类型排列
+				c. 显示了查询使用了何种类型
+					（1）从最好到最差依次是：system > const > eq_ref > ref > range > index > all
+						（a）system：表只有一行记录（等于系统表），这是const类型的特例，平时不会出现，这个可以忽略不计
+						（b）const：
+							表示通过索引一次就能找到了，const用于比较primary key或者unique索引。因为只匹配一行数据，所以查询速度很快。
+							如主键置于where列表中，MySQL就能将该表的查询转化为一个常量
+						（c）eq_ref：唯一性索引扫描：对于每个索引键，表中只有一条记录与之匹配。常见于主键或唯一索引扫描
+						（d）ref：
+							非唯一性索引扫描，返回匹配某个单独值的所有行
+							本质上也是一种索引访问，它返回所有匹配某个单独值的行。
+							然而，他可能会找到多个符合条件的行，所有它应该呼吁查找和扫描的混合体
+						（e）range：
+							只检索给定范围的行，使用一个索引来选择行，key列显示使用了哪个索引
+							一般就是在你的where语句中出现了between、<、>、in等的查询
+							这种范围扫描所有扫描比全表扫描要好，因为它只需要开始于索引的某一点，二结束另一点，不用扫描所有索引。
+						（f）index：
+							full index scan，index与all的区别为：index类型只遍历索引树，这通常比all快，因为索引文件通常数据文件小
+							（也就是说虽然index和all都是读全表，但是index是从索引中读取的，二all是从磁盘中读取的）
+						（g）all：full table scan，将遍历全表找到匹配的行
+						（h）备注：一般来说，得保证查询至少达到range级别，最好是能达到ref。
+					（2）一般来说，得保证查询至少达到range级别，最好能达到ref
+			E. possible_keys
+				a. 显示可能应用在这张表中的索引，一个或者多个。
+				b. 查询涉及到的字段上若存在索引，则该索引将被列出，但比一定被查询实际使用
+			F. key
+				a. 实际使用的索引，如果为null，则没有使用索引，则说明了两种情况
+					（1）没有建立索引
+					（2）索引失效
+				b. 查询中若使用了覆盖索引，则该索引仅出现在key列表中
+					覆盖索引：即查询的字段，与索引建立的字段个数、顺序一一吻合，因此当查询该字段时是从索引上进行查找的，key列表使用的
+					是索引查找，而且type上是index，如果key为null，则type则为all。
+			G. key_len
+				a. 表示索引中使用的字节数，可通过该列计算查询中使用的索引长度，在不损失精确性的前提下，长度越小越好
+				b. key_len显示的值为索引字段的最大可能长度，并非真实长度，即key_len是根据表定义计算而得的，不是通过表内检索得出的。
+			H. ref
+				a. 显示索引的哪一列被使用了，如果可能的话，是一个常量。哪些列或者常量被用于查找索引列上的值。
+				b. 查询中与其他表关联的字段，外键关系建立索引。
+			I. rows：根据表统计信息及索引选用情况，大致估算找到所需的记录所需要读取的行数，在相同的结果的前提下，所需要的行数越少越好
+			J. Extra：包含了不适合在其他列中显示但十分重要的额外信息
+				a. using filesort: 
+					（1）说明mysql会对数据使用一个外部的索引排序，而不是按照表内的索引顺序进行读取
+					（2）MySQL中无法利用所以完成的排序操作称为“文件排序”
+					（3）当出现该额外信息时，问题比较严重，说明SQL的性能出现了问题
+					（4）检索排序的字段最好是按照索引建立时的字段和顺序，如果不是按照表内的索引顺序进行读取，将会出现该额外信息。
+				b. using temporary
+					（1）使用了临时表保存中间结果，MySQL在对查询结果排序时使用了临时表。常见于排序order by和group by。
+					（2）当出现该额外信息时，问题将非常严重，由于使用了临时表保存数据，需要对数据进行迁移，使用完毕之后，再删除临时表，此时会消耗大量的系统资源
+					（3）出现该原因是，该使用group by分组时，使用的字段顺序没有严格按照索引建立时，字段顺序，因此会产生临时表和文件排序的问题
+				c. using index
+					（1）表示相应的select操作中使用了覆盖索引（covering index），避免访问了表的数据行，效率不错
+					（2）如果同时出现using where，表明索引被用来执行索引键值的查找
+					（3）如果没有同时出现using where，表明索引用来读取数据而非执行查找动作
+					（4）覆盖索引（covering index）
+						（a）理解方式一：推荐使用，就是select的数据列只从索引中就能够获取，不必在读取数据行，MySQL可以利用所以返回select列表中的字段，而不必根据
+						索引再次读取数据文件，换句话说查询列要被缩减的索引覆盖
+						（b）理解方式二：索引是高效找到行的一个方法，但是一般数据库也能使用索引找到一个列的数据，因此它不必读取整个行，毕竟索引叶子节点存储了它们
+						的索引就可以得到想要的数据，那就不必再读取行了，一个索引包含了（或覆盖了）满足是查询结果的数据就叫做覆盖索引。
+						（c）注意：
+							如果要使用覆盖索引，一定要注意select列表中只取出需要的列，而不是select *
+							因为如果将所有字段一起做索引会导致索引文件过大，查询性能下降。 
+				d. using where：表明使用了where过滤
+				e. using join buffer：表明使用了连接缓存
+				f. impossible where：where 子句的值总是false，不能用来获取任何元组
+				g. select table optimized away：
+					（1）在没有group by 子句的情况下，基于索引优化min/max操作
+					（2）对于MyISAM存储引擎优化count（*）操作，不必等到执行阶段再进行计算
+					（3）查询执行计划生成的阶段即完成优化
+				h. distinct：优化distinct操作，在找到第一匹配到的元组后即停止找同样值的动作。
+五、索引优化
+	1. 索引分析
+		① 索引单表优化案例：
+			查询员工表中job_id为ST_CLERK，工资大于3000的员工id和姓名，并按照入职时间降序排序
+			A. 查看：select employee_id, last_name from employees where job_id = 'ST_CLERK' and salary > 3000 order by hiredate desc;
+			B. 执行计划分析：explain select employee_id, last_name from employees where job_id = 'ST_CLERK' and salary > 3000 order by hiredate desc;
+			C. 分析结果：
+			+----+-------------+-----------+------+---------------+-----------+---------+-------+------+----------------------------------------------------+
+			| id | select_type | table     | type | possible_keys | key       | key_len | ref   | rows | Extra                                              |
+			+----+-------------+-----------+------+---------------+-----------+---------+-------+------+----------------------------------------------------+
+			|  1 | SIMPLE      | employees | ref  | job_id_fk     | job_id_fk | 23      | const |   20 | Using index condition; Using where; Using filesort |
+			+----+-------------+-----------+------+---------------+-----------+---------+-------+------+----------------------------------------------------+
+			D. 结论：extra出现了using flotsort是最坏的情况，必须优化
+			E. 建立索引：create index idx_employees_jsh on employees(job_id, salary, hiredate);
+			F. 执行计划结论：extra仍然出现了using flotsort现象，原因是salary > 3000的范围查找，导致了索引失效，从而使查找排序的顺序与索引建立时字段与顺序不一致，因此出现了文件排序的结果
+			G. 解决办法：删除原先建立的索引，重新建立索引，该索引应该只保留没有范围查找的字段，使得查找排序的顺序与索引建立时字段的个数与顺序相吻合，从而解决文件内排序的问题，进而优化SQL。
+		② 索引两表优化案例：
+			两表连接时使用左连接或者右连接时
+			A. 查看：select employee_id, last_name, d.department_id, department_name from employees e left join departments d on e.department_id = d.department_id;
+			B. 执行计划分析：explain select employee_id, last_name, d.department_id, department_name from employees e left join departments d on e.department_id = d.department_id;
+			C. 分析结果：
+			+----+-------------+-------+--------+---------------+---------+---------+-----------------------------+------+-------+
+			| id | select_type | table | type   | possible_keys | key     | key_len | ref                         | rows | Extra |
+			+----+-------------+-------+--------+---------------+---------+---------+-----------------------------+------+-------+
+			|  1 | SIMPLE      | e     | ALL    | NULL          | NULL    | NULL    | NULL                        |  107 | NULL  |
+			|  1 | SIMPLE      | d     | eq_ref | PRIMARY       | PRIMARY | 4       | myemployees.e.department_id |    1 | NULL  |
+			+----+-------------+-------+--------+---------------+---------+---------+-----------------------------+------+-------+
+			D. 结论：左连接时left join的左边是全部保留，因此是All，而由于右边使用了主键索引，type为唯一索引，rows为1行，因此该SQL是最优的。
+			假如left join 的右边没有建立主键索引，则右边理应为All，此时两次全表查找时SQL的性能很差，必须优化，此时应建立索引，因为左连接时左表需要全部保留，因此为All，而右表则需要匹配，
+			所以需要在右表建立索引，此时右表的type才能为ref，性能才能达到最优状态。同理右连接需要在左表建立索引。
+		③ 索引三表优化案例：
+			三表连接查询是在两表查询的基础上进行的，当前两个表连接得到的结果作为一个新表与第三个表关联，因此结论也与两表连接查询的结论一致
+		④ join语句的优化
+			A. 尽可能减少join语句中的nestedLoop的循环的总次数：“永远用小结果集驱动大的结果集”
+			B. 优先优化NestedLoop的内层循环
+			C. 保证join语句中被驱动表上join条件字段已经被索引
+			D. 当无法保证驱动表的join条件字段被索引且内存资源充足的前提下，不要太吝啬joinbuffer的设置。
+	2. 索引失效（应该避免）：
+		①建表SQL
+		②案例：
+			A. 全值匹配我最爱
+				a. 即：检索的字段（where后的条件查询）与索引的字段和顺序一一吻合。
+				b. 案例：查找工资为8000，领导的员工编号为146，入职时间为2014-03-05 00:00:00的员工信息
+					（1）查找select * from employees where salary = 8000 and manager_id = 146 and hiredate = '2014-03-05 00:00:00';
+					（2）使用explain执行计划：
+					（3）执行计划结果：
+					+----+-------------+-----------+------+---------------+------+---------+------+------+-------------+
+					| id | select_type | table     | type | possible_keys | key  | key_len | ref  | rows | Extra       |
+					+----+-------------+-----------+------+---------------+------+---------+------+------+-------------+
+					|  1 | SIMPLE      | employees | ALL  | NULL          | NULL | NULL    | NULL |  107 | Using where |
+					+----+-------------+-----------+------+---------------+------+---------+------+------+-------------+
+					（4）结果分析：该查找是简单查找，查找类别是全表扫描，可能用到的索引是null，实际用到的索引也是空，优化器优化了107行，被用于索引上的列为null
+								   该结果是没有使用到索引，全变查询，SQL的性能很低。
+					（5）解决方案：建立包含了salary、manager_id和hiredate字段的索引：alter table employees add index idx_employees_smh(salary, manager_id, hiredate);
+					（6）再次执行计划结果：
+					+----+-------------+-----------+------+-------------------+-------------------+---------+-------------------+------+-------+
+					| id | select_type | table     | type | possible_keys     | key               | key_len | ref               | rows | Extra |
+					+----+-------------+-----------+------+-------------------+-------------------+---------+-------------------+------+-------+
+					|  1 | SIMPLE      | employees | ref  | idx_employees_smh | idx_employees_smh | 20      | const,const,const |    1 | NULL  |
+					+----+-------------+-----------+------+-------------------+-------------------+---------+-------------------+------+-------+
+					（7）结果分析：该查找是简单查找，查找类型是非唯一索引，可能使用的索引是idx_employees_smh，实际使用的索引是idx_employees_smh，索引的长度为20，
+					被用于索引上的列为常量，被优化器优化的行数为1，额外的信息为null，由于使用了索引，因此才SQL的性能不错。
+			B. 最佳左前缀法则
+				a. 如果索引有多列，要遵循最左前缀法则。指的是查询从索引的最左前列开始并且不能跳过索引中的列
+				b. 口诀是：带头大哥不能死，中间兄弟不能断。
+				c. 案例：
+					（1）违背最左前缀法则的案例：
+						（a）查看表的索引：show index from employees;，结果为：idx_employees_smh，该索引列的顺序为：salary、manager_id和hiredate
+						（b）查找领导的员工编号为146，入职时间为2014-03-05 00:00:00的员工信息select * from employees where manager_id = 146 and hiredate = '2014-03-05 00:00:00';
+						（c）查看执行计划
+						（d）执行计划的结果
+						+----+-------------+-----------+------+---------------+------+---------+------+------+-------------+
+						| id | select_type | table     | type | possible_keys | key  | key_len | ref  | rows | Extra       |
+						+----+-------------+-----------+------+---------------+------+---------+------+------+-------------+
+						|  1 | SIMPLE      | employees | ALL  | NULL          | NULL | NULL    | NULL |  107 | Using where |
+						+----+-------------+-----------+------+---------------+------+---------+------+------+-------------+
+						（e）结论：该查询语句的查询顺序是从manager_id开始的，违背了最左前缀法则即带头大哥不能死，造成索引失效，因此查询类型为全表扫描，没有使用索引，优化器优化的行数为107行
+					（2）跳过索引中的列的案例：
+						（a）该表的索引为idx_employees_smh，索引列的顺序为：salary、manager_id和hiredate
+						（b）查找工资为8000，入职时间为2014-03-05 00:00:00的员工信息:select * from employees where salary = 8000 and hiredate = '2014-03-05 00:00:00';
+						（c）查看执行计划
+						（d）执行计划的结果
+						+----+-------------+-----------+------+-------------------+-------------------+---------+-------+------+-----------------------+
+						| id | select_type | table     | type | possible_keys     | key               | key_len | ref   | rows | Extra                 |
+						+----+-------------+-----------+------+-------------------+-------------------+---------+-------+------+-----------------------+
+						|  1 | SIMPLE      | employees | ref  | idx_employees_smh | idx_employees_smh | 9       | const |    3 | Using index condition |
+						+----+-------------+-----------+------+-------------------+-------------------+---------+-------+------+-----------------------+
+						（e）结论：该查询语句的查询顺序中跳过了manager_id字段，违背了不能跳过索引中的列的法则即中间兄弟不能断，造成了manager_id字段以后的索引失效，但是查询类型为非唯一索引，
+						实际用到的索引为idx_employees_smh，用于索引列上只有一个常量，被优化器优化的行数为3行，
+			C. 不在索引列上做任何操作（计算、函数、（自动or手动）类型转换），会导致索引失效而转向全表扫描
+				a. 案例一：在索引列上使用函数
+					（1）该表的索引为idx_employees_smh，索引列的顺序为：salary、manager_id和hiredate
+					（2）查找工资向上取整不超过8000的员工信息：select * from employees where ceil(salary) = 8000;
+					（3）查看执行计划
+					（4）执行计划的结果
+					+----+-------------+-----------+------+---------------+------+---------+------+------+-------------+
+					| id | select_type | table     | type | possible_keys | key  | key_len | ref  | rows | Extra       |
+					+----+-------------+-----------+------+---------------+------+---------+------+------+-------------+
+					|  1 | SIMPLE      | employees | ALL  | NULL          | NULL | NULL    | NULL |  107 | Using where |
+					+----+-------------+-----------+------+---------------+------+---------+------+------+-------------+
+					（5）分析与结论：该查询的查询条件符合了最左前缀法则，如果不对索引列使用函数，则执行结果为使用了索引，但是对索引列使用了函数后，执行结果表名没有使用索引，并且是全表扫描。
+					因此，在索引列上做任何操作（计算、函数、（自动or手动）类型转换），会导致索引失效而转向全表扫描
+			D. 存储引擎不能使用索引中范围条件右边的列
+				案例：在索引中对列使用范围条件
+				a. 该表的索引为idx_employees_smh，索引列的顺序为：salary、manager_id和hiredate
+				b. 查找工资为8000，领导的员工编号大于145，入职时间为2014-03-05 00:00:00的员工信息select * from employees where salary = 8000 and manager_id > 145 and hiredate = '2014-03-05 00:00:00';
+				c. 查看执行计划
+				d. 执行计划的结果
+				+----+-------------+-----------+-------+-------------------+-------------------+---------+------+------+-----------------------+
+				| id | select_type | table     | type  | possible_keys     | key               | key_len | ref  | rows | Extra                 |
+				+----+-------------+-----------+-------+-------------------+-------------------+---------+------+------+-----------------------+
+				|  1 | SIMPLE      | employees | range | idx_employees_smh | idx_employees_smh | 14      | NULL |    1 | Using index condition |
+				+----+-------------+-----------+-------+-------------------+-------------------+---------+------+------+-----------------------+
+				e. 结果分析：当索引列使用等号时更多是检索，使用不等号更多是排序，在使用不等号之后的索引列再使用等号时，已经失去了检索的作用更多是全表查询，因此在索引中列使用了范围查找，其在索引中右边的列就失效了
+				f. 结论，当索引中的列使用了范围查找，即该列以及其右边的列会造成索引失效，因此查找类型变成了范围查找，但是仍使用了索引，索引的长度会减少，性能会下降。
+			E. 尽量使用覆盖索引（只访问索引的查询（索引列和查询列一致）），减少select *
+				案例：在查询列表中使用覆盖索引，即使用查找列表为索引列
+				a. 该表的索引为idx_employees_smh，索引列的顺序为：salary、manager_id和hiredate
+				b. 查找工资为8000，领导的员工编号等于146，入职时间为2014-03-05 00:00:00的员工信息月薪、领导编号和入职时间select
+				select salary, manager_id, hiredate from employees where salary = 8000 and manager_id = 146 and hiredate = '2014-03-05 00:00:00';
+				c. 查看执行计划
+				d. 执行计划的结果
+				+----+-------------+-----------+------+-------------------+-------------------+---------+-------------------+------+-------------+
+				| id | select_type | table     | type | possible_keys     | key               | key_len | ref               | rows | Extra       |
+				+----+-------------+-----------+------+-------------------+-------------------+---------+-------------------+------+-------------+
+				|  1 | SIMPLE      | employees | ref  | idx_employees_smh | idx_employees_smh | 20      | const,const,const |    1 | Using index |
+				+----+-------------+-----------+------+-------------------+-------------------+---------+-------------------+------+-------------+
+				e. 结果分析：在额外信息extra中出现了using index，即使用索引进行查找，其性能更好
+				f. 结论：尽量使用覆盖索引（只访问索引的查询（索引列和查询列一致）），减少select *
+			F. mysql在使用不等于（!=或者<>）的时候无法使用索引会导致全表扫描
+				案例：在查询条件中对索引列使用!=或者<>
+				a. 该表的索引为idx_employees_smh，索引列的顺序为：salary、manager_id和hiredate
+				b. 查找工资不为8000，领导的员工编号等于146，入职时间为2014-03-05 00:00:00的员工信息：select * from employees where salary != 8000 and manager_id = 146 and hiredate = '2014-03-05 00:00:00';
+				c. 查看执行计划
+				d. 执行计划的结果
+				+----+-------------+-----------+------+-------------------+------+---------+------+------+-------------+
+				| id | select_type | table     | type | possible_keys     | key  | key_len | ref  | rows | Extra       |
+				+----+-------------+-----------+------+-------------------+------+---------+------+------+-------------+
+				|  1 | SIMPLE      | employees | ALL  | idx_employees_smh | NULL | NULL    | NULL |  107 | Using where |
+				+----+-------------+-----------+------+-------------------+------+---------+------+------+-------------+
+				e. 结果分析：由于对索引列使用了!=号，使得查找类型为全表扫描，虽然理论上使用了索引，但是实际上却没有，而且优化器优化的行数也为全部。
+				f. 结论：对索引列使用不等号，会造成索引失效，因此mysql在使用不等于（!=或者<>）的时候无法使用索引会导致全表扫描
+			G. is null，is not null也无法使用索引
+				案例：在查询条件中对索引列使用is null 或者 is not null
+				a. 该表的索引为idx_employees_smh，索引列的顺序为：salary、manager_id和hiredate
+				b. 查找工资不为null的员工信息：select * from employees where salary is not null;
+				c. 查看执行计划
+				d. 执行计划的结果
+				+----+-------------+-----------+------+-------------------+------+---------+------+------+-------------+
+				| id | select_type | table     | type | possible_keys     | key  | key_len | ref  | rows | Extra       |
+				+----+-------------+-----------+------+-------------------+------+---------+------+------+-------------+
+				|  1 | SIMPLE      | employees | ALL  | idx_employees_smh | NULL | NULL    | NULL |  107 | Using where |
+				+----+-------------+-----------+------+-------------------+------+---------+------+------+-------------+
+				e. 结果分析：该情况与在查找中对索引列使用不等号和存储引擎不能使用索引中范围条件右边的列的情况一致
+				f. 结论：查询条件中对索引列使用了is null，is not null会造成索引失效，导致全表扫描
+			H. like以通配符开头（'%abc....'）mysql索引失效会变成全表扫面的操作
+				a. locations表的索引为idx_locations_sc，索引列的顺序为street_address和country_id。
+				b. 案例一：改变%解决索引失效
+					（1）两边都有%
+					 explain select * from locations where street_address like '%ra%' and country_id = 'US';
+					+----+-------------+-----------+------+---------------+------+---------+------+------+-------------+
+					| id | select_type | table     | type | possible_keys | key  | key_len | ref  | rows | Extra       |
+					+----+-------------+-----------+------+---------------+------+---------+------+------+-------------+
+					|  1 | SIMPLE      | locations | ALL  | NULL          | NULL | NULL    | NULL |   23 | Using where |
+					+----+-------------+-----------+------+---------------+------+---------+------+------+-------------+
+					（2）左边有%
+					explain select * from locations where street_address like '%ra' and country_id = 'US';
+					+----+-------------+-----------+------+---------------+------+---------+------+------+-------------+
+					| id | select_type | table     | type | possible_keys | key  | key_len | ref  | rows | Extra       |
+					+----+-------------+-----------+------+---------------+------+---------+------+------+-------------+
+					|  1 | SIMPLE      | locations | ALL  | NULL          | NULL | NULL    | NULL |   23 | Using where |
+					+----+-------------+-----------+------+---------------+------+---------+------+------+-------------+
+					（3）右边有%
+					explain select * from locations where street_address like 'ra%' and country_id = 'US';
+					+----+-------------+-----------+-------+------------------+------------------+---------+------+------+-----------------------+
+					| id | select_type | table     | type  | possible_keys    | key              | key_len | ref  | rows | Extra                 |
+					+----+-------------+-----------+-------+------------------+------------------+---------+------+------+-----------------------+
+					|  1 | SIMPLE      | locations | range | idx_locations_sc | idx_locations_sc | 90      | NULL |    1 | Using index condition |
+					+----+-------------+-----------+-------+------------------+------------------+---------+------+------+-----------------------+
+					（4）结果分析：当%号加在两边或者左边时，索引失效并造成全表扫描，当%加在右边时，索引被使用，并且查找类型为范围查找。
+					（5）结论：改变like以通配符开头操作mysql索引失效而变成全表扫描的方法是在like查找时%放在查找条件的后面，但是后果是查找数据与%放两边或者左边时数据不一样
+				c. 案例二：改变查找列表解决like以通配符%开头造成的索引失效
+					（1）覆盖索引
+					explain select street_address, country_id from locations where street_address like '%ra%' and country_id = 'US';
+					+----+-------------+-----------+-------+---------------+------------------+---------+------+------+--------------------------+
+					| id | select_type | table     | type  | possible_keys | key              | key_len | ref  | rows | Extra                    |
+					+----+-------------+-----------+-------+---------------+------------------+---------+------+------+--------------------------+
+					|  1 | SIMPLE      | locations | index | NULL          | idx_locations_sc | 90      | NULL |   23 | Using where; Using index |
+					+----+-------------+-----------+-------+---------------+------------------+---------+------+------+--------------------------+
+					（2）结果分析：使用覆盖索引，查询类型从全表扫描变为索引扫描，并且使用了索引，而且额外信息extra中还使用了索引，SQL性能得到提升
+					（3）结论：当要求使用like时通配符%加在两边并且要求索引不失效时，只能改变查询列表，使用覆盖索引的方法，解决索引失效的问题，即查询列表不超过索引字段最好一致，顺序必须完全一致。
+				d. 结论：
+					（1）like以通配符开头（'%abc....'）mysql索引失效会变成全表扫面
+					（2）like百分写右边
+					（3）如果两边都有%，则覆盖索引
+			I. 字符串不加单引号（双引号）索引会失效
+				分析：字符串不加单引号仍然可以查找，实质是在底层mysql自动进行类型转换，违背了不在索引列上做任何操作的原则，因此造成了索引失效
+				结论：查找时字符串当条件必须加引号，并且不能显式或者隐式进行类型转换，否则会引起索引失效。
+			J. 少用or，用它来连接时会索引失效
+				案例：使用or的条件查询
+				（1）该表的索引为idx_employees_smh，索引列的顺序为：salary、manager_id和hiredate
+				（2）查找工资为8000或者9000的员工信息：select * from employees where salary = 8000 or salary = 9000;
+				（3）查看执行计划
+				（4）执行计划的结果
+				+----+-------------+-----------+-------+-------------------+-------------------+---------+------+------+-----------------------+
+				| id | select_type | table     | type  | possible_keys     | key               | key_len | ref  | rows | Extra                 |
+				+----+-------------+-----------+-------+-------------------+-------------------+---------+------+------+-----------------------+
+				|  1 | SIMPLE      | employees | range | idx_employees_smh | idx_employees_smh | 9       | NULL |    7 | Using index condition |
+				+----+-------------+-----------+-------+-------------------+-------------------+---------+------+------+-----------------------+
+				（5）结果分析：使用or做查询条件，会导致查询类型变坏，从而使得性能降低，可能会导致索引失效。
+			K. 小总结：
+				a. 全查找我最爱
+				explain select * from mytable where a ='a1' and b = 'b1' and c = 'c1' and d = 'd1';
+				+----+-------------+---------+------+------------------+------------------+---------+-------------------------+------+--------------------------+
+				| id | select_type | table   | type | possible_keys    | key              | key_len | ref                     | rows | Extra                    |
+				+----+-------------+---------+------+------------------+------------------+---------+-------------------------+------+--------------------------+
+				|  1 | SIMPLE      | mytable | ref  | idx_mytable_abcd | idx_mytable_abcd | 56      | const,const,const,const |    1 | Using where; Using index |
+				+----+-------------+---------+------+------------------+------------------+---------+-------------------------+------+--------------------------+
+				b. 当定值查找使用查询列与索引列一致，当顺序不一致，此时索引仍然有效，原因是mysql优化器会自动优化SQL，使得此时的索引仍然有效，
+				但是会消耗系统资源，因此建议查询列的顺序与索引列的顺序保持一致
+				select * from mytable where d ='d1' and c = 'c1' and b = 'b1' and a = 'a1';
+				+----+-------------+---------+------+------------------+------------------+---------+-------------------------+------+--------------------------+
+				| id | select_type | table   | type | possible_keys    | key              | key_len | ref                     | rows | Extra                    |
+				+----+-------------+---------+------+------------------+------------------+---------+-------------------------+------+--------------------------+
+				|  1 | SIMPLE      | mytable | ref  | idx_mytable_abcd | idx_mytable_abcd | 56      | const,const,const,const |    1 | Using where; Using index |
+				+----+-------------+---------+------+------------------+------------------+---------+-------------------------+------+--------------------------+
+				c. 当查询列与索引列个数顺序一致，但是出现范围查找时，会造成范围之后索引失效，而范围查找的列只是部分用到索引，并且只是用于排序，
+				此时，用于索引上的列也会相应减少。
+				select * from mytable where a ='a1' and b = 'b1' and c > 'c1' and d = 'd1';
+				+----+-------------+---------+------+------------------+------------------+---------+-------------+------+--------------------------+
+				| id | select_type | table   | type | possible_keys    | key              | key_len | ref         | rows | Extra                    |
+				+----+-------------+---------+------+------------------+------------------+---------+-------------+------+--------------------------+
+				|  1 | SIMPLE      | mytable | ref  | idx_mytable_abcd | idx_mytable_abcd | 28      | const,const |    1 | Using where; Using index |
+				+----+-------------+---------+------+------------------+------------------+---------+-------------+------+--------------------------+
+				d. 当查询列与索引列个数一致，顺序不一致时，出现范围查找时，虽然造成范围查找之后索引失效，但是mysql优化器会在底层对SQL进行优化，重新调整顺序
+				在调整顺序之后再出现范围查找之后的索引失效。提高了mysql的性能。
+				select * from mytable where a ='a1' and b = 'b1' and d > 'd1' and c = 'c1';
+				+----+-------------+---------+------+------------------+------------------+---------+-------------------+------+--------------------------+
+				| id | select_type | table   | type | possible_keys    | key              | key_len | ref               | rows | Extra                    |
+				+----+-------------+---------+------+------------------+------------------+---------+-------------------+------+--------------------------+
+				|  1 | SIMPLE      | mytable | ref  | idx_mytable_abcd | idx_mytable_abcd | 42      | const,const,const |    1 | Using where; Using index |
+				+----+-------------+---------+------+------------------+------------------+---------+-------------------+------+--------------------------+
+				e. 这种情况使用了三个索引列，即a、b用于查找，而c用于排序，但是并没有统计到索引的长度中，因此验证了索引不仅是用于检索，也是用于排序的数据结构
+				select * from mytable where a ='a1' and b = 'b1' and d = 'd1' order by c;
+				+----+-------------+---------+------+------------------+------------------+---------+-------------+------+--------------------------+
+				| id | select_type | table   | type | possible_keys    | key              | key_len | ref         | rows | Extra                    |
+				+----+-------------+---------+------+------------------+------------------+---------+-------------+------+--------------------------+
+				|  1 | SIMPLE      | mytable | ref  | idx_mytable_abcd | idx_mytable_abcd | 28      | const,const |    1 | Using where; Using index |
+				+----+-------------+---------+------+------------------+------------------+---------+-------------+------+--------------------------+
+				f. 该情况与e一样。
+				select * from mytable where a ='a1' and b = 'b1' order by c;
+				+----+-------------+---------+------+------------------+------------------+---------+-------------+------+--------------------------+
+				| id | select_type | table   | type | possible_keys    | key              | key_len | ref         | rows | Extra                    |
+				+----+-------------+---------+------+------------------+------------------+---------+-------------+------+--------------------------+
+				|  1 | SIMPLE      | mytable | ref  | idx_mytable_abcd | idx_mytable_abcd | 28      | const,const |    1 | Using where; Using index |
+				+----+-------------+---------+------+------------------+------------------+---------+-------------+------+--------------------------+
+				g. 由于索引建立时列的顺序为a、b、c、d，但是下面将索引的列a、b用于查找，跳开c，将d用于排序，会造成文件被排序的额外信息，该后果将会使SQL变得非常慢
+				select * from mytable where a ='a1' and b = 'b1' order by d;
+				+----+-------------+---------+------+------------------+------------------+---------+-------------+------+------------------------------------------+
+				| id | select_type | table   | type | possible_keys    | key              | key_len | ref         | rows | Extra                                    |
+				+----+-------------+---------+------+------------------+------------------+---------+-------------+------+------------------------------------------+
+				|  1 | SIMPLE      | mytable | ref  | idx_mytable_abcd | idx_mytable_abcd | 28      | const,const |    1 | Using where; Using index; Using filesort |
+				+----+-------------+---------+------+------------------+------------------+---------+-------------+------+------------------------------------------+
+				h. 该查找使用了索引的a用于查找，也使用了索引的b、c用于排序
+				explain select * from mytable where a = 'a1' and e = 'e1' order by b, c;
+				+----+-------------+---------+------+------------------+------------------+---------+-------+------+------------------------------------+
+				| id | select_type | table   | type | possible_keys    | key              | key_len | ref   | rows | Extra                              |
+				+----+-------------+---------+------+------------------+------------------+---------+-------+------+------------------------------------+
+				|  1 | SIMPLE      | mytable | ref  | idx_mytable_abcd | idx_mytable_abcd | 14      | const |    1 | Using index condition; Using where |
+				+----+-------------+---------+------+------------------+------------------+---------+-------+------+------------------------------------+
+				i. 该方式查找会造成filesort，原因是范围查找之后索引会失效，并在索引失效的前提下进行了排序，所以会造成filesort的后果
+				select * from mytable where a = 'a1' and b = 'b1' and c > 'c1' order by d;
+				+----+-------------+---------+-------+------------------+------------------+---------+------+------+---------------------------------------+
+				| id | select_type | table   | type  | possible_keys    | key              | key_len | ref  | rows | Extra                                 |
+				+----+-------------+---------+-------+------------------+------------------+---------+------+------+---------------------------------------+
+				|  1 | SIMPLE      | mytable | range | idx_mytable_abcd | idx_mytable_abcd | 42      | NULL |    1 | Using index condition; Using filesort |
+				+----+-------------+---------+-------+------------------+------------------+---------+------+------+---------------------------------------+
+				j. 该方式查找造成了filesort的原因是，排序的字段与索引建立时字段的顺序不一致。
+				select * from mytable where a = 'a1' and e = 'e1' order by c, b;
+				+----+-------------+---------+------+------------------+------------------+---------+-------+------+----------------------------------------------------+
+				| id | select_type | table   | type | possible_keys    | key              | key_len | ref   | rows | Extra                                              |
+				+----+-------------+---------+------+------------------+------------------+---------+-------+------+----------------------------------------------------+
+				|  1 | SIMPLE      | mytable | ref  | idx_mytable_abcd | idx_mytable_abcd | 14      | const |    1 | Using index condition; Using where; Using filesort |
+				+----+-------------+---------+------+------------------+------------------+---------+-------+------+----------------------------------------------------+
+				k. 该方式查找并不会出现严重的问题，原因是查找与排序都按照索引的字段顺序，只是字段重复而已，
+				select * from mytable where a = 'a1' and b = 'b1' order by b, c;
+				+----+-------------+---------+------+------------------+------------------+---------+-------------+------+------------------------------------+
+				| id | select_type | table   | type | possible_keys    | key              | key_len | ref         | rows | Extra                              |
+				+----+-------------+---------+------+------------------+------------------+---------+-------------+------+------------------------------------+
+				|  1 | SIMPLE      | mytable | ref  | idx_mytable_abcd | idx_mytable_abcd | 28      | const,const |    1 | Using index condition; Using where |
+				+----+-------------+---------+------+------------------+------------------+---------+-------------+------+------------------------------------+
+				l. 	一般情况下，order by 排序的字段与索引列的顺序不一致时，会产生filesort的结果，但是当order by排序的字段为常量时，以下情况，并不会产生filesort
+				select * from mytable where a = 'a1' and b = 'b1' order by c, b;
+				+----+-------------+---------+------+------------------+------------------+---------+-------------+------+------------------------------------+
+				| id | select_type | table   | type | possible_keys    | key              | key_len | ref         | rows | Extra                              |
+				+----+-------------+---------+------+------------------+------------------+---------+-------------+------+------------------------------------+
+				|  1 | SIMPLE      | mytable | ref  | idx_mytable_abcd | idx_mytable_abcd | 28      | const,const |    1 | Using index condition; Using where |
+				+----+-------------+---------+------+------------------+------------------+---------+-------------+------+------------------------------------+
+				m. select * from mytable where a = 'a1' and d = 'd1' group by b, c;
+				+----+-------------+---------+------+------------------+------------------+---------+-------+------+------------------------------------+
+				| id | select_type | table   | type | possible_keys    | key              | key_len | ref   | rows | Extra                              |
+				+----+-------------+---------+------+------------------+------------------+---------+-------+------+------------------------------------+
+				|  1 | SIMPLE      | mytable | ref  | idx_mytable_abcd | idx_mytable_abcd | 14      | const |    1 | Using index condition; Using where |
+				+----+-------------+---------+------+------------------+------------------+---------+-------+------+------------------------------------+
+				n. group by与order by的情况大致，也就是说分组之前必排序，所以分组与排序的排序和索引优化的法则几乎是一致的，如果错乱会产生临时表和文件排序的问题  
+				explain select * from mytable where a = 'a1' and d = 'd1' group by c, b;
+				+----+-------------+---------+------+------------------+------------------+---------+-------+------+---------------------------------------------------------------------+
+				| id | select_type | table   | type | possible_keys    | key              | key_len | ref   | rows | Extra                                                               |
+				+----+-------------+---------+------+------------------+------------------+---------+-------+------+---------------------------------------------------------------------+
+				|  1 | SIMPLE      | mytable | ref  | idx_mytable_abcd | idx_mytable_abcd | 14      | const |    1 | Using index condition; Using where; Using temporary; Using filesort |
+				+----+-------------+---------+------+------------------+------------------+---------+-------+------+---------------------------------------------------------------------+
+	3. 一般建议:
+		① 对于单值索引，尽量选择针对当前query过滤更好的索引
+		② 在选择组合索引的时候，当前query中过滤性最好的字段在索引字段顺序中，位置越靠前越好
+		③ 在选择组合索引的时候，尽量选择可能包含当前query中where子句中更多字段的索引
+		④ 尽可能通过分析统计信息和调整query的写法来达到选择合适索引的目的。
+	4. 优化总结口诀
+		①全值匹配我最爱，最左前缀要遵守；
+		②带头大哥不能死，中间兄弟不能断；
+		③索引列上少计算，范围之后全失效；
+		④like百分写最右，覆盖索引不写* ；
+		⑤不等空值还有or，索引失效要少用；
+		⑥var引号不能丢， SQL高级也不难！
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		
+	 
