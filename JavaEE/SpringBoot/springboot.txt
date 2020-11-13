@@ -1423,7 +1423,9 @@
 			G. 容器日志
 				a. 命令：docker logs container-name/container-id
 				b. 说明：
-			H. 更多命令：https://docs.docker.com/engine/reference/commandline/docker/
+			H. 进入容器
+				a. 命令：docker exec -it container-name/container-id /bin/bash
+			I. 更多命令：https://docs.docker.com/engine/reference/commandline/docker/
 		③ 以Tomcat为例执行docker命令操作
 			A. 搜索镜像：docker search tomcat
 			B. 拉取镜像：docker pull tomcat
@@ -1444,6 +1446,7 @@
 			docker run --name mysql -v /conf/mysql:/etc/mysql/conf.d -e MYSQL_ROOT_PASSWORD=2648 -d mysql:lastest 
 			G. 指定mysql的一些参数：
 			docker run --name mysql -e MYSQL_ROOT_PASSWORD=2648 -d mysql:lastest --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+			H. 设置MySQL用户的权限：grant all privileges on *.* to root@'%' identified by '123456' with grant option;
 六、Spring Boot与数据访问
 	1. 简介：对于数据访问层，无论是SQL还是NOSQL，Spring Boot默认采用整合Spring  Data的方式进行统一处理，添加大量自动配置，屏蔽了很多设置。
 	引入了各种xxxTemplate，xxxRepository来简化我们对数据访问层的操作。对我们来说只需要进行简单的设置即可。

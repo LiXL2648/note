@@ -749,7 +749,7 @@
 				b. 将CaptchaImageVO验证码信息类对象，保存到session中。（这个类的代码后文有介绍）
 				c. 通过captchaProducer.createImage(capText)生成验证码图片，并通过ServletOutputStream返回给前端
 				d. 我们要把CaptchaImageVO保存到session里面。所以该类中不要加图片，只保存验证码文字和失效时间，用于后续验证即可。把验证码图片保存起来既没有用处，又浪费内存。
-			B. 代码：
+			B. 前后代码：
 				@RestController
 				public class CaptchaCodeController {
 
@@ -806,6 +806,24 @@
 					.authorizeRequests()
 					.antMatchers("/login.html", "/", "/login", "/kaptcha").permitAll() // 不需要通过登录验证就可以被访问的资源路径
 					...
+				}
+			C. 前后端分离图片验证码
+				public R kaptcha() {
+
+					// 将验证码保存到redis中，并设置过期时间为两分钟
+					String captchaText = captchaProducer.createText();
+					String captchaKey = IdUtil.simpleUUID();
+					stringRedisTemplate.opsForValue().set(captchaKey, captchaText, 60 * 2, TimeUnit.SECONDS);
+
+					// 将验证码图片返回到前端 ServletOutputStream out = response.getOutputStream();
+					try(ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+						BufferedImage image = captchaProducer.createImage(captchaText);
+						ImageIO.write(image, "jpg", out);
+						byte[] b = out.toByteArray();
+						return R.ok().put("key", captchaKey).put("image", Base64.getEncoder().encodeToString(b));
+					} catch (IOException e) {
+						return R.error("获取图片验证码失败");
+					}
 				}
 		⑤ 验证码用户访问
 			A. 实现的效果是，页面初始化即加载验证码。以后每一次点击，都会更新验证码。
