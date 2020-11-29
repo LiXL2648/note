@@ -833,112 +833,438 @@
 		I. 打印生活在广州的交易员的所有交易额
 		J. 所有交易中，最高的交易额是多少
 		K. 找到交易额最小的交易
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+五、并行流与串行流
+	1. 了解Fork/Join框架
+		① Fork/Join框架：就是在必要的情况下，将一个大任务，进行拆分（fork）成若干个小任务（拆到不可再拆时），
+		再将一个个的小任务运算的结果进行join汇总
+											--------
+											| 任务 |
+											--------
+										   fork |
+							--------------------|---------------------
+							↓ 							    		 ↓
+					    ----------								----------
+						| 子任务 |								| 子任务 | 				---------------------
+						----------								----------				|					|
+							↓ forke								fork ↓					|   任务递归分配	|
+				--------------------------			    --------------------------		|	成若干个小任务	|
+				↓						 ↓				↓						 ↓		|					|
+			----------				----------		----------				----------	---------------------
+			| 子任务 |				| 子任务 |		| 子任务 |				| 子任务 |
+			----------				----------		----------				----------
+			--------------------------------------------------------------------------- ---------------------
+				↓						 ↓				↓						 ↓		| 	  				|
+			----------				----------		----------				----------  |	   并行求值		|
+			|		 |				|		 |		|		 |				|		 |	|					|
+			----------				----------		----------				----------	---------------------
+				|		  Join			 |				|		  Join			 |
+				--------------------------				--------------------------
+							↓										↓					---------------------
+						---------			join				---------				|					|
+						|		| -----------------------------	|		|				|	合并部分结果	|
+						---------			  |					---------				|					|
+											  ↓											---------------------
+											-----
+											|	|
+											-----
+		② 代码
+			import java.util.concurrent.RecursiveTask;
+
+			public class ForkJoinTask extends RecursiveTask<Long> {
+
+				private Long start;
+
+				private Long end;
+
+				private static final Long THRESHOL = 10000L;
+
+				public ForkJoinTask(Long start, Long end) {
+					this.start = start;
+					this.end = end;
+				}
+
+				@Override
+				protected Long compute() {
+
+					long length = end - start;
+
+					if (length <= THRESHOL) {
+
+						long sum = 0;
+
+						for (long i = start; i <= end; i++) {
+							sum += i;
+						}
+
+						return sum;
+					} else {
+
+						long middle = (start + end) / 2;
+
+						ForkJoinTask left = new ForkJoinTask(start, middle);
+						left.fork();
+
+						ForkJoinTask right = new ForkJoinTask(middle + 1, end);
+						right.fork();
+
+						return left.join() + right.join();
+					}
+				}
+			}
+			
+			public void testForkJoinTask() {
+
+				Instant startTime = Instant.now();
+
+				ForkJoinPool forkJoinPool = new ForkJoinPool();
+
+				ForkJoinTask forkJoinTask = new ForkJoinTask(0L, 50000000000L);
+
+				Long sum = forkJoinPool.invoke(forkJoinTask);
+
+				System.out.println(sum);
+
+				Instant endTime = Instant.now();
+				System.out.println(Duration.between(startTime, endTime).toMillis()); // 277 5808 35519
+			}
+	
+	2. Fork / Join 框架与传统线程池的区别
+		① 	采用“工作窃取”模式（work-stealing）: 当执行新的任务时它可以将其拆分成更小的任务执行，并将小任务加到线程队列中，
+		然后再从随机线程的队列中偷一个并把它放在自己的队列中
+		② 相对于一般的线程池实现，fork /join 框架的优势体现于现在对其中包含的任务的处理方式上，在一般的线程会处于等待状态，
+		而Fork / Join 框架实现中，如果某个子问题由于等待另一个子问题的完成而无法继续运行，那么处理该子问题的线程会主动寻找
+		其他尚未运行的子问题来执行，这种方式减少了线程等待的时间，提高了性能
+	3. 并行流与顺序流
+		① 并行流就是把一个内容分成多个数据块，并用不同的线程分别处理每个数据块的流
+		② Java 8 中将并行流进行了优化，我们很容易的对数据进行并行操作，Stream API 可以声明性地通过parallel()与
+		sequential()在并行流与顺序流之间进行切换
+		③ 代码：
+			@Test
+			public void testparallel() {
+
+				Instant startTime = Instant.now();
+
+				long sum = LongStream.rangeClosed(0, 50000000000L)
+						.parallel()
+						.reduce(0, Long::sum);
+
+				System.out.println(sum);
+
+				Instant endTime = Instant.now();
+				System.out.println(Duration.between(startTime, endTime).toMillis()); // 18555
+			}
+六、Optional 类
+	1. Optional<T>（java.util.Optional） 类是一个容器类，代表一个值存在或者不存在，原来null表示一个值不存在，现在Optional可以
+	更好的表达这个概念，并且避免空指针异常
+	2. 常用API
+		① Optional.of(T t)：创建一个Optional实例
+		② Optional.empty()：创建一个空的Optional实例
+		③ Optional.ofNullable(T t)：若 t 不为null，创建Optional实例，否则创建空实例
+		④ isPresent()：判断是否包含值
+		⑤ orElse(T t)：如果调用对象包含值，返回改值，否则返回t
+		⑥ orElseGet(Supplier s)：如果调用对象包含值，返回该值，否则返回s获取的值
+		⑦ map(Function f)：如果有值对其进行处理，并返回处理后的Optional，否则返回Optional.empty()
+		⑧ flatMap(Function mapper)：与map类似，要求返回值必须是Optional
+七、接口中的默认方法与静态方法
+	1. 接口中的默认方法
+		① Java 8 中允许接口中包含具有实现的方法，该方法称为“默认方法”，默认方法使用default关键字修饰。
+		② 代码：
+			public interface DefaultMethod {
+    
+				void test();
+				
+				default String hello() {
+					return "Hello";
+				}
+			}
+		③ 接口中默认方法的“类优先”原则
+			A. 若接口中定义了一个默认方法，而另一个父类或者接口中又定义了一个同名的方法时，选择父类中的方法。如果一个父类提供了
+			具体实现，那么接口中具有相同名称和参数的默认方法会被忽略
+				a. 代码
+					public class SameMethodClass {
+
+						public String hello() {
+							return "Hello WOrld";
+						}
+					}
+					
+					public class DefaultMethodInterfaceImpl extends SameMethodClass implements DefaultMethodInterface {
+
+						@Override
+						public void test() {
+							DefaultMethodInterfaceImpl defaultMethodInterfaceImpl = new DefaultMethodInterfaceImpl();
+							String hello = defaultMethodInterfaceImpl.hello();
+							System.out.println(hello);
+						}
+
+						public static void main(String[] args) {
+							DefaultMethodInterfaceImpl defaultMethodInterface = new DefaultMethodInterfaceImpl();
+							defaultMethodInterface.test();
+						}
+					}
+				b. 输出：Hello WOrld	
+			B. 接口冲突，如果一个父接口提供了一个默认方法，而另一个接口也提供了	一个具有相同名称和参数列表的方法（不管方法是否默认），
+			那么必须覆盖该方法来解决冲突.
+				a. 代码：
+					public class SameMethodClass {
+
+						public String hello() {
+							return "Hello WOrld";
+						}
+					}
+				
+					import com.li.java8.interfact.DefaultMethodInterface;
+					import com.li.java8.interfact.SameMethodInterface;
+
+					public class SameMethodInterfaceImpl implements DefaultMethodInterface, SameMethodInterface {
+
+						@Override
+						public void test() {
+							SameMethodInterfaceImpl sameMethodInterface = new SameMethodInterfaceImpl();
+							System.out.println(sameMethodInterface.hello());
+						}
+
+						@Override
+						public String hello() {
+							return SameMethodInterface.super.hello();
+						}
+
+						public static void main(String[] args) {
+							SameMethodInterfaceImpl sameMethodInterface = new SameMethodInterfaceImpl();
+							sameMethodInterface.test();
+						}
+					}
+				b. 输出：Hello LiXL
+	2. 接口中的静态方法
+		public interface SameMethodInterface {
+
+			default String hello() {
+				return "Hello LiXL";
+			}
+
+			public static String say() {
+				return "hello";
+			}
+		}
+八、新时间日期API
+	1. 传统时间日期格式化的线程安全
+		① 代码
+			public class DateFormateTest {
+
+				public static void main(String[] args) throws Exception {
+					SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+
+					Callable<Date> task = new Callable<Date>() {
+						@Override
+						public Date call() throws Exception {
+							return sdf.parse("2020-11-24");
+						}
+					};
+
+					ExecutorService pool = Executors.newFixedThreadPool(10);
+
+					List<Future<Date>> futures = new ArrayList<>();
+
+					for (int i = 0; i < 10; i++) {
+						futures.add(pool.submit(task));
+					}
+
+					for (Future<Date> future : futures) {
+						System.out.println(future.get());
+					}
+					
+					pool.shutdown();
+				}
+			}
+		② 解决方法：为时间格式化对象加上锁
+			public class DateFormateThreadLocal {
+
+					private static final ThreadLocal<DateFormat> df = new ThreadLocal<DateFormat>() {
+						@Override
+						protected DateFormat initialValue() {
+							return new SimpleDateFormat("yyyy-MM-dd");
+						}
+					};
+
+					public static Date convert(String source) throws ParseException {
+						return df.get().parse(source);
+					}
+
+				}
+	2. 使用LocalDate、LocalTime和LocalDateTime
+		① LocalDate、LocalTime和LocalDateTime类的实例是不可变的对象，分别表示使用ISO-8601日历系统的日期、时间和日期时间。
+		它们提供了简单的日期或者时间，并不包含当前时间信息，也不包含时区相关信息
+		② 注：ISO-8601日历系统是国际标准化组织制定的现代公民日期和时间表示法
+		③ LocalDate、LocalTime和LocalDateTime的API：
+			A. LocalDateTime LocalDateTime.now()：获取当前系统时间
+			B. LocalDateTime LocalDateTime.of(int year, Month month, int dayOfMonth, int hour, int minute, int second)：指定年月日时分秒获取时间对象
+			C. LocalDateTime plusMinutes(long minutes)：在指定的时间的基础上可以增加年、月、日、时、分、秒等。
+			D. LocalDateTime minusHours(long hours)：在指定的时间的基础上可以减少年、月、日、时、分、秒等。
+			E. int getDayOfMonth()/DayOfWeek getDayOfWeek()：在指定的时间中获取年份、月份、月的某天、星期的某天或者小时、分钟、秒等
+				LocalDateTime dateTime = LocalDateTime.now();
+				System.out.println(dateTime.getYear()); 
+				System.out.println(dateTime.getMonthValue());
+				System.out.println(dateTime.getDayOfMonth());
+				System.out.println(dateTime.getHour());
+				System.out.println(dateTime.getMinute());
+				System.out.println(dateTime.getSecond());
+				DayOfWeek dayOfWeek = dateTime.getDayOfWeek();
+				System.out.println(dayOfWeek); // 	WEDNESDAY
+				System.out.println(dateTime.getDayOfYear());
+	3. Instant
+		① 时间戳（以 Unix 元年：1900-01-01 00:00:00 之间的毫秒值）
+		② Instant 的 API
+			A. Instant Instant.now()：获取当前时间，默认获取UTC时区（世界协调时间）
+			B. OffsetDateTime atOffset(ZoneOffset offset)：设置时区偏移量，得到带偏移量的时间
+				OffsetDateTime offsetDateTime = ins.atOffset(ZoneOffset.ofHours(8)); // 2020-11-25T22:48:39.455+08:00
+			C. long toEpochMilli()：获取时间戳
+			D. Instant Instant.ofEpochSecond(long epochSecond)：相对于元年的基础，加上某个时间单位
+				System.out.println(Instant.ofEpochSecond(1)); // 1970-01-01T00:00:01Z
+	4. Duration和Period
+		① Duration：计算两个时间之间的间隔
+		② Period：计算两个日期之间的间隔
+		③ Duration 的API
+			A Duration Duration.between(Temporal startInclusive, Temporal endExclusive)：计算两个时间之间的间隔，Duration是OS显示时间间隔的格式
+				Instant ins1 = Instant.now();
+
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {
+				}
+
+				Instant ins2 = Instant.now();
+
+				Duration duration = Duration.between(ins1, ins2);
+				System.out.println(duration); // PT1.009S
+			B long toMillis()：获取计算两个时间的间隔转换成毫秒
+				System.out.println(duration.toMillis()); // 1001
+		④ Period 的 API：
+			A. 	Period Period.between(LocalDate startDateInclusive, LocalDate endDateExclusive)：计算两个日期之间的间隔，Period是OS显示时间间隔的格式
+				LocalDate date1 = LocalDate.now();
+
+				LocalDate date2 = LocalDate.of(1996, 5, 4);
+
+				Period period = Period.between(date2, date1);
+				System.out.println(period);
+			B. int getYears()、int getMonths()、int getDays()：获取计算两个日期的间隔转换成年、月、日
+				System.out.println(period.getYears());
+				System.out.println(period.getMonths());
+				System.out.println(period.getDays());
+	5. 日期的操纵
+		① TemporalAdjuster：时间校正器。有时候我们可能需要获取例如：将日期调整到“下个周日”等操作
+		② TemporalAdjusters：该类通过静态方法提供了大量的常用TemporalAdjuster的实现
+		③ TemporalAdjuster 和 TemporalAdjusters 的API：
+			A. LocalDate with(TemporalAdjuster adjuster)：日期计算，需要传时间校正器对象 TemporalAdjuster，可以由TemporalAdjusters获取
+				LocalDate localDate = LocalDate.now();
+				System.out.println(localDate);
+				LocalDate nextSATURDAY = localDate.with(TemporalAdjusters.next(DayOfWeek.SATURDAY)); // 获取下个周六的日期
+				System.out.println(nextSATURDAY);
+			B. LocalDate withDayOfMonth(int dayOfMonth)：获取当前月份的某一天的日期
+				LocalDate withDayOfMonth = localDate.withDayOfMonth(10);
+			C.  自定义日期时间校正规则
+				@Test
+				public void testWith() {
+					LocalDate localDate = LocalDate.now();
+					System.out.println(localDate);
+					LocalDate with = localDate.with((l) -> {
+						LocalDate date = (LocalDate) l;
+						DayOfWeek dayOfWeek = date.getDayOfWeek();
+						if (dayOfWeek.equals(DayOfWeek.FRIDAY)) {
+							return date.plusDays(3);
+						} else if (dayOfWeek.equals(DayOfWeek.SATURDAY)) {
+							return date.plusDays(2);
+						} else {
+							return date.plusDays(1);
+						}
+					});
+					System.out.println(with);
+				}
+	6. DateTimeFormatter
+		① 日期格式化
+		② DateTimeFormatter 的 API
+			A. DateTimeFormatter DateTimeFormatter.ISO_DATE：DateTimeFormatter提供了多个ISO标准的时间格式化器
+				LocalDateTime dateTime = LocalDateTime.now();
+				String dateStr = dateTime.format(dft);
+				System.out.println(dateStr);
+			B. DateTimeFormatter DateTimeFormatter.ofPattern(String pattern)：自定义时间格式
+				DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+				String dateTime = dateTimeFormatter.format(LocalDateTime.now());
+				System.out.println(dateTime);
+			C. LocalDateTime LocalDateTime.parse(CharSequence text, DateTimeFormatter formatter)：将时间字符串转换为时间对象
+	7. 时区的处理
+		① Java 8中加入了对时区的支持，带时区的时间分别为：ZonedDate、ZonedTime、ZonedDateTime，其中每个时区都对应着ID，地区ID
+		都为“{区域}/{城市}”的格式，例如：Asia/Shanghai等
+		② ZoneId：该类中包含了所有的时区信息
+		③ ZoneId 的 API
+			A. Set<String> ZoneId.getAvailableZoneIds()：获取所有的时区
+			B. LocalDateTime LocalDateTime.now(ZoneId.of(String ZoneId))：获取指定时区的时间
+				LocalDateTime dateTime = LocalDateTime.now(ZoneId.of("America/New_York"));
+			C. ZonedDateTime dateTime.atZone(ZoneId.of(String ZoneId))：返回与UTC标准时间的时差并且带时区信息的时间
+				LocalDateTime dateTime = LocalDateTime.now(ZoneId.of("America/New_York"));
+				ZonedDateTime zonedDateTime = dateTime.atZone(ZoneId.of("America/New_York"));
+				System.out.println(zonedDateTime); // 2020-11-28T09:49:38.658-05:00[America/New_York]
+			D. java.util.Date 与 java.time.LocalDateTime 的相互转换
+				SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+				DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+				
+				// Date 转换为 LocalDateTime
+				Date date = new Date();
+				System.out.println(sdf.format(date));
+				LocalDateTime dateTime = LocalDateTime.ofInstant(date.toInstant(), ZoneId.systemDefault());
+				System.out.println(dateTime.format(dtf));
+
+				// LocalDateTime 转换为 Date
+				Date date1 = Date.from(dateTime.atZone(ZoneId.systemDefault()).toInstant());
+				System.out.println(sdf.format(date1));
+九、重复注解与类型注解
+	1. 重复注解
+		① 定义一个注解
+			@Repeatable(MyAnnotations.class)
+			@Target({TYPE, FIELD, METHOD, PARAMETER, CONSTRUCTOR, LOCAL_VARIABLE})
+			@Retention(RetentionPolicy.RUNTIME)
+			public @interface MyAnnotation {
+
+				String value() default "LiXL";
+			}
+		② 此时并不能使用重复注解，需要定义重复注解容器
+			@Target({TYPE, FIELD, METHOD, PARAMETER, CONSTRUCTOR, LOCAL_VARIABLE})
+			@Retention(RetentionPolicy.RUNTIME)
+			public @interface MyAnnotations {
+
+				MyAnnotation[] value();
+			}
+		③ 需要在注解类上使用@Repeatable(MyAnnotations.class)指定该注解是可以重复的，并且指明注解容器
+		④ 注：注解类和注解容器的成员方法的名称需要保持一致
+		⑤ 在方法上可重复标注该注解，并且使用反射获取该方法上的注解
+			@Test
+			public void testAnnotation() {
+				Class<AnnotationTest> clazz = AnnotationTest.class;
+				try {
+					Method method = clazz.getMethod("testAnnotations");
+					List<MyAnnotation> myAnnotations = Arrays.asList(method.getAnnotationsByType(MyAnnotation.class));
+					myAnnotations.forEach(a -> System.out.println(a.value()));
+				} catch (NoSuchMethodException e) {
+					e.printStackTrace();
+				}
+			}
+
+			@MyAnnotation("Hello")
+			@MyAnnotation("World")
+			public void testAnnotations() {
+
+			}
+	3. 类型注解：可在参数上使用注解标注
+		① 在注解类上的 @Target 上添加 TYPE_PARAMETER 枚举对象
+		② 在方法的方法的参数走使用该注解
+		③ 相关代码
+			@Repeatable(MyAnnotations.class)
+			@Target({TYPE, FIELD, METHOD, PARAMETER, CONSTRUCTOR, LOCAL_VARIABLE, TYPE_PARAMETER})
+			@Retention(RetentionPolicy.RUNTIME)
+			public @interface MyAnnotation {
+
+				String value() default "LiXL";
+			}
+		
+			public void testAnnotations(@MyAnnotation String value) {
+				System.out.println(value);
+			}
