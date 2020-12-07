@@ -785,30 +785,122 @@
 				}
 			}
 		}
+九、线程八锁
+	1. 题目：判断打印 one、two 还是 three
+		① 两个普通同步方法，两个线程，标准打印，先打印 one，再打印 two
+		② 两个普通同步方法，其中 getOne() 新增 Thread.sleep(3000)，两个线程，标准打印，先打印 one，再打印 two
+		③ 两个普通同步方法，其中 getOne() 新增 Thread.sleep(3000)，新增普通方法 getThree()，三个线程，标准打印，先打印 three，再打印one，最后打印 two
+		④ 两个普通同步方法，其中 getOne() 新增 Thread.sleep(3000)，两个对象，两个线程，标准打印，先打印 two，再打印 one
+		③ 两个同步方法，其中 getOne() 新增 Thread.sleep(3000)，并且是静态方法，两个线程，标准打印，先打印 two，再打印 one
+		⑥ 两个静态同步方法，其中 getOne() 新增 Thread.sleep(3000)，两个线程，标准打印，先打印 one，再打印two
+		⑦ 两个同步方法，其中 getOne() 新增 Thread.sleep(3000)，并且是静态方法，两个对象，两个线程，标准打印，先打印 two，再打印 one
+		⑧ 两个静态同步方法，其中 getOne() 新增 Thread.sleep(3000)，两个对象，两个线程，标准打印，先打印 one，再打印two
+	2. 线程八锁的关键
+		① 非静态方法的锁为 this，静态方法的锁为对应的 Class 实例，不同锁之间没有竞争关系
+		② 某一个时刻内，只能有一个线程持有锁，无论方法有几个，其他线程就会被挂起等待持锁线程释放锁。
+十、线程池
+	1. 提供了一个线程队列，队列中保存着所有等待状态的线程，避免了创建与销毁线程的额外开销，提高响应的速度。
+	2. 线程池的体系结构：
+		java.util.concurrent.Executor：负责线程的使用和调度的根接口
+			|-- ExecutorService：子接口，线程池的主要接口
+				|-- ThreadPoolExecutor：线程池的实现类
+				|-- ScheduledExecutorServer：子接口，负责线程的调度
+					|-- ScheduledThreadPoolExecutor：线程调度的实现类，且继承自ThreadPoolExecutor
+	3. Executors：工具类，用于获取线程池
+		① static ExecutorService newFixedThreadPool(int nThreads)：创建固定大小的线程池
+		② static ExecutorService newCachedThreadPool()：创建缓存线程池，线程池的数量不固定，可以根据需求自动更改数量
+		③ static ExecutorService newSingleThreadExecutor()：创建单个线程的线程池，线程池中的线程只有一个。
+		④ static ScheduledExecutorService newScheduledThreadPool(int corePoolSize)：创建固定大小的线程池，可以延时或者定时的执行任务。
+	4. ExecutorService API：
+		① submit(Runnable task)：为线程池中的线程分配任务，需要传递一个 Runnable 实现类对象
+		② Future<T> submit(Callable<T> task)：为线程池中的线程分配任务，需要传递一个 Callable 实现类对象
+		③ void shutdown()：关闭线程池，不会立即关闭，而是等待线程中的任务完成之后，在关闭时，不会再接收其他任务
+		④ shutdownNow()：立即关闭线程池
+	5. ScheduledExecutorService API：
+		① ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit)：需要传递一个 Runnable 实现类对象，delay：定时调度时长，TimeUnit：时间类型
+		② <V> ScheduledFuture<V> schedule(Callable<V> callable, long delay, TimeUnit unit)：定时调度线程，需要传递一个 Callable 实现类对象
+	6. 举例：
+		① 线程池
+			import java.util.ArrayList;
+			import java.util.List;
+			import java.util.concurrent.*;
 
+			public class ThreadPoolTest {
 
+				public static void main(String[] args) {
 
+					ThreadDemo thread = new ThreadDemo();
+					CallableDemo callableDemo = new CallableDemo();
 
+					ExecutorService pool = Executors.newFixedThreadPool(5);
+					List<Future<Integer>> futures = new ArrayList<>();
 
+					for (int i = 0; i < 10; i++) {
+						//pool.submit(thread);
+						Future<Integer> future = pool.submit(callableDemo);
+						futures.add(future);
+					}
 
+					try {
+						for (Future<Integer> future : futures) {
+							System.out.println(future.get());
+						}
+					} catch (InterruptedException | ExecutionException e) {
+						e.printStackTrace();
+					}
 
+					pool.shutdown();
+				}
+			}
 
+			class CallableDemo implements Callable<Integer> {
 
+				@Override
+				public Integer call() throws Exception {
 
+					int sum = 0;
 
+					for (int i = 0; i <= 100; i++) {
+						sum += i;
+					}
+					return sum;
+				}
+			}
 
+			class ThreadDemo implements Runnable {
 
+				@Override
+				public void run() {
+					for (int i = 0; i < 20; i++) {
+						System.out.println(Thread.currentThread().getName() + ": " + i);
+					}
+				}
+			}
+		② 定时调度线程池
+			import java.util.Random;
+			import java.util.concurrent.*;
 
+			public class ScheduledThreadPoolTest {
 
+				public static void main(String[] args) {
 
+					ScheduledExecutorService pool = Executors.newScheduledThreadPool(5);
 
+					for (int i = 0; i < 10; i++) {
+						Future<Integer> future = pool.schedule(() -> {
+							return new Random().nextInt(100);
+						}, 1, TimeUnit.SECONDS);
 
+						try {
+							System.out.println(future.get());
+						} catch (InterruptedException | ExecutionException e) {
+							e.printStackTrace();
+						}
+					}
 
-
-
-
-
-
+					pool.shutdown();
+				}
+			}
 
 
 
