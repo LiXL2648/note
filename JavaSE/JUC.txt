@@ -1,0 +1,863 @@
+一、Java JUC
+	1. 主要内容
+		① Java JUC简介
+		② volatile关键字--内存可见性
+		③ 原子变量--CAS算法
+		④ ConcurrentHashMap锁分段机制
+		⑤ CountDownLatch 闭锁
+		⑥ 实现Callable接口
+		⑦ Lock同步锁
+		⑧ Condition控制线程通信
+		⑨ 线程八锁
+		⑩ 线程按序交替
+		①① ReadWriteLock读写锁
+		①② 线程八锁
+		①③ 线程池
+		①④ 线程调度
+		①⑤ ForkJoinPool 分支/合并框架，工作窃取
+	2. Java JUC 简介：在Java 5.0 提供了java.util.concurrent（简称 JUC）包，在此包中增加了在并发编程中很常用的
+	实用工具类，用于定义类似于线程的自定义子系统，包括线程池、异步IO和轻量级任务框架。提供可调用的、灵活的线程
+	池。还提供了设计用于多线程的上下文的Conllection实现等。
+二、volatile 关键字与内存可见性
+	1. 当多个线程操作共享数据时，会出现数据不一致，也就是内存可见性，原因是多个线程操作共享数据时，彼此不可见
+		① 相关代码
+			public static void main(String[] args) {
+				ThreadTask threadTask = new ThreadTask();
+				new Thread(threadTask).start();
+
+				while (true) {
+					if (threadTask.isFlag()) {
+						System.out.println("Hello World");
+						break;
+					}
+				}
+			}
+			
+			class ThreadTask implements Runnable {
+				private boolean flag = false;
+				@Override
+				public void run() {
+					try {
+						Thread.sleep(300);
+					} catch (InterruptedException e) {
+					}
+					flag = true;
+					System.out.println("flag = " + isFlag());
+				}
+				public boolean isFlag() {
+					return flag;
+				}
+				public void setFlag(boolean flag) {
+					this.flag = flag;
+				}
+			}
+		② 原因分析
+			A. 共享数据保存在主存中，此时启动了两个线程，主线程用于读取共享数据，而子线程用于对共享数据进行写操作，
+			每个线程都有自己的缓存
+			B. 对于子线程，首先会将共享数据存放在缓存中，将其修改完成之后又将该数据更新到主存中
+			C. 对于主线程，同样会将共享数据存放到缓存中，由于子线程等待了200ms，因此主线程中存放的共享数据是没修改之前的，
+			并且主线程中使用的while(true)底层代码去轮询共享数据，该方式轮询的速度极快，导致主线程没机会再次获取主存中已修改的
+			数据
+			D. 导致这种情况的原因就是线程之间操作共享数据时的内存不可见
+		③ 解决该问题的方式之一，在主线程读取共享数据时，使用synchronized同步锁，每次读取共享数据时都刷新主线程的缓存，每次都
+		从主线程中读取数据。但是加上同步锁之后会导致线程的效率非常低
+			while (true) {
+				synchronized (threadTask) {
+					if (threadTask.isFlag()) {
+						System.out.println("Hello World");
+						break;
+					}
+				}
+			}
+	2. volatile关键字修饰：
+		① 当多个线程进行操作共享数据时，可以保证内存中的数据可见，原因是使用volatile关键字后，子线程操作共享数据后会迅速将共享数据
+		更新到缓存中，而主线每次都是从主存中读取数据，相当于操作共享数据是在主存中进行的
+		② 使用volatile关键字会导致执行效率降低，原因是JVM底层会进行重排序，而使用volatile关键字之后，就无法进行重排序，但相较于加锁
+		效率又会高很多。
+		④ 相关代码：private volatile boolean flag = false;
+	3. volatile与synchronized比较
+		① volatile是一种较为轻量级的的同步策略
+		② volatile不具备“互斥性”（“互斥性”是指只能有一个线程持有锁，当线程执行完成释放锁之后，另一个线程才能持有锁），synchronized
+		具备“互斥性”
+		③ volatile不能保证变量“的原子性”
+三、原子变量与CAS算法
+	1. i++ 的原子性问题：
+		① i++ 的操作实际上分成三个步骤“读-改-写”
+			int i = 10;
+			i++;
+			等价于
+			
+			int i = 10;
+			int temp = i;
+			i = i + 1;
+			i = temp;
+		② i++ 的原子性问题重现
+			A. 相关代码：
+				public class AtomicTest {
+					public static void main(String[] args) {
+						AtomicDemo atomicDemo = new AtomicDemo();
+						for (int i = 0; i < 10; i++) {
+							new Thread(atomicDemo).start();
+						}
+					}
+				}
+
+				class AtomicDemo implements Runnable {
+					private int seriaNum = 0;
+					public int getSeriaNum() {
+
+						return seriaNum++;
+					}
+					@Override
+					public void run() {
+						try {
+							Thread.sleep(200);
+						} catch (InterruptedException e) {
+						}
+						System.out.println(Thread.currentThread().getName() + ": " + getSeriaNum());
+					}
+				}
+			B. 运行结果
+				Thread-0: 1
+				Thread-1: 0
+				Thread-2: 0
+				Thread-7: 1
+				Thread-8: 3
+				Thread-6: 2
+				Thread-9: 4
+				Thread-3: 5
+				Thread-4: 6
+				Thread-5: 7
+			C. 结论：出现重复数据，变量出现原子性问题，从而导致多线程安全问题
+		③ i++原子性问题原因分析：
+			A. 该问题与内存不可见性相似
+			B. 多个线程共同对共享数据进行自增操作首先会把在主存中的共享数据存放在线程的缓存中，自增完之后会将共享数据更新到主存中
+			C. 其他线程操作共享数据时，可能操作的是前一个线程还未更新的的数据，由此造成变量的原子性问题
+			D. 由于是多个线程同时对共享数据进行自增（同时具备“读-改-写”操作，不可分割，因此称之为原子性）操作，因此变量的原子性不是
+			内存不可见性的问题，不能使用volatile关键字（具备内存可见性，不具备“原子性”和“互斥性”，会将自增变量的“读-改-写”操作分割开）
+	2. 原子变量
+		① JDK 1.5 以后 java.util.concurrent.atomic 包下提供了常用的原子变量等
+			A. AtomicInteger
+			B. AtomicIntegerArray
+			C. AtomicLong
+			D. AtomicLongArray
+			E. AtomicBoolean
+			F. AtomicReference
+		② 原子变量包含以下属性：
+			A. volatile：保证变量的内存可见性
+			B. CAS（compare-and-swap）算法：保证数据的原子性
+		③  CAS 算法
+			A. CAS 算法是硬件对于并发操作共享数据的支持，针对多处理器操作而设计的处理器中的一种特殊指令，用于管理对共享数据的并发访问，
+			CAS是一种无锁的非阻塞算法的实现
+			B. CAS 算法包括了三个操作数
+				a. 需要读写的内存值：V
+				b. 进行比较的值（预估值）：A
+				c. 拟写入的值（更新值）：B
+				d. 三个操作数的关系是：当且仅当 V 的值等于 A 时，CAS 通过原子方式用新值 B 来更新 V 的值，否则不进行任何操作
+			C. CAS 算法的执行流程：
+				a. 首先由于原子变量使用了volatile，保证了变量的内存可见性，即对变量的操作相当于在主存中操作
+				b. 但当一个线程将要对共享数据进行操作时，会读取主存中的共享数据存放到V中
+				c. 接着会同时从主存中读取共享数据放到A中并且更新V为B值，该步骤是同步进行的，不会发生阻塞
+				d. 当判断V与A相等时，会将B的值更新到主存中，当c步骤中从读取的预估值已经被其他线程更新了，此时预估值A与V不相等，则不会进行任何操作，
+				由于比较和替换是同步进行的，则保证了变量的原子性
+				e. CAS 算法的执行效率比加锁要快，原因是加锁时有多个线程会发生阻塞，而CAS算法不会发生阻塞，当线程对变量更新失败后，会紧接着执行相同
+				的步骤对共享数据进行比较和更新
+			D. AtomicInteger 的 API
+				a. AtomicInteger()：构造函数，默认起始值为0
+				b. AtomicInteger(int initialValue)：构造函数，初始化起始值
+				c. getAndIncrement()：先获取变量值，再自增，等价于 i++
+				d. getAndDecrement()：先获取变量值，再自减，等价于 i--
+				e. getAndAdd(int delta)：先获取变量值，再加上delta
+				f. getAndDecrement(int delta)：先获取变量值，再减去delta
+				g. incrementAndGet()：先自增，再获取变量值，等价于 ++i
+				h. decrementAndGet()：先自减，再获取变量值，等价于 --i
+				i. addAndGet(int delta)：先加上delta，再获取变量值
+				j. decrementAndGet(int delta)：先减去delta，再获取变量值
+				k. boolean compareAndSet(int expect, int update)：核心方法，先比较再替换，需要传递预估值和将要更新的值
+		④ 模拟 CAS 算法
+			public class CompareAndSwapTest {
+
+				public static void main(String[] args) {
+					CompareAndSwap compareAndSwap = new CompareAndSwap();
+					for (int i = 0; i < 10; i++) {
+						final int j = i;
+						new Thread(() -> {
+							while (!compareAndSwap.compareAndSet(compareAndSwap.getValue(), j));
+						}).start();
+					}
+				}
+			}
+
+			class CompareAndSwap {
+				private int value = 0;
+
+				// 获取内存值
+				public synchronized int getValue() {
+					return value;
+				}
+
+				// 比较和替换
+				public synchronized int compareAndSwap(int expecte, int newValue) {
+					// 先获取内存值
+					int oldValue = this.getValue();
+
+					if (expecte == oldValue) {
+						this.value = newValue;
+						System.out.println(Thread.currentThread().getName() + ": " + this.value);
+					}
+
+					return oldValue;
+				}
+
+				// 是否修改成功
+				public synchronized boolean compareAndSet(int expecte, int newValue) {
+					return expecte == this.compareAndSwap(expecte, newValue);
+				}
+			}
+二、ConcurrentHashMap 锁分段机制
+    1. ConcurrentHashMap
+        ① Java 5.0 在 java.util.concurrent 包中提供了多种并发容器类来改进同步容器的性能
+        ② ConcurrentHashMap 同步容器类是 Java 5 增加的一个线程安全的哈希表。对与多线程的操作，介于 HashMap 与 Hashtable 之间。
+        内部采用“锁分段”机制替代 Hashtable 的独占锁，进而提高性能
+        ③ 此包还提供了设计用于多线程上下文的 Collection 实现：ConcurrentHashMap、ConcurrentSkipListMap、ConcurrentSkipListSet、
+        CopyOnWriteArrayList 和 CopyOnWriteArraySet。当期望许多线程访问一个给定的 collection 时，ConcurrentHashMap 通常优于同步
+        HashMap，ConcurrentSkipListMap 优于同步的 TreeMap。当期望的读数和遍历远远大于列表更新数时，CopyOnWriteArrayList优于同步的ArrayList
+    2. HashMap、ConcurrentHashMap与Hashtable之间的对比
+        ① HashMap、ConcurrentHashMap与Hashtable 底层都是 hash 表
+        ① Hashtable 是效率低线程安全的，当多个线程访问时，Hashtable 会在全局上加锁，即并行操作转换成串行操作，当一个线程完成访问后，下一个线程
+        才能开始访问，造成效率非常低，即便是考虑线程安全的问题，也不会选择Hashtable。对于复合操作（比如：若存在，则删除）可能也存在线程不安全等
+        ① HashMap 是效率高线程不安全的
+        ③ ConcurrentHashMap 介于 HashMap 与 Hashtable 之间，采用了“锁分段”机制。ConcurrentHashMap 存在一个分段级别 concurrentLevel，默认是16，
+        即把 ConcurrentHashMap 分成了16段，每一段都是一个独立的 hash 表（segment）并且持有独立的锁，而一个 hash 表 也分成了16段，每一段都是一个
+        独立的链表。当多个线程访问 ConcurrentHashMap，能够并行访问每一个 ConcurrentHashMap 段，因此ConcurrentHashMap线程安全而且效率高。Java 8
+        以后取消了 ConcurrentHashMap 的锁分段机制，改成 CAS 算法，即无锁状态。
+    3. CopyOnWriteArrayList 和 CopyOnWriteArraySet
+        ① 写入并复制
+        ② 传统的 Collections 工具类提供创建的同步集合在多线程的并发修改时会产生异常，举例：
+            public class CopyOnWriterArrayListTest {
+
+                public static void main(String[] args) {
+                    CopyOnWriterArrayThread thread = new CopyOnWriterArrayThread();
+
+                    for (int i = 0; i < 10; i++) {
+                        new Thread(thread).start();
+                    }
+                }
+            }
+
+            class CopyOnWriterArrayThread implements Runnable {
+
+                private static List<String> list = Collections.synchronizedList(new ArrayList<>());
+
+                static {
+                    list.add("AAA");
+                    list.add("BBB");
+                    list.add("CCC");
+                }
+
+                @Override
+                public void run() {
+                    Iterator<String> iterator = list.iterator();
+
+                    while (iterator.hasNext()) {
+                        System.out.println(iterator.next());
+
+                        list.add("DDDD");
+                    }
+                }
+            }
+        ③ 使用 CopyOnWriteArrayList 和 CopyOnWriteArraySet 替代同步集合，可以解决并发修改异常，在底层代码中，首先会对当前集合进行
+        复制，再把需要写入的数据添加到新的集合，最后用新的集合替代旧的集合。得出的结论是：CopyOnWriteArrayList 和 CopyOnWriteArraySet
+        不适合进行频繁更新的情况，因为每次更新时，都会进行复制，开销大，效率低，但是适合遍历或者并发遍历更新频繁的情况。
+            private static CopyOnWriteArrayList list = new CopyOnWriteArrayList<>();
+三、CountDownLatch：闭锁
+    1. CountDownLatch
+        ① Java 5.0 在 java.util.concurrent 包中提供了多种并发容器类来改进同步容器的性能
+        ② CountDownLatch 是一个同步辅助类，在完成一组正在其他线程中执行的某些操作之前，它允许一个或者多个线程一直等待
+        ③ 闭锁可以延迟线程的进度直到其达到终止状态，闭锁可以用来确保某些活动直到其他活动都完成才继续执行
+            A. 确保某个计算在其需要的所有资源都被初始化之后才继续执行
+            B. 确保某个服务在其依赖的所有其他服务都已经启动之后才启动
+            C. 等待直到某个操作所有参与者都准备就绪再继续执行
+    2. API：
+        ① CountDownLatch(int count):]：构造函数，需要指定线程的个数
+        ② await()：主线程等待分线程执行
+        ③ countDown()：每个线程执行完毕时闭锁数需要递减一，线程执行完毕之后必须执行，需要放在 finally 块中
+    3 举例：只有在所有分线程执行完毕之后再执行主线程
+        public class CountDownLatchTest {
+
+            public static void main(String[] args) {
+
+                CountDownLatch countDownLatch = new CountDownLatch(5);
+                CountDownLatchThread thread = new CountDownLatchThread(countDownLatch);
+                LocalDateTime start = LocalDateTime.now();
+
+                for (int i = 0; i < 5; i++) {
+                    new Thread(thread).start();
+                }
+
+                try {
+                    countDownLatch.await();
+                } catch (InterruptedException e) {
+                }
+                LocalDateTime end = LocalDateTime.now();
+                System.out.println("消耗的时间为：" + Duration.between(start, end).toMillis());
+            }
+        }
+
+        class CountDownLatchThread implements Runnable {
+
+            CountDownLatch countDownLatch;
+
+            public CountDownLatchThread(CountDownLatch countDownLatch) {
+                this.countDownLatch = countDownLatch;
+            }
+
+            @Override
+            public void run() {
+
+                synchronized (this) {
+                    System.out.println(Thread.currentThread().getName());
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                    } finally {
+                        countDownLatch.countDown();
+                    }
+                }
+            }
+        }
+四、创建执行线程：
+    1. 创建多线程方式一：继承与java.lang.Thread类
+        ① 创建一个继承于Thread的子类
+        ② 重写Thread类的run()方法，方法内实现此子类需要完成的功能
+        ③ 创建一个子类的对象
+        ④ 调用线程的start()方法：启动此线程；调用相应的run()方法。
+        ⑤ 一个线程只能执行一次start()方法、不能通过通过Thread类的继承继承类对象run()启动一个线程
+    2. 创建多线程方式二：实现Runnable接口：
+       	① 创建一个实现Runnable接口的类
+       	② 实现Runnable接口的抽象方法，实现某个功能
+       	③ 创建Runnable接口实现类的对象
+       	④ 将此对象作为形参传递到Thread的构造器中，创键Thread类的对象，此对象即为一个线程
+       	⑤ 调用start()方法，启动线程
+    3. 创建多线程方式三：实现
+        ① 创建一个实现 Callable 接口的类，需要指定泛型
+        ② 实现 Callable 接口的 call() 方法，返回值为指定的泛型，并且能够抛出异常
+        ③ 创建实现 Callable 接口的类的对象
+        ④ 创建一个实现了 Future 接口的类 FutureTask 的对象，将 Callable 的对象作为参数传给FutureTask，用于接收 call() 方法的返回值
+        ⑤ 创建一个 Thread 对象，将 FutureTask 的对象传到 Thread 中，并调用 Thread 对象的 start() 方法开启线程
+        ⑥ 调用 FutureTask 对象的 get() 方法可以获取 Callable 对象的call() 方法 的返回值，需要抛出异常
+        ⑦ 注意：FutureTask 可用于闭锁
+        ⑧ 举例：
+            public class CallableTest {
+
+                public static void main(String[] args) {
+                    CallableThread callable = new CallableThread();
+
+                    FutureTask task = new FutureTask(callable);
+
+                    new Thread(task).start();
+
+                    try {
+                        Object result = task.get();
+                        System.out.println(result);
+                        System.out.println("结果执行完毕");
+                    } catch (InterruptedException | ExecutionException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+
+            class CallableThread implements Callable<Long> {
+
+                @Override
+                public Long call() throws Exception {
+                    long sum = 0;
+                    for (int i = 0; i <= 100; i++) {
+                        System.out.println(i);
+                        sum += i;
+                    }
+                    return sum;
+                }
+            }
+    4. java.lang.Thread、Runnable 接口和 Callable 接口区别与联系
+       	① 联系：继承 Thread 类、实现 Runnable 接口或者用于接收实现了 Callable 的抽象方法 call() 方法返回值的 FutureTask的类
+       	直接或者间接地实现了Runable接口
+       	② 区别：实现Runnable接口实现多线程的方式多于继承Thread类的方式
+            A. 避免了java中单继承的局限性
+            B. 解决了多个线程公用同一个资源的问题
+        ③ Callable 接口的抽象方法有返回值，并且用于接收 Callable 对象的 call() 方法返回值的 FutureTask 可用于 闭锁
+五、同步锁Lock
+    1. 用于解决多线程安全问题的方式
+        ① 同步代码块（）
+        ② 同步方法（synchronized）
+        ③ 同步锁 Lock（JDK1.5 以后）
+        ④ 注：同步代码块和同步方法都需要使用到 synchronized 关键字，是一个隐式锁，而同步锁是一个显式锁
+    2. API：
+		① ReentrantLock()：构造函数，获取一个 Lock 接口的对象
+        ① lock()：给当前线程加锁
+        ② unlock()：给当前线程解锁
+    3. 举例：买票
+        public class LockTest {
+
+            public static void main(String[] args) {
+                SellTicket sellTicket = new SellTicket();
+                new Thread(sellTicket, "一号窗口").start();
+                new Thread(sellTicket, "二号窗口").start();
+                new Thread(sellTicket, "三号窗口").start();
+            }
+        }
+
+        class SellTicket implements Runnable {
+
+            private int ticketNum = 100;
+
+            private Lock lock = new ReentrantLock();
+            @Override
+            public void run() {
+                while (ticketNum > 0) {
+                    lock.lock();
+                    try {
+                        System.out.println(Thread.currentThread().getName() + "完成售票，余票为：" + --ticketNum);
+                    } finally {
+                        lock.unlock();
+                        try {
+                            Thread.sleep(200);
+                        } catch (InterruptedException e) {
+                        }
+                    }
+                }
+            }
+        }
+	4. 生产者和消费者案例：使用 synchronized 和 Object 类中的等待唤醒机制
+		① 创建流程：
+			A. 店员类：提供进货和卖货的方法，由于出现多线程操作共享数据，所以需要对方法进行加锁
+			B. 生产者类：实现 Runnable 接口，实现run()通知店员进货，
+			C. 消费者类：实现 Runnable 接口，实现run()通知店员卖货
+		② 注意：
+			A. 当店员的货物已满时，应让生产者等待生产，当货物没进满时，应让生产者唤醒继续生产
+			B. 当店员的货物卖完时，应让消费者等待消费，当货物没卖完时，应让消费者唤醒继续消费
+			C. 假如消费者还有一次循环，消费者还有两次循环，并且由消费者抢到锁，此时如果店员产品数为0时，消费者线程进入等待
+			并且释放锁，而由生产者抢到锁，生产者第一次循环时生产了一个商品，并唤醒了消费者线程，但是消费者线程此时没有循环，
+			结束线程，生产者再次获取锁时，由于产品数已满，而进入等待，而该等待却没有其他线程唤醒，只能进入无限地等待中。产生
+			该问题的原因是 if..else，当唤醒之后让其他线程必须执行else中的语句，即去除 else 逻辑。再次执行，两个线程顺利结束。
+			D. 当分别增加生产者和消费者进程时，会产生一个产品数超出阈值的现象。原因是假如两个消费者线程由于产品数不足同时进
+			入等待，而生产者线程生产了产品后唤醒了消费者线程，两个线程同时进行消费，此时就会产生产品数低于阈值的现象，该现象
+			称之为虚假唤醒。在JDK API文档中，对于等待唤醒有段描述：在某个版本中，中断和虚假唤醒可能存在，因此该方法应总是使用
+			在循环中。
+		③ 举例：
+			public class ProductorAndConsumer {
+
+				public static void main(String[] args) {
+
+					Clerk clerk = new Clerk();
+
+					Productor productor = new Productor(clerk);
+					Consumer consumer = new Consumer(clerk);
+
+					new Thread(productor, "生产者 A").start();
+					new Thread(consumer, "消费者 B").start();
+
+					new Thread(productor, "生产者 C").start();
+					new Thread(consumer, "消费者 D").start();
+				}
+			}
+
+			class Clerk {
+				private int product = 0;
+
+				public synchronized void getProduct() {
+					while (product >= 1) {
+						System.out.println("产品已满");
+						try {
+							this.wait();
+						} catch (InterruptedException e) {
+						}
+					}
+					System.out.println(Thread.currentThread().getName() + ": " + ++product);
+					this.notifyAll();
+				}
+
+				public synchronized void sale() {
+					while (product <= 0) {
+						System.out.println("产品已卖完");
+						try {
+							this.wait();
+						} catch (InterruptedException e) {
+						}
+					}
+					System.out.println(Thread.currentThread().getName() + ": " + --product);
+					this.notifyAll();
+				}
+			}
+
+			class Productor implements Runnable {
+
+				private Clerk clerk;
+
+				public Productor(Clerk clerk) {
+					this.clerk = clerk;
+				}
+
+				@Override
+				public void run() {
+					for (int i = 0; i < 10; i++) {
+						clerk.getProduct();
+					}
+				}
+			}
+
+			class Consumer implements Runnable {
+
+				private Clerk clerk;
+
+				public Consumer(Clerk clerk) {
+					this.clerk = clerk;
+				}
+
+				@Override
+				public void run() {
+					for (int i = 0; i < 10; i++) {
+						try {
+							Thread.sleep(200);
+						} catch (InterruptedException e) {
+						}
+						clerk.sale();
+					}
+				}
+			}
+六、Condition
+	1. Condition 控制线程通信
+		① Condition 接口描述了可能会与锁有关联的条件变量。这些变量在用法上与使用 Object.wait() 访问的隐式监视器类似，但提供
+		了更加强大的功能。需要特别指出的是，单个 Lock 可能与多个 Condition 对象关联。为了避免兼容性问题，Condition 方法名与
+		对应的Object版本中的不同
+		② 在Condition 对象中，与wait、notify 和 notifyAll 方法对应的分别是await、signal 和 signalAll。
+		③ Condition 实例实质上被绑定到了一个锁上。要为特定 Lock 实例获得 Condition 实例，使用其 newCondition() 方法。
+	2. 生产者和消费者案例：使用 Lock 和 Condition
+		import java.util.concurrent.locks.Condition;
+		import java.util.concurrent.locks.Lock;
+		import java.util.concurrent.locks.ReentrantLock;
+
+		public class ProductorAndConsumer {
+
+			public static void main(String[] args) {
+
+				Clerk clerk = new Clerk();
+
+				Productor productor = new Productor(clerk);
+				Consumer consumer = new Consumer(clerk);
+
+				new Thread(productor, "生产者 A").start();
+				new Thread(consumer, "消费者 B").start();
+
+				new Thread(productor, "生产者 C").start();
+				new Thread(consumer, "消费者 D").start();
+			}
+		}
+
+		class Clerk {
+			private int product = 0;
+
+			private Lock lock = new ReentrantLock();
+			private Condition condition = lock.newCondition();
+
+			public void getProduct() {
+				lock.lock();
+
+				try {
+					while (product >= 1) {
+						System.out.println("产品已满");
+						try {
+							condition.await();
+						} catch (InterruptedException e) {
+						}
+					}
+					System.out.println(Thread.currentThread().getName() + ": " + ++product);
+					condition.signalAll();
+				} finally {
+					lock.unlock();
+				}
+			}
+
+			public void sale() {
+				lock.lock();
+
+				try {
+					while (product <= 0) {
+						System.out.println("产品已卖完");
+						try {
+							condition.await();
+						} catch (InterruptedException e) {
+						}
+					}
+					System.out.println(Thread.currentThread().getName() + ": " + --product);
+					condition.signalAll();
+				} finally {
+					lock.unlock();
+				}
+
+			}
+		}
+
+		class Productor implements Runnable {
+
+			private Clerk clerk;
+
+			public Productor(Clerk clerk) {
+				this.clerk = clerk;
+			}
+
+			@Override
+			public void run() {
+				for (int i = 0; i < 10; i++) {
+					clerk.getProduct();
+				}
+			}
+		}
+
+		class Consumer implements Runnable {
+
+			private Clerk clerk;
+
+			public Consumer(Clerk clerk) {
+				this.clerk = clerk;
+			}
+
+			@Override
+			public void run() {
+				for (int i = 0; i < 10; i++) {
+					try {
+						Thread.sleep(200);
+					} catch (InterruptedException e) {
+					}
+					clerk.sale();
+				}
+			}
+		}
+七、线程按序交替
+	1. 编写一个程序，开启 3 个线程，这三个线程的 ID 分别为 A、B 和 C，每个线程将自己的 ID 在屏幕上打印 10 遍，
+	要求输出的结果必须按顺序显示。如：ABCABCABC…… 依次递归。
+	2. 代码：
+		import java.util.concurrent.locks.Condition;
+		import java.util.concurrent.locks.Lock;
+		import java.util.concurrent.locks.ReentrantLock;
+
+		public class ABCAlternate {
+
+			public static void main(String[] args) {
+				Alternate alternate = new Alternate();
+
+				new Thread(() -> {
+					for (int i = 0; i < 10; i++) {
+						alternate.loopA();
+					}
+				}).start();
+
+				new Thread(() -> {
+					for (int i = 0; i < 10; i++) {
+						alternate.loopB();
+					}
+				}).start();
+
+				new Thread(() -> {
+					for (int i = 0; i < 10; i++) {
+						alternate.loopC();
+					}
+				}).start();
+			}
+		}
+
+		class Alternate {
+
+			private int num = 1;
+
+			private Lock lock = new ReentrantLock();
+			private Condition conditionA = lock.newCondition();
+			private Condition conditionB = lock.newCondition();
+			private Condition conditionC = lock.newCondition();
+
+			public void loopA() {
+				lock.lock();
+
+				try {
+					if (num != 1) {
+						try {
+							conditionA.await();
+						} catch (InterruptedException e) {
+						}
+					}
+
+					System.out.print("A");
+					num = 2;
+					conditionB.signal();
+				} finally {
+					lock.unlock();
+				}
+			}
+
+			public void loopB() {
+				lock.lock();
+
+				try {
+					if (num != 2) {
+						try {
+							conditionB.await();
+						} catch (InterruptedException e) {
+						}
+					}
+
+					System.out.print("B");
+					num = 3;
+					conditionC.signal();
+				} finally {
+					lock.unlock();
+				}
+			}
+
+			public void loopC() {
+				lock.lock();
+
+				try {
+					if (num != 3) {
+						try {
+							conditionC.await();
+						} catch (InterruptedException e) {
+						}
+					}
+
+					System.out.print("C");
+					num = 1;
+					conditionA.signal();
+				} finally {
+					lock.unlock();
+				}
+			}
+		}
+八、ReadWriterLock
+	1. ReadWriterLock：读写锁
+		① 读写锁包含一对相关的锁，读锁用于只读操作，写锁用于写操作。读锁可能由多个读线程同时运行，写锁是唯一的。
+		② 读锁和写锁之间是互斥的，同一时间只能有一个在运行。但是可以有多个线程同时读取数据。
+	2. 读写锁机制
+		① 读-读不互斥
+		② 读-写互斥
+		③ 写-写互斥
+	3. 代码：
+		import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+		public class ReadWriteLockTest {
+
+			public static void main(String[] args) {
+
+				ReadWriteLockDemo readWriteLockDemo = new ReadWriteLockDemo();
+
+				new Thread(() -> readWriteLockDemo.write(26), "Write-0").start();
+
+				new Thread(() -> readWriteLockDemo.write(48), "Write-1").start();
+
+				for (int i = 0; i < 10; i++) {
+					new Thread(() -> readWriteLockDemo.read(), "Read-" + i).start();
+				}
+			}
+		}
+		class ReadWriteLockDemo {
+
+			private int num = 0;
+
+			private ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+
+			public void read() {
+				lock.readLock().lock();
+
+				try {
+					System.out.println(Thread.currentThread().getName() + ": " + num);
+				} finally {
+					lock.readLock().unlock();
+				}
+			}
+
+			public void write(int num) {
+				lock.writeLock().lock();
+
+				try {
+					this.num = num;
+					System.out.println(Thread.currentThread().getName() + ": " + this.num);
+				} finally {
+					lock.writeLock().unlock();
+				}
+			}
+		}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
