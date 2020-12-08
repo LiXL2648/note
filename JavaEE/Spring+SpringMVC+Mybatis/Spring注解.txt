@@ -850,7 +850,7 @@
 					})
 					public class RootConfig {}
 				g. maven项目发布到tomcat后没有lib目录解决方案
-					(1) 右键项目选择Properties，选择M有Eclipse，选择Deploment Asseml，点击Add添加Java Build Path Entries
+					(1) 右键项目选择Properties，选择MyEclipse，选择Deploment Asseml，点击Add添加Java Build Path Entries
 					(2) 点击Apply和OK完成设置
 		② 定制与接管SpringMVC
 			A. 在SpringMVC的配置类上使用@EnableWebMvc注解，开启SpringMVC定制配置功能，该配置相当于使用<mvc:annotation-driven/>

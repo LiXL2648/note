@@ -1,0 +1,164 @@
+一、搭建JavaEE 环境
+	1. 概述
+		① 原理：在Windows系统下，如果想通过浏览器访问Linux系统下的服务器，必须构建JavaEE环境
+		包括：JDK、Tomcat、MySQL、Eclipse等
+		② 准备工作
+			A. 下载JDK：jdk-8u211-linux-i586.tar.gz，官网为：http://www.oracle.com
+			B. 下载Tomcat：apache-tomcat-9.0.20.tar.gz，官网为：http://tomcat.apache.org/
+			C. 下载eclipse：eclipse-inst-linux64.tar.gz，官网为：https://www.eclipse.org/
+			D. 下载MySQL：mysql-5.6.14.tar.gz
+		③ 将软件安装包上传到/opt 下：使用Xftp6
+	2. 安装JDK：
+		① 解压JDK到 /opt/下：tar -zxvf jdk1.7.0_79.tar.gz
+		② 配置环境变量的配置文件vim /etc/profile
+			export JAVA_HOME=/opt/jdk1.7.0_79
+			export JAVA_BIN=/opt/jdk1.7.0_79/bin
+			export PATH=$PATH:$JAVA_HOME/bin
+			export CLASSPATH=.:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar
+		③ 需要注销用户，环境变量才能生效。
+		⑥ 至此在任何目录下都可以执行javac 和 java 命令
+	3. 安装Tomcat：
+		① 解压Tomcat 到/opt/ 下：tar -zxvf apache-tomcat-7.0.70.tar.gz 
+		② 进入 bin/下开启服务： cd /opt/apache-tomcat-7.0.70/bin → ./startup.sh
+		③ 测试在本地进入Tomcat主页：在本地浏览器输入：http://localhost:8080，一般可以成功
+		④ 使用dos命令行：telnet CentOS的ip 8080，发现无法连接成功，进入CentOS6终端查看端口号
+		netstat -anp | grep 8080，发现其端口号没有开放
+		⑤ 开放端口8080 ,这样外网才能访问到tomcat，进入：vim /etc/sysconfig/iptables，复制一行
+		并修改其端口号为8080，重启防火墙：service iptables restart，在使用dos命令行：telnet CentOS的ip 8080，连接成功。
+		⑥ 使用Windows浏览器访问虚拟机地址：CentOSip:8080，一般也可以访问成功
+		⑦ 配置Tomcat的环境变量（不知有什么用），进入：vim /etc/profile，输入
+		export TOMCAT_HOME=/usr/local/tomcat
+		export PATH=$PATH:$TOMCAT_HOME/bin
+		保存退出，并重启
+	4. 安装eclipse：
+		① 解压eclipse到 /opt/ tar -zxvf eclipse-jee-mars-2-linux-gtk-x86_64.tar.gz
+		② 进入 eclipse/ 目录，打开eclipse：./eclipse
+	5. CentOS 6.8下编译安装MySQL 5.6.14：
+		① 概述：通过源代码安装高版本的5.6.14。
+		② 正文：
+			A. 卸载旧版本：使用下面的命令检查是否安装有MySQL Server
+			rpm -qa | grep mysql
+				a. 目前我们查询到的是这样的：
+					mysql-libs-5.1.73-7.el6.x86_64
+				b. 如果查询到了，就删除它
+					rpm -e mysql_libs   //普通删除模式
+					rpm -e --nodeps mysql_libs    // 强力删除模式，如果使用上面命令删除时，
+					提示有依赖的其它文件，则用该命令可以对其进行强力删除
+			B. 安装MySQL：
+				a. 安装编译代码需要的包
+				yum -y install make gcc-c++ cmake bison-devel  ncurses-devel
+				b. 下载MySQL 5.6.14
+				c. 解压MySQL 5.6.14.tar.gz: tar xvf mysql-5.6.14.tar.gz
+				d. 进入mysql-5.6.14/ 目录编译源码，如下(直接复制):
+				cmake -DCMAKE_INSTALL_PREFIX=/usr/local/mysql -DMYSQL_DATADIR=/usr/local/mysql/data -DSYSCONFDIR=/etc -DWITH_MYISAM_STORAGE_ENGINE=1 -DWITH_INNOBASE_STORAGE_ENGINE=1 -DWITH_MEMORY_STORAGE_ENGINE=1 -DWITH_READLINE=1 -DMYSQL_UNIX_ADDR=/var/lib/mysql/mysql.sock -DMYSQL_TCP_PORT=3306 -DENABLED_LOCAL_INFILE=1 -DWITH_PARTITION_STORAGE_ENGINE=1 -DEXTRA_CHARSETS=all -DDEFAULT_CHARSET=utf8 -DDEFAULT_COLLATION=utf8_general_ci
+				e. 编译并安装: make && make install(&&：指的是先执行make再执行make install，也可以分开执行)
+				f. 整个过程需要30分钟左右……漫长的等待
+			C. 配置MySQL
+				a. 设置权限
+					(1) 使用下面的命令查看是否有mysql用户及用户组
+						cat /etc/passwd 查看用户列表
+						cat /etc/group  查看用户组列表
+					(2) 如果没有就创建
+						groupadd mysql
+						useradd -g mysql mysql
+					(3) 修改/opt/mysql-5.6.14权限: chown -R mysql:mysql /usr/local/mysql（安装版一般都是在/usr/local/目录下）
+				b. 初始化配置，进入安装路径（cd /usr/local/mysql，在执行下面的指令），执行初始化配置脚本，创建系统自带的数据库和表
+					(1) cd /usr/local/mysql
+					(2) scripts/mysql_install_db --basedir=/usr/local/mysql --datadir=/usr/local/mysql/data --user=mysql
+				c. 注意：
+					(1) 在启动MySQL服务时，会按照一定次序搜索my.cnf，先在/etc目录下找，找不到则会搜索"$basedir/my.cnf"，
+					在本例中就是 /usr/local/mysql/my.cnf，这是新版MySQL的配置文件的默认位置！
+					(2) ：在CentOS 6.8版操作系统的最小安装完成后，在/etc目录下会存在一个my.cnf，需要将此文件更名为其他的名字，
+					如：/etc/my.cnf.bak，否则，该文件会干扰源码安装的MySQL的正确配置，造成无法启动。
+					(3) 修改名称，防止干扰(如果不存在该文件，则不需要修改)：mv /etc/my.cnf /etc/my.cnf.bak
+				d. 启动MySQL
+					(1) 添加服务，拷贝服务脚本到init.d目录，并设置开机启动(以下命令在/usr/local/mysql 下执行)
+						cp support-files/mysql.server /etc/init.d/mysql
+						chkconfig mysql on
+						service mysql start(启动MySQL)
+					(2)执行下面的命令修改root密码
+						cd /usr/local/mysql/bin
+						./mysql -u root -p
+						 SET PASSWORD = PASSWORD('root');
+
+				e. 至此MySQL安装步骤结束，MySQL可以正常使用
+			D. 简单使用：
+				a. 查看数据库：show databases
+				b. 创建一个数据库：create database myemployees
+				c. 退出mysql服务：quit
+				!
+				!
+			E.  配置MySQL的环境变量		
+				export PATH=$PATH:/usr/local/mysql/bin
+			F.  使环境变量配置生效
+				source /etc/profile
+二、安装git
+	1. yum安装
+		① 在Linux上是有yum安装Git，只需要一行命令：yum -y install git
+		② 输入 git --version查看Git是否安装完成以及查看其版本号，yum安装git被安装在/usr/libexec/git-core目录下
+		③ 使用yum安装的Git版本低并且不能控制版本
+	2. 从GitHub上下载最新的源码编译后安装
+		① 下载Git源码
+			wget https://github.com/git/git/archive/v2.27.0.tar.gz
+		② 解压下载得到的v2.27.0.tar.gz压缩包
+			tar -zxvf v2.27.0.tar.gz -C /usr/local/src/
+		③ 进入解压后得到的文件夹
+			cd /usr/local/src/git-2.27.0/
+		④ 安装编译所需要的依赖：
+			yum install curl-devel expat-devel gettext-devel openssl-devel zlib-devel gcc perl-ExtUtils-MakeMaker -y
+		⑤ 安装编译源码所需依赖的时候，yum自动帮你安装了git，这时候你需要先卸载这个旧版的git：
+			yum -y remove git
+		⑥ 编译git源码
+			make prefix=/usr/local/git all
+		⑦ 安装git至/usr/local/git路径
+			make prefix=/usr/local/git install
+		⑧ 配置环境变量，在底部加上
+			vim /etc/profile 
+			export PATH=$PATH:/usr/local/git/bin
+		⑨ 刷新环境变量
+			source /etc/profile
+		⑩ 查看Git是否安装完成
+			git --version
+	3. 至此，从github上下载最新的源码编译后安装git完成。
+三、安装docker-compose
+	1 下载：docker-compose
+		sudo curl -L "https://github.com/docker/compose/releases/download/1.24.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+	2 将下载得到的docker-compose赋予执行权限
+		sudo chmod +x /usr/local/bin/docker-compose
+	3. 在/usr/bin/中创建docker-compos的快捷方式
+		sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+	4 查看docker-compose版本信息
+		docker-compose -v
+
+四、Centos7 源码安装 MySQL5.7.30
+	1. MySQL官网下载链接：https://downloads.mysql.com/archives/community/
+	2. 下载
+		① Product Version；5.7.30
+		② Operating System：Source Code
+		③ OS Version：Generice Linux(Architecture Independent)
+		② 注：Mysql5.7版本更新后有很多变化，连编译安装都有变化，而MySQL5.7的安装必须要boost库，不过MySQL的官网源码有带boost库的源码和不带boost库的源码两种，因此有两种安装方式，
+		其实都是一样的，如果选择不带boost库源码的需要在安装MySQL之前单独安装boost，并在编译时指定boost的安装目录，选择带boost的版本，则不需要提前安装boost，只需要在cmake编译
+		时带上参数-DWITH_BOOST=boost即可。
+	3. 安装环境：
+		① 安装 libaio， libaio 包的作用是为了支持同步I/O，对于数据库之类的系统特别重要。
+			yum install -y libaio
+		② 安装 cmake，CMake是一个跨平台的安装（编译）工具。
+			yum install -y cmake
+		③ 安装依赖
+			yum install -y gcc-c++ bison-devel  ncurses-devel  bison perl perl-devel  perl perl-devel
+五、yum安装报错[Errno 256] No more mirrors to try
+	1. 执行命令 yum clean all，清理客户端yum源配置的缓存
+	2. 执行命令 yum makecache，将Linux服务器的包信息下载到本地电脑缓存，makecache来建立一个缓存，后边yum安装在缓存中搜索，提高速度
+
+
+
+
+
+
+
+
+
+
+
+			
+

@@ -94,7 +94,7 @@
 				<template>
 					页面模板
 				</template>
-			B. JS 模块对象
+			B. JS 模块对象，注意：data必须指定为函数，而不是对象
 				<script>
 					export default {
 						data() {return {}},
@@ -111,63 +111,1221 @@
 			A. 引入组件
 			B. 映射成标签
 			C. 使用组件标签
-			D. 代码：
-				<template>
-					<HelloWorld></HelloWorld>
-					<hello-world></hello-world>
-				</template>
-				<script>
-					import HelloWorld from './components/HelloWorld'
-					export default {
-						components: {
-							HelloWorld
-						}
-					}
-				</script>
+			D. demo：
+				A. 目录结构关系
+					|-- src-comment
+						|-- components
+							|-- HelloWorld.vue
+						|-- App.vue
+						|-- main.js
+				B. 代码
+					a. HelloWorld.vue
+						<template>
+						  <div>
+							<p class="msg">{{msg}}</p>
+						  </div>
+						</template>
+
+						<script>
+						  export default {
+							data() {
+							  return {
+								msg: 'Hello Vue'
+							  }
+							}
+						  }
+						</script>
+
+						<style>
+						  .msg {
+							color: red;
+							font-size: 20px;
+						  }
+						</style>
+					b. App.vue 	
+						<template>
+						  <div>
+							<img src="./assets/logo.png" class="logo"/>
+							<!--3. 使用组件标签-->
+							<HelloWorld/>
+						  </div>
+						</template>
+
+						<script>
+						  // 1. 引入组件
+						  import HelloWorld from './components/HelloWorld.vue'
+						  export default {
+							// 2. 映射组件标签
+							components: {
+							  HelloWorld
+							}
+						  }
+						</script>
+
+						<style>
+						  .logo {
+							width: 200px;
+							height: 200px;
+						  }
+						</style>
+					c. main.js
+						/*
+						入口JS：创建Vue实例
+						* */
+						import Vue from 'vue'
+						import App from './App.vue'
+
+						new Vue({
+						  el: '#app',
+						  components: {
+							App
+						  },
+						  template: '<App/>'
+						})
+
 			E. 关于标签名与标签属性名书写问题
 				a. 写法一: 一模一样
 				b. 写法二: 大写变小写, 并用-连接
 
+	5. 组件间通信
+		① 组件间通信基本原则
+			A. 不要在子组件中直接修改父组件的状态数据
+			B. 数据在哪, 更新数据的行为(函数)就应该定义在哪
+		② vue 组件间通信方式
+			A. props
+			B. vue 的自定义事件
+			C. 消息订阅与发布(如: pubsub 库)
+			D. slot
+			E. vuex(后面单独讲)
+	6. 组件间通信1: props
+		① 使用组件标签时：<my-component name='tom' :age='3' :set-name='setName'></my-component>
+		② 定义MyComponent 组件时
+			A. 在组件内声明所有的props
+			B. 方式一: 只指定名称：props: ['name', 'age', 'setName']
+			C. 方式二: 指定名称和类型
+				props: {
+					name: String,
+					age: Number,
+					setNmae: Function
+				}
+			D. 方式三: 指定名称/类型/必要性/默认值
+			props: {
+				name: {type: String, required: true, default:xxx},
+			}
+		③ 注意
+			A. 此方式用于父组件向子组件传递数据
+			B. 所有标签属性都会成为组件对象的属性, 模板页面可以直接引用
+			C. 问题:
+				a. 如果需要向非子后代传递数据必须多层逐层传递
+				b. 兄弟组件间也不能直接props 通信, 必须借助父组件才可以
+		④ demo1：comment manage
+			A. 目录结构关系
+				|-- src-comment
+					|-- components
+						|-- Add.vue
+						|-- Item.vue
+						|-- List.vue
+					|-- App.vue
+					|-- main.js
+			B. 编码
+				a. Add.vue
+					<template>
+						<div>
+						  <div class="col-md-4">
+							<form class="form-horizontal">
+							  <div class="form-group">
+								<label>用户名</label>
+								<input type="text" class="form-control" placeholder="用户名" v-model="name">
+							  </div>
+							  <div class="form-group">
+								<label>评论内容</label>
+								<textarea class="form-control" rows="6" placeholder="评论内容" v-model="content"></textarea>
+							  </div>
+							  <div class="form-group">
+								<div class="col-sm-offset-2 col-sm-10">
+								  <button type="button" class="btn btn-default pull-right" @click="add">提交</button>
+								</div>
+							  </div>
+							</form>
+						  </div>
+						</div>
+					</template>
+
+					<script>
+						export default {
+						  data() {
+							return {
+							  name: '',
+							  content: ''
+							}
+						  },
+						  methods: {
+							add() {
+							  const name = this.name.trim()
+							  const content = this.content.trim()
+							  if(!name || !content) {
+								alert('姓名或者内容不能为空')
+								return
+							  }
+							  const comment = {name: name, content: content}
+
+							  this.addComment(comment)
+							  this.name = ''
+							  this.content = ''
+							}
+						  },
+						  props: {
+							addComment: {//指定属性名/属性值类型/必要性
+							  type: Function,
+							  require: true
+							}
+						  }
+						}
+					</script>
+				b. List.vue
+					<template>
+						<div>
+						  <div class="col-md-8">
+							<h3 class="reply">评论回复：</h3>
+							<h2 v-show="comments.length === 0">暂无评论，点击左侧添加评论！！！</h2>
+							<ul class="list-group">
+							  <Item v-for="(comment, index) in comments" :key="index" :comment="comment" :delComment="delComment" :index="index"/>
+							</ul>
+						  </div>
+						</div>
+					</template>
+
+					<script>
+						import Item from './Item.vue'
+						export default {
+						  components: {
+							Item
+						  },
+						  props: ['comments', 'delComment']// 声明接收属性，只指定属性名
+						}
+					</script>
+
+					<style>
+					  .reply {
+						margin-top: 0px;
+					  }
+					</style>
+				c. Item.vue
+					<template>
+						<div>
+						  <li class="list-group-item">
+							<div class="handle">
+							  <a href="javascript:;" @click="addComment">删除</a>
+							</div>
+							<p class="user"><span >{{comment.name}}</span><span>说:</span></p>
+							<p class="centence">{{comment.content}}</p>
+						  </li>
+						</div>
+					</template>
+
+					<script>
+						export default {
+						  methods: {
+							addComment() {
+							  const {comment, delComment, index} = this
+							  if(window.confirm('确定删除' + comment.name + '的评论')) {
+								delComment(index);
+							  }
+							}
+						  },
+						  props: {
+							comment: Object,//指定属性名和属性值,
+							delComment: Function,
+							index: Number
+						  }
+						}
+					</script>
+				d. App.vue
+					<template>
+						<div>
+						  <header class="site-header jumbotron">
+							<div class="container">
+							  <div class="row">
+								<div class="col-xs-12">
+								  <h1>请发表对Vue的评论</h1>
+								</div>
+							  </div>
+							</div>
+						  </header>
+						  <div class="container">
+							<Add :addComment="addComment"/>
+							<List :comments="comments" :delComment="delComment"/>
+						  </div>
+						</div>
+					</template>
+
+					<script>
+						import Add from './components/Add.vue'
+						import List from './components/List.vue'
+
+						export default {
+						  data() {
+							return {
+							  comments: [
+								{name: 'LiXC', content: 'Vue 还不错'},
+								{name: 'LiXY', content: 'Vue 好用'},
+								{name: 'LiXL', content: 'Vue 很好用'},
+							  ]
+							}
+						  },
+						  methods: {
+							addComment(comment) {
+							  this.comments.unshift(comment)
+							},
+							delComment(index) {
+							  this.comments.splice(index, 1)
+							}
+						  },
+						  components: {
+							Add, List
+						  }
+						}
+					</script>
+				e. main.js
+					import Vue from 'vue'
+					import App from './App.vue'
+
+					new Vue({
+					  el: '#app',
+					  components: {App},
+					  template: '<App/>'
+					})
+		⑤ demo2：todo list
+			A. 目录结构关系
+				|-- src-todo
+					|-- components
+						|-- TodoFooter.vue
+						|-- TodoHeader.vue
+						|-- TodoItem.vue
+						|-- TodoList.vue
+					|-- css
+						|-- base.css
+					|-- util
+						|-- localStorageUtil.js
+					|-- App.vue
+					|-- main.js
+			B. 编码：
+				a. TodoHeader.vue
+					<template>
+						<div class="todo-header">
+							<input type="text" placeholder="请输入你的任务名称，按回车键确认" v-model="task" @keyup.enter="addItem"/>
+						  </div>
+					</template>
+
+					<script>
+						export default {
+						  data() {
+							return {
+							  task : ''
+							}
+						  },
+						  computed: {
+							completeSize() {
+							  return this.todos.reduce((prevTotal, todo) => prevTotal + (todo.complete ? 1 : 0), 0)
+							},
+							isCheck: {
+							  get() {
+								return this.completeSize === this.todos.length && this.completeSize > 0
+							  },
+							  set(value) {
+								this.selAllTodos(value)
+							  }
+							}
+						  },
+						  methods: {
+							addItem() {
+							  const task = this.task.trim()
+							  if (!task) {
+								alert('输入任务不能为空')
+								return
+							  }
+							  const todo = {task: task, complete: false}
+					//          this.addTodo(todo)
+							  this.$emit('addTodo', todo)
+							  this.task = ''
+							}
+						  },
+						  props: {
+							addTodo: Function
+						  }
+						}
+					</script>
+				b. TodoList.vue
+					<template>
+						<ul class="todo-main">
+							<TodoItem v-for="(todo, index) in todos" :key="index" :todo="todo" :index="index" :delTodo="delTodo"/>
+						</ul>
+					</template>
+
+					<script>
+					  import TodoItem from './TodoItem.vue'
+					  export default {
+						components: {
+						  TodoItem
+						},
+						props: {
+						  todos: Array,
+						  delTodo: Function
+						}
+					  }
+					</script>
+				c. TodoItem.vue
+					<template>
+					  <li @mouseenter="isEnter=true" @mouseleave="isEnter=false" :class="{isEnter: isEnter, isLeave: !isEnter}">
+						<label>
+						  <input type="checkbox" v-model="todo.complete"/>
+						  <span>{{todo.task}}</span>
+						</label>
+						<button class="btn btn-danger" v-show="isEnter" @click="delItem">删除</button>
+					  </li>
+					</template>
+
+					<script>
+						export default {
+						  data() {
+							return {
+							  isEnter: false
+							}
+						  },
+						  methods: {
+							delItem() {
+							  const {todo, index, delTodo} = this
+							  if (window.confirm('确定删除任务 ' + todo.task + ' 吗？')) {
+								delTodo(index)
+							  }
+							}
+						  },
+						  props: {
+							todo: Object,
+							index: Number,
+							delTodo: Function
+						  }
+						}
+					</script>
+				d. TodoFooter.vue
+					<template>
+						<div class="todo-footer">
+							<label>
+							  <!--<input type="checkbox" v-model="isCheck"/>-->
+							  <slot name="isCheck"></slot>
+							</label>
+							<span>
+							  <!--<span>已完成{{completeSize}}</span> / 全部{{todos.length}}-->
+							  <slot name="completeSize"></slot>
+							</span>
+							<!--<button class="btn btn-danger" v-show="completeSize" @click="delCompleteTodos">清除已完成任务</button>-->
+							  <slot name="delCompleteTodos"></slot>
+						  </div>
+					</template>
+
+					<script>
+						export default {
+						  /*computed: {
+							completeSize() {
+							  return this.todos.reduce((prevTotal, todo) => prevTotal + (todo.complete ? 1 : 0), 0)
+							},
+							isCheck: {
+							  get() {
+								return this.completeSize === this.todos.length && this.completeSize > 0
+							  },
+							  set(value) {
+								this.selAllTodos(value)
+							  }
+							}
+						  },
+						  props: {
+							todos: Array,
+							delCompleteTodos: Function,
+							selAllTodos: Function
+						  }*/
+						}
+					</script>
+				e. localStorageUtil.js
+					const TODO_KEY = 'todos'
+					export default {
+					  saveTodos(todos) {
+						window.localStorage.setItem(TODO_KEY, JSON.stringify(todos))
+					  },
+					  getTodos() {
+						return JSON.parse(window.localStorage.getItem(TODO_KEY) || '[]')
+					  }
+					}
+				f. App.vue
+					<template>
+					  <div class="todo-container">
+						<div class="todo-wrap">
+						  <!--<todo-header :addTodo="addTodo"/>-->
+						  <!--<todo-header @addTodo="addTodo"/>-->
+						  <todo-header ref="header"/>
+						  <todo-list :todos="todos" :delTodo="delTodo"/>
+						  <!--<todo-footer :todos="todos" :delCompleteTodos="delCompleteTodos" :selAllTodos="selAllTodos"/>-->
+						  <todo-footer>
+							<input type="checkbox" v-model="isCheck" slot="isCheck"/>
+							<span slot="completeSize">已完成{{completeSize}}</span> / 全部{{todos.length}}
+							<button class="btn btn-danger" v-show="completeSize" @click="delCompleteTodos" slot="delCompleteTodos">清除已完成任务</button>
+						  </todo-footer>
+						</div>
+					  </div>
+					</template>
+
+					<script>
+					  import TodoHeader from './components/TodoHeader.vue'
+					  import TodoList from './components/TodoList.vue'
+					  import TodoFooter from './components/TodoFooter.vue'
+					  import LocalStorageUtil from './util/localStorageUtil'
 
 
+					  export default {
+						data() {
+						  return {
+					//        todos: JSON.parse(window.localStorage.getItem('todos') || '[]')
+							todos: LocalStorageUtil.getTodos()
+						  }
+						},
+						computed: {
+						  completeSize() {
+							return this.todos.reduce((prevTotal, todo) => prevTotal + (todo.complete ? 1 : 0), 0)
+						  },
+						  isCheck: {
+							get() {
+							  return this.completeSize === this.todos.length && this.completeSize > 0
+							},
+							set(value) {
+							  this.selAllTodos(value)
+							}
+						  }
+						},
+						methods: {
+						  addTodo(todo) {
+							this.todos.unshift(todo)
+						  },
+						  delTodo(index) {
+							this.todos.splice(index, 1)
+						  },
+						  delCompleteTodos() {
+							this.todos = this.todos.filter(todo => !todo.complete)
+						  },
+						  selAllTodos(isCheck) {
+							this.todos.forEach(todo => todo.complete = isCheck)
+						  }
+						},
+						mounted() {// 执行异步代码
+						  // 给<todo-header/>绑定addTodo事件监听
+						  this.$refs.header.$on('addTodo', this.addTodo)
+						},
+						watch: {
+						  todos: {
+							deep: true,
+							handler: LocalStorageUtil.saveTodos
+						  }
+						},
+						components: {
+						  TodoHeader, TodoList, TodoFooter
+						}
+					  }
+					</script>
+				g. main.js
+					import Vue from 'vue'
+					import App from './App.vue'
+					import './css/base.css'
 
+					new Vue({
+					  el: '#app',
+					  components: {App},
+					  template: '<App/>'
+					})
+	7. 组件间通信2: vue 自定义事件
+		① 绑定事件监听
+			A. 通过v-on 绑定：@delete_todo="deleteTodo"
+			B. 通过$on()
+				this.$refs.xxx.$on('delete_todo', function (todo) {
+					this.deleteTodo(todo)
+				})
+		② 触发事件
+			// 触发事件(只能在父组件中接收)
+			this.$emit(eventName, data)
+		③ 注意:
+			A. 此方式只用于子组件向父组件发送消息(数据)
+			B. 问题: 隔代组件或兄弟组件间通信此种方式不合适
+		④ 编码
+			A. App.vue
+				<todo-header @addTodo="addTodo"/>
+				<todo-header ref="header"/>
 
+				export default {
+					methods: {
+					  addTodo(todo) {
+						this.todos.unshift(todo)
+					  },
+					},
+					
+					mounted() {// 执行异步代码
+					  // 给<todo-header/>绑定addTodo事件监听
+					  this.$refs.header.$on('addTodo', this.addTodo)
+					},
+				}
+			B. TodoHeader.vue
+				methods: {
+					addItem() {
+					  const task = this.task.trim()
+					  if (!task) {
+						alert('输入任务不能为空')
+						return
+					  }
+					  const todo = {task: task, complete: false}
+					  // this.addTodo(todo)
+					  this.$emit('addTodo', todo)
+					  this.task = ''
+					}
+				}
+	8. 组件间通信3: 消息订阅与发布(PubSubJS 库)
+		① vue安装pubsub-js 库的命令
+			A. 查看pubsub-js 库是否已经存在该库命令：
+			npm info pubsub-js
+			B. 若不存在,则先安装pubsub-js 库，命令如下：
+			npm install --save pubsub-js
+		② 订阅消息：PubSub.subscribe('msg', function(msg, data){})
+		③ 发布消息：PubSub.publish('msg', data)
+		④ 注意：优点，此方式可实现任意关系组件间通信(数据)
+		⑤ 事件的2 个重要操作(总结)
+			A. 绑定事件监听(订阅消息)
+				a. 目标: 标签元素<button>
+				b. 事件名(类型): click/focus
+				c. 回调函数: function(event){}
+			B. 触发事件(发布消息)
+				a. DOM 事件: 用户在浏览器上对应的界面上做对应的操作
+				b. 自定义: 编码手动触发
+		⑥ demo：github users
+			A. 目录结构关系
+				|-- src-axios
+					|-- components
+						|-- Main.vue
+						|-- Search.vue
+					|-- App.vue
+					|-- main.js
+			B. 编码
+				a. Search.vue
+					<template>
+					  <section class="jumbotron">
+						<h3 class="jumbotron-heading">Search Github Users</h3>
+						<div>
+						  <input type="text" placeholder="enter the name you search" v-model="searchText"/>
+						  <button @click="searchUsers">Search</button>
+						</div>
+					  </section>
+					</template>
 
+					<script>
+					  import Pubsub from 'pubsub-js'
+					  export default {
+						data() {
+						  return {
+							searchText: ''
+						  }
+						},
+						methods: {
+						  searchUsers() {
+							// 发布搜索用户的消息
+							const searchText = this.searchText.trim()
+							if (!searchText) {
+							  alert('请输入搜索内容')
+							  return
+							}
+							Pubsub.publish('search', searchText)
+						  }
+						}
+					  }
+					</script>
+				b. Main.vue
+					<template>
+					  <div>
+						<h2 v-if="initView">请输入用户名搜索</h2>
+						<h2 v-if="loading">LOADING...</h2>
+						<h2 v-if="errorMsg">{{errorMsg}}</h2>
 
+						<div class="row">
+						  <div class="card" v-for="(user, index) in users" :key="index">
+							<a :href="user.blogUrl" target="_blank">
+							  <img :src="user.avatarUrl" style='width: 100px'/>
+							</a>
+							<p class="card-text">{{user.name}}</p>
+						  </div>
+						</div>
+					  </div>
+					</template>
 
+					<script>
+					  import Pubsub from 'pubsub-js'
+					  import Axios from 'axios'
+					  export default {
+						data() {
+						  return {
+							initView: true,
+							loading: false,
+							errorMsg: '',
+							users: null
+						  }
+						},
+						mounted() {
+						  //不能直接在此发送Ajax，需要触发search模块的的点击事件时发送
+						  //订阅搜索用户的消息
+						  Pubsub.subscribe('search', (msg, searchText) => {
+							// 更新请求状态
+							this.initView = false
+							this.loading = true
+							this.users = null
+							this.errorMsg = ''
 
+							const url = `https://api.github.com/search/users?q=${searchText}`
+							// 发送Ajax请求
+							Axios.get(url).then(
+							  respone => {
+								const users = respone.data.items.map(item => ({
+								  name: item.login,
+								  avatarUrl: item.avatar_url,
+								  blogUrl: item.html_url
+								}))
 
+								this.loading = false
+								this.users = users
 
+								//显示查找的结果
+							  }).catch(error => {
+								this.loading = false
+								this.errorMsg = '请求失败'
+							})
+						  })
+						}
+					  }
+					</script>
+				c. App.vue
+					<template>
+					  <div class="container">
+						<search/>
+						<users-main/>
+					  </div>
+					</template>
 
+					<script>
+					  import Search from './components/Search.vue'
+					  import Main from './components/Main.vue'
 
+					  export default {
+						components: {
+						  Search,
+						  UsersMain:Main
+						}
+					  }
+					</script>
+				d. main.js
+					import Vue from 'vue'
+					import App from './App.vue'
 
+					new Vue ({
+					  el: '#app',
+					  components: { App },
+					  template: '<App/>'
+					})
+	9. 组件间通信4: slot
+		① 理解：此方式用于父组件向子组件传递`标签数据`
+		② 子组件: Child.vue
+			<template>
+				<div>
+					<slot name="xxx">不确定的标签结构1</slot>
+					<div>组件确定的标签结构</div>
+					<slot name="yyy">不确定的标签结构2</slot>
+				</div>
+			</template>
+		③ 父组件: Parent.vue
+			<child>
+				<div slot="xxx">xxx 对应的标签结构</div>
+				<div slot="yyy">yyyy 对应的标签结构</div>
+			</child>
+		④ 编码：
+			A. App.vue
+				<todo-footer>
+					<input type="checkbox" v-model="isCheck" slot="isCheck"/>
+					<span slot="completeSize">已完成{{completeSize}}</span> / 全部{{todos.length}}
+					<button class="btn btn-danger" v-show="completeSize" @click="delCompleteTodos" slot="delCompleteTodos">清除已完成任务</button>
+				 </todo-footer>
+			B. TodoFooter.vue
+				<template>
+					<div class="todo-footer">
+						<label>
+						  <!--<input type="checkbox" v-model="isCheck"/>-->
+						  <slot name="isCheck"></slot>
+						</label>
+						<span>
+						  <!--<span>已完成{{completeSize}}</span> / 全部{{todos.length}}-->
+						  <slot name="completeSize"></slot>
+						</span>
+						<!--<button class="btn btn-danger" v-show="completeSize" @click="delCompleteTodos">清除已完成任务</button>-->
+						  <slot name="delCompleteTodos"></slot>
+					  </div>
+				</template>
+四、vue-ajax
+	1. vue 项目中常用的2 个ajax 库
+		① vue-resource：vue 插件, 非官方库, vue1.x 使用广泛
+		② axios：通用的ajax 请求库, 官方推荐, vue2.x 使用广泛
+	2. vue-resource 的使用
+		① 在线文档：https://github.com/pagekit/vue-resource/blob/develop/docs/http.md
+		② 下载：npm install vue-resource --save
+		③ 编码
+			// 引入模块
+			import VueResource from 'vue-resource'
+			// 使用插件
+			Vue.use(VueResource)
+			// 通过vue/组件对象发送ajax 请求
+			this.$http.get('/someUrl').then((response) => {
+				// success callback
+				console.log(response.data) //返回结果数据
+			}, (response) => {
+				// error callback
+				console.log(response.statusText) //错误信息
+			})
+	3. axios 的使用
+		① 在线文档：https://github.com/pagekit/vue-resource/blob/develop/docs/http.md
+		② 下载：npm install axios --save
+		③ 编码
+			// 引入模块
+			import axios from 'axios'
+			// 发送ajax 请求
+			axios.get(url).then(response => {
+				console.log(response.data) // 得到返回结果数据
+			})
+			.catch(error => {
+				console.log(error.message)
+			})
+	4. 测试接口
+		① 接口1: https://api.github.com/search/repositories?q=v&sort=stars
+		② 接口2: https://api.github.com/search/users?q=aa
+五、vue UI 组件库
+	1. 常用
+		① Mint UI:
+			A. 主页: http://mint-ui.github.io/#!/zh-cn
+			B. 说明: 饿了么开源的基于vue 的移动端UI 组件库
+		② lment
+			A. 主页: http://element-cn.eleme.io/#/zh-CN
+			B. 说明: 饿了么开源的基于vue 的PC 端UI 组件库
+	2. 使用Mint UI
+		① 下载：npm install --save mint-ui
+		② 实现按需打包
+			A. 下载：npm install --save-dev babel-plugin-component
+			B. 修改babel 配置
+				"plugins": ["transform-runtime",["component", [
+					{
+						"libraryName": "mint-ui",
+						"style": true
+					}
+				]]]
+		③ mint-ui 组件分类
+			A. 标签组件
+			B. 非标签组件
+		④ 使用mint-ui 的组件
+			A. index.html
+				<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />替换
+				<meta name="viewport" content="width=device-width,initial-scale=1.0">
+				
+				<script src="https://as.alipayobjects.com/g/component/fastclick/1.0.6/fastclick.js"></script>
+				<script>
+					if ('addEventListener' in document) {
+						document.addEventListener('DOMContentLoaded', function() {
+						FastClick.attach(document.body);
+						}, false);
+					}
+					if(!window.Promise) {
+						document.writeln('<script src="https://as.alipayobjects.com/g/component/es6-promise/3.2.2/es6-promise.min.js"'+'>'+'<'+'/'+'script>');
+					}
+				</script>
+			B. main.js
+				import Vue from 'vue'
+				import App from './App.vue'
+				import {Button} from 'mint-ui'
 
+				Vue.component(Button.name, Button)
 
+				new Vue ({
+				  el: '#app',
+				  components: { App },
+				  template: '<App/>'
+				})
+			C. App.vue
+				<template>
+				  <mt-button type="primary" style="width: 100%" @click.native="handleClick">Test</mt-button>
+				</template>
 
+				<script>
+				  import {Toast} from 'mint-ui'
+				  export default {
+					methods: {
+					  handleClick() {
+						Toast("Test")
+					  }
+					}
+				  }
+				</script>
+六、vue-router
+	1. 理解
+		① 说明
+			A. 官方提供的用来实现SPA 的vue 插件
+			B. github: https://github.com/vuejs/vue-router
+			C. 中文文档: http://router.vuejs.org/zh-cn/
+			D. 下载: npm install vue-router --save
+		② 相关API 说明
+			A. VueRouter(): 用于创建路由器的构建函数
+				new VueRouter({
+				// 多个配置项
+				})
+			B. 路由配置（/src/route/index.js）
+				routes: [
+					{ // 一般路由
+						path: '/about',
+						component: About
+					},
+					{ // 自动跳转路由
+						path: '/',
+						redirect: '/about'
+					}
+				]
+			C. 注册路由器（/src/main.js）
+				import router from './router'
+				new Vue({
+					router
+				})
+			D. 使用路由组件标签
+				a. <router-link>: 用来生成路由链接
+					<router-link to="/xxx">Go to XXX</router-link>
+				b. <router-view>: 用来显示当前路由组件界面
+					<router-view></router-view>
+	2. 基本路由
+		① 路由组件
+			A. About.vue
+			B. Home.vue
+		② 应用组件: App.vue
+			<div>
+				<!--路由链接-->
+				<router-link to="/about">About</router-link>
+				<router-link to="/home">Home</router-link>
+				<!--用于渲染当前路由组件-->
+				<router-view></router-view>
+			</div>
+		③ 路由器模块: src/router/index.js
+			export default new VueRouter({
+				routes: [
+					{
+					path: '/',
+					redirect: '/about'
+					},
+					{
+					path: '/about',
+					component: About
+					},
+					{
+					path: '/home',
+					component: Home
+					}
+				]
+			})
+		④ 注册路由器: main.js
+			import Vue from 'vue'
+			import router from './router'
+			// 创建vue 配置路由器
+			new Vue({
+				el: '#app',
+				router,
+				render: h => h(app)
+			})
+		⑤ 优化路由器配置：linkActiveClass: 'active', // 指定选中的路由链接的class
+		⑥ 总结: 编写使用路由的3 步
+			A. 定义路由组件
+			B. 注册路由
+			C. 使用路由
+				<router-link>
+				<router-view>
+	3. 嵌套路由
+		① 子路由组件
+			News.vue
+			Message.vue
+		② 配置嵌套路由: router.js
+			path: '/home',
+			component: home,
+			children: [
+				{
+					path: 'news',
+					component: News
+				},
+				{
+					path: 'message',
+					component: Message
+				}
+			]
+		③ 路由链接: Home.vue
+			<router-link to="/home/news">News</router-link>
+			<router-link to="/home/message">Message</router-link>
+			<router-view></route-view>
+	4. 向路由组件传递数据
+		① 方式1:路由路径携带参数(param/query)
+			A. 配置路由
+				children: [
+					{
+						path: 'mdetail/:id', // 'mdetail?id=:id'
+						component: MessageDetail
+					}
+				]
+			B. 路由路径：<router-link :to="'/home/message/mdetail/'+m.id">{{m.title}}</router-link>
+			C. 路由组件中读取请求参数：this.$route.params.id/this.$route.query.id
+		② 方式2: <router-view>属性携带数据：<router-view :msg="msg"></router-view>
+	5. 缓存路由组件对象
+		① 理解
+			A. 默认情况下, 被切换的路由组件对象会死亡释放, 再次回来时是重新创建的
+			B. 如果可以缓存路由组件对象, 可以提高用户体验
+		② 编码实现
+			<keep-alive>
+				<router-view></router-view>
+			</keep-alive>
+	6. 编程式路由导航
+		① 相关API
+			A. this.$router.push(path): 相当于点击路由链接(可以返回到当前路由界面)
+			B. this.$router.replace(path): 用新路由替换当前路由(不可以返回到当前路由界面)
+			C. this.$router.back(): 请求(返回)上一个记录路由
+			D. this.$router.go(-1): 请求(返回)上一个记录路由
+			E. this.$router.go(1): 请求下一个记录路由
+	7. demo：Router
+		① 目录结构关系
+			|-- src-route
+				|-- router
+					|-- index.js
+				|-- views
+					|-- About.vue
+					|-- Home.vue
+					|-- Message.vue
+					|-- MessageDetail.vue
+					|-- News.vue
+				|-- App.vue
+				|-- main.js
+		② 编码：
+			A. About.vue
+				<template>
+				  <div>
+					<h2>About</h2>
+				  </div>
+				</template>
 
+				<script>
+				  export default {}
+				</script>
+			B. Home.vue
+				<template>
+				  <div>
+					<h2>Home</h2>
+					<div>
+					  <ul class="nav nav-tabs">
+						<li><router-link to="/home/news">News</router-link></li>
+						<li><router-link to="/home/message">Message</router-link></li>
+					  </ul>
+					  <div>
+						<router-view></router-view>
+						<hr/>
+					  </div>
+					</div>
+				  </div>
+				</template>
 
+				<script>
+				  export default {}
+				</script>
+			C. News.vue
+				<template>
+				  <ul>
+					<li v-for="(news, index) in newsArr" :key="index">{{news}}</li>
+				  </ul>
+				</template>
 
+				<script>
+				  export default {
+					data() {
+					  return {
+						newsArr: ['News1', 'News2', 'News3']
+					  }
+					}
+				  }
+				</script>
+			D. Message.vue
+				<template>
+				  <div>
+					<ul>
+					  <li v-for="(message, index) in messageArr" :key="message.id">
+						<router-link :to="`/home/message/detail/${message.id}`">{{message.title}}</router-link>
+						<button @click="pushShow(message.id)">push</button>
+						<button @click="replaceShow(message.id)">replace</button>
+					  </li>
+					</ul>
+					<button @click="$router.back()">返回</button>
+					<hr/>
+					<router-view :messageArr="messageArr"></router-view>
+				  </div>
+				</template>
 
+				<script>
+				  export default {
+					data() {
+					  return {
+						messageArr: []
+					  }
+					},
+					methods: {
+					  pushShow(id) {
+						this.$router.push(`/home/message/detail/${id}`)
+					  },
+					  replaceShow(id) {
+						this.$router.replace(`/home/message/detail/${id}`)
+					  }
+					},
+					mounted() {
+					  setTimeout(() => {
+						this.messageArr = [
+							{id: 1, title: 'message1', content: 'message1 content'},
+							{id: 2, title: 'message2', content: 'message1 content'},
+							{id: 3, title: 'message3', content: 'message1 content'},
+							{id: 4, title: 'message4', content: 'message1 content'}
+						  ]
+					  }, 1000)
+					}
+				  }
+				</script>
+			E. MessageDetail.vue
+				<template>
+				  <ul>
+					<li>id: {{message.id}}</li>
+					<li>title: {{message.title}}</li>
+					<li>content: {{message.content}}</li>
+				  </ul>
+				</template>
 
+				<script>
+				  export default {
+					data() {
+					  return {
+						message: {}
+					  }
+					},
 
+					props: {
+					  messageArr: Array
+					},
 
+					mounted() {
+					  setTimeout(() => {
+						const id = this.$route.params.id * 1// id可能是个文本
+						this.message = this.messageArr.find(detail => detail.id === id)
+					  }, 1000)
+					},
 
+					watch: {
+					  $route: function(value) {
+						const id = value.params.id * 1// id可能是个文本
+						this.message = this.messageArr.find(detail => detail.id === id)
+					  }
+					}
+				  }
+				</script>
+			F. index.js
+				import Vue from 'vue'
+				import VueRouter from 'vue-router'
+				import About from '../views/About.vue'
+				import Home from '../views/Home.vue'
+				import News from '../views/News.vue'
+				import Message from '../views/Message.vue'
+				import MessageDetail from '../views/MessageDetail.vue'
 
+				Vue.use(VueRouter)
 
+				export default new VueRouter({//配置对象
+				  routes: [
+					{
+					  path: '/about',
+					  component: About
+					},
+					{
+					  path: '/home',
+					  component: Home,
+					  children: [
+						{
+						  path: '/home/news',
+						  component: News
+						},
+						{
+						  path: 'message',
+						  component: Message,
+						  children: [
+							{
+							  path: 'detail/:id',
+							  component: MessageDetail
+							}
+						  ]
+						},
+						{
+						  path: '',
+						  redirect: 'news'
+						}
+					  ]
+					},
+					{
+					  path: '/',
+					  redirect: '/about'
+					}
+				  ]
+				})
+			G. main.js
+				import Vue from 'vue'
+				import App from './App.vue'
+				import router from './router'
 
+				new Vue ({
+				  el: '#app',
+				  components: { App },
+				  template: '<App/>',
+				  router: router
+				})
+			H. App.vue
+				<template>
+				  <div>
+					<div class="row">
+					  <div class="col-xs-offset-2 col-xs-8">
+						<div class="page-header"><h2>Router Test</h2></div>
+					  </div>
+					</div>
 
+					<div class="row">
+					  <div class="col-xs-2 col-xs-offset-2">
+						<div class="list-group">
+						  <!--路由链接-->
+						  <router-link to="/about" class="list-group-item">About</router-link>
+						  <router-link to="/home" class="list-group-item">Home</router-link>
+						</div>
+					  </div>
+					  <div class="col-xs-6">
+						<div class="panel">
+						  <div class="panel-body">
+							<!--路由视图-->
+							<keep-alive>
+							  <router-view></router-view>
+							</keep-alive>
+						  </div>
+						</div>
+					  </div>
+					</div>
+				  </div>
+				</template>
 
-
-
-
-
-
-
-
-
-
-
-
+				<script>
+				  export default {}
+				</script>
 
 
 

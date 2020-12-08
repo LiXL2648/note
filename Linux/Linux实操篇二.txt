@@ -1,0 +1,678 @@
+一、组管理和权限管理
+	注：组的管理只能在root中进行，用户的所有者可以对该用户的权限进行管理
+	1. Linux 组基本介绍
+		① 在linux 中的每个用户必须属于一个组，不能独立于组外。在linux 中每个文件有所有者、所在组、其它组的概念。
+		② 所有者
+ 		③ 所在组
+		④ 其它组
+		⑤ 改变用户所在的组
+	2. 文件/目录所有者
+		① 一般为文件的创建者,谁创建了该文件，就自然的成为该文件的所有者，但并不是绝对的，文件的所有者可以变。
+		② 查看文件的所有者
+			A. 指令：ls -ahl
+			B. 应用实例：创建一个组lixl,再创建一个用户LiXL,将LiXL 放在lixl 组,然后使用LiXL 来创
+			建一个文件hello.txt，使用ls -ahl查看文件的所有者
+				a. 创建分组：groupadd lixl
+				b. 创建用户：useradd -g lixl LiXL
+				c. 设置新用户密码：passwd LiXL
+				d. 切换用户：su LiXL
+				e. 切换目录：cd ~
+				f. 添加文件：touch hello.txt
+				g. 查看文件的所有者：ls -ahl
+				h. 查看结果：-rw-r--r--. 1 LiXL lixl   0 5月  17 01:33 hello.txt
+	3. 修改文件所有者
+		① 指令：chown 用户名 文件名
+		② 应用案例
+			A. 要求：使用root 创建一个文件chown.txt ，然后将其所有者修改成LiXL
+				a. 创建chown.txt：touch chown.txt
+				b. 查看文件所有者：ls -ahl
+				c. 改变文件的所有者：chown LiXL chown.txt
+		③ 细节说明
+			改变文件的所有者并不会改变文件所在的组，因此文件的所有者不一定是创建文件的用户。
+	4. 组的创建
+		① 基本指令
+			groupadd 组名
+		② 应用实例:
+			A. 创建一个组lixl,再创建一个用户LiXL，使用id查看用户
+				a. 创建组: groupadd lixl
+				b. 添加用户: useradd -g lixl LiXL
+				c. 查看用户: id LiXL
+	5. 文件/目录所在组
+		当某个用户创建了一个文件后，默认这个文件的所在组就是该用户所在的组。
+		① 查看文件/目录所在组
+			A. 基本指令：ls –ahl
+		② 修改文件所在的组
+			A. 基本指令：chgrp 组名 文件名
+			B. 应用实例
+				a. root用户将chown.txt文件所在的组修改为lixl
+					chgrp lixl chown.txt
+
+	6. 其它组
+		除文件的所有者和所在组的用户外，系统的其它用户都是文件的其它组.
+	7. 改变用户所在组
+		在添加用户时，可以指定将该用户添加到哪个组中，同样的用root 的管理权限可以改变某个用户
+		所在的组。
+		① 改变用户所在组
+			A. usermod –g 组名用户名
+			B. usermod –d 目录名用户名改变该用户登陆的初始目录。
+		② 应用实例
+			A. 将yucx用户从原来所在的组yucx组，修改到lixl组
+				a. 修改用户所在的组：usermod -g lixl yucx
+				b. 查看用户所在的组: id yucx
+				c. j结果：uid=1000(yucx) gid=1001(lixl) 组=1001(lixl),10(wheel)
+
+	8. 权限的基本介绍
+		1. ls -l 中显示的内容如下：
+			-rwxrw-r-- 1 root root 1213 Feb 2 09:39 abc
+		2. 0-9 位说明
+			① 第0 位确定文件类型(d:目录, -:文件, l:软连接, c:字符设备(鼠标、键盘) , b:块文件(硬盘))
+			② 第1-3 位确定所有者（该文件的所有者）拥有该文件的权限。---User
+			③ 第4-6 位确定所属组（同用户组的）拥有该文件的权限，---Group
+			④ 第7-9 位确定其他用户拥有该文件的权限---Other
+	9. rwx 权限详解
+		① rwx 作用到文件
+			A. [ r ]代表可读(read): 可以读取,查看
+			B. [ w ]代表可写(write): 可以修改,但是不代表可以删除该文件,删除一个文件的前提条件是对该
+			文件所在的目录有写权限，才能删除该文件.
+			C. [ x ]代表可执行(execute):可以被执行
+		② rwx 作用到目录
+			A. [ r ]代表可读(read): 可以读取，ls 查看目录内容
+			B. [ w ]代表可写(write): 可以修改,目录内创建+删除+重命名目录
+			C. [ x ]代表可执行(execute):可以进入该目录
+	10. 文件及目录权限实际案例
+		① ls -l 中显示的内容如下：(记住)
+			-rwxrw-r-- 1 root root 1213 Feb 2 09:39 abc
+		② 10 个字符确定不同用户能对文件干什么
+			A. 第一个字符代表文件类型： 文件(-),目录(d),链接(l),字符设备：鼠标、键盘(c),块文件：硬盘(b)
+			B. 其余字符每3 个一组(rwx) 读(r) 写(w) 执行(x)
+				a. 第一组rwx : 文件拥有者的权限是读、写和执行
+				b. 第二组rw- : 与文件拥有者同一组的用户的权限是读、写但不能执行
+				c. 第三组r-- : 不与文件拥有者同组的其他用户的权限是读不能写和执行
+				d. 可用数字表示为: r=4,w=2,x=1 因此rwx=4+2+1=7
+		③ 其他代表的含义：
+			A. 1: 文件：硬连接数 或 目录：子目录数
+			B. root: 用户
+			C. root: 组
+			D. 1213: 文件大小(字节)，如果是文件夹，显示4096 字节
+			E. Feb 2 09:39: 最后修改日期
+			G. abc: 文件名
+	11. 修改权限：chmod
+		① 基本说明：
+			通过chmod 指令，可以修改文件或者目录的权限
+		② 第一种方式：+ 、-、= 变更权限
+			u:所有者g:所有组o:其他人a:所有人(u、g、o 的总和)
+			A. chmod u=rwx,g=rx,o=x 文件目录名
+			B. chmod o+w 文件目录名
+			C. chmod a-x 文件目录名
+			D. 案例演示
+				a. 给hello.txt 文件的所有者读写执行的权限，给所在组读执行权限，给其它组读执行权限。
+					chmod u=rwx,g=rx,o=rx hello.txt
+				b. 给hello.txt 文件的所有者除去执行的权限，增加组写的权限
+					chmod u-x,g+w hello.txt
+				c. 给hello.txt 文件的所有用户去除读的权限
+					chmod a-r hello.txt
+		③第二种方式：通过数字变更权限
+			A. 规则：r=4 w=2 x=1 ,rwx=4+2+1=7
+			B. chmod u=rwx,g=rx,o=x 文件目录名
+			相当于chmod 751 文件目录名
+			C. 案例演示
+				要求：将/root/hello.txt 文件的权限修改成rwxr-xr-x, 使用给数字的方式实现：
+				chmod 755 hello.txt
+	12. 修改文件所有者: chown
+		① 基本介绍
+			A. 改变文件的所有者：chown newowner file 
+			B. 改变用户的所有者和所有组：chown newowner:newgroup file 
+			C. -R 如果是目录则使其下所有子文件或目录递归生效
+		② 案例演示：
+			A. 请将 /home/test/a .txt 文件的所有者修改成LiXL, 
+			   将 /home/test/b .txt 文件的所有者、所在组修改成yucx
+			   将 /home/test/b .txt 文件的所在组修改成LiXL
+				   chown LiXL a.txt
+				   chown yucx:yucx b.txt
+				   chgrp lixl c.txt
+			B. 请将 /home/test 目录下所有的文件和目录的所有者都修改成lixl
+					chown -R LiXL:lixl test/
+	13. 修改文件所在组-chgrp
+		① 基本介绍
+			chgrp newgroup file 改变文件的所有组
+		② 案例演示
+			A. 请将 /home/test/c .txt 文件的所在组修改成lixl
+				chgrp lixl c.txt
+			B. 请将/home/test 目录下所有的文件和目录的所在组都修改成yucx
+				chgrp -R bandit /home/kkk
+	14.最佳实践
+		1. 警察和土匪游戏
+			① 要求
+				A. 组：
+					a. police：警察
+					b. bandit：土匪
+				B. 用户
+					a. 警察组：jack, jerry
+					b. 土匪组：li, yu
+			② 创建组
+				A. groupadd police
+				B. groupadd bandit
+			③ 创建用户
+				A. useradd -g police jack
+				B. useradd -g police jerry
+				C. useradd -g bandit li
+				D. useradd -g bandit yu
+			④ 修改用户密码
+				A. passwd jack
+				B. passwd jerry
+				C. passwd li
+				D. passwd yu
+			⑤ jack 创建一个文件，自己可以读写，本组人可以读，其它组没人任何权限
+				A. 切换用户：su jack
+				B. 创建一个文件：touch hello.txt
+				C. 修改文件权限：chmod u=rw,g=r,o= hello.txt
+			⑥ jack 修改该文件，让其它组人可以读, 本组人可以读写
+				A. chmod o=r,g=rw hello.txt
+			⑦ yu 投靠警察，看看是否可以读写Jack的文件.
+				A. 进入root查看jack的权限
+					a. su root
+					b. ls -l → drwx------.  3 jerry police   78 5月  17 15:56 jack, 即jack对所在组、其他组没有权限
+				B. 将yu的所在组修改到police组：usermod -g police yu
+				C. 切换到jack用户，将用户权限修改为所在组可以读、执行的权限
+					a. su jack
+					b. chmod g=rx jack/
+				D. 切换至yu用户，读写jack的文件
+					a. su yu
+					b. cd jack/
+					c. vim hello.txt
+	2. 练习文件权限管理[课堂练习]
+		建立两个组（神仙,妖怪）
+		建立四个用户(唐僧,悟空，八戒，沙僧)
+		设置密码
+		把悟空，八戒放入妖怪唐僧沙僧在神仙
+		用悟空建立一个文件（monkey.java 该文件要输出i am monkey）
+		给八戒一个可以r w 的权限
+		八戒修改monkey.java 加入一句话( i am pig)
+		唐僧沙僧对该文件没有权限
+		把沙僧放入妖怪组
+		让沙僧修改该文件monkey, 加入一句话("我是沙僧，我是妖怪!");
+二、crond 任务调度
+	1. 概述
+		①任务调度：是指系统在某个时间执行的特定的命令或程序。
+		②任务调度分类：
+			A. 系统工作：有些重要的工作必须周而复始地执行。如病毒扫描等
+			B. 个别用户工作：个别用户可能希望执行某些程序，比如对mysql 数据库的备份。
+		③如果是简单的任务，可以不用写脚本，直接在crontab中加入任务即可
+		④对于比较复杂的任务，需要写脚本（shell编程）
+	2. 基本语法：
+		① crontab [选项]
+		② 常用选项：
+			A. -e: 编辑crontab定时任务
+			B. -l: 查询crontab
+			C. -r: 删除当前用户所有的crontab任务
+	3. 快速入门
+		① 任务的要求
+			设置任务调度文件：/etc/crontab
+			设置个人任务调度。执行crontab –e 命令。
+			接着输入任务到调度文件如：*/1 * * * * ls –l /etc/ > /tmp/to.txt
+			意思说每小时的每分钟执行ls –l /etc/ > /tmp/to.txt 命令
+		② 步骤如下
+			crontab -e
+			*/1 * * * * ls –l /home/test/ >> /home/test/to.txt
+			当保存退出后调度即开始
+			该任务是每一分钟执行查看/home/test/并追加到/home/test/to.txt文件中
+		③参数细节说明
+			A. 五个占位符的说明
+				a. 第一个*：一个小时当中的第几分钟，范围从0-59
+				b. 第二个*：一天当中的第几个小时，范围从0-23
+				c. 第三个*：一个月当中的第几天，范围从1-31
+				d. 第四个*：一年当中的第几月，范围从1-12
+				e. 第五个*：一周当中的星期几，范围从0-7（0和7都是代表星期日）
+			B. 特殊符号说明：
+				a. *：代表任意时间。比如第一个*就代表一个小时中的每分钟都执行一次的意思
+				b. ,：代表不连续的时间。比如“0 8,12,16 * * *”，就代表在每天的8:00,12:00,16:00都执行一次命令
+				c. -：代表连续的时间范围。比如“0 5 * * 1-6”，代表在周一至周六的凌晨5:00执行命令
+				d. */n：代表每隔多久就执行一次。比如“*/10 * * * *”代表的是每个10分钟就执行一次命令。
+			C. 特定时间执行任务案例
+				a. 45 22 * * *命令：在每天的22:45执行命令
+				b. 0 17 * * 1命令：在每周一的17:00执行命令
+				c. 0 5 1,15 * *命令：在每月1号和15号的凌晨5:00执行命令
+				d. 40 4 * * 1-5命令：在周一至周五的凌晨4:00执行命令
+				e. */10 4 * * *命令：在每天的凌晨4点每隔10分钟执行命令
+				f. 0 0 1,5 * 1命令：在1号和15号，每周一的0:00都会执行命令。
+				注意：星期几和几号最好不要同时出现，因为他们都定义的是添。非常容易让管理员混乱。
+	4. 任务调度的几个应用实例			
+		① 案例1：每隔1 分钟，就将当前的日期信息，追加到/home/test/mydate 文件中
+			a. 先编写一个文件：vim vim task1.sh，输入date >> /home/test/mydate 指令，保存退出
+			b. 给task1.sh 一个可以执行权限：chmod 744 task1.sh
+			c. 执行调度任务：crontab -e，*/1 * * * * /home/taest/task1.sh
+			d. 保存退出，调度任务开始
+		② 案例2：每隔1 分钟， 将当前日期和日历都追加到/home/mycal 文件中
+			a. 先编写一个文件：
+				vim vim task2.sh，输入 
+				date >> /home/test/mycal
+				cal >> /home/test/mycal
+				保存退出
+			b. 给task1.sh 一个可以执行权限：chmod 744 task2.sh
+			c. 执行调度任务：crontab -e，*/1 * * * * /home/taest/task1.sh
+			d. 保存退出，调度任务开始
+		③ 案例3: 每天凌晨2:00 将mysql 数据库testdb ，备份到文件中mydb.bak。
+	5. crond 相关指令:
+		① conrtab –r：终止任务调度。
+		② crontab –l：列出当前有那些任务调度
+		③ service crond restart [重启任务调度]
+三、Linux 磁盘分区、挂载
+	1. 分区基础知识
+		① 分区的方式：
+			A. mbr 分区:
+				a. 最多支持四个主分区
+				b. 系统只能安装在主分区
+				c. 扩展分区要占一个主分区
+				d. MBR 最大只支持2TB，但拥有最好的兼容性
+			B. gtp 分区:
+				a. 支持无限多个主分区（但操作系统可能限制，比如windows 下最多128 个分区）
+				b. 最大支持18EB 的大容量（1EB=1024 PB，1PB=1024 TB ）
+				c. windows7 64 位以后支持gtp
+		② windows 下的磁盘分区
+			A. 磁盘分成主分区和扩展分区，扩展分区中包含各个逻辑分区
+	2. Linux 分区
+		① 原理介绍
+			A. Linux 来说无论有几个分区，分给哪一目录使用，它归根结底就只有一个根目录，一个独立且
+			唯一的文件结构, Linux 中每个分区都是用来组成整个文件系统的一部分。
+			B. Linux 采用了一种叫“载入”的处理方法，它的整个文件系统中包含了一整套的文件和目录，
+			且将一个分区和一个目录联系起来。这时要载入的一个分区将使它的存储空间在一个目录下获得。
+			C. 示意图描述：Linux下的磁盘分区是挂载（mount）到Linux的文件系统中，也可以从文件系统中卸载（umount）
+		② 硬盘说明
+			A. Linux 硬盘分IDE 硬盘和SCSI 硬盘，目前基本上是SCSI 硬盘
+			B. 对于IDE 硬盘，驱动器标识符为“hdx~”,其中“hd”表明分区所在设备的类型，这里是指IDE 硬
+			盘了。“x”为盘号（a 为基本盘，b 为基本从属盘，c 为辅助主盘，d 为辅助从属盘）,“~”代表分区，
+			前四个分区用数字1 到4 表示，它们是主分区或扩展分区，从5 开始就是逻辑分区。例，hda3 表示为
+			第一个IDE 硬盘上的第三个主分区或扩展分区,hdb2 表示为第二个IDE 硬盘上的第二个主分区或扩展
+			分区。
+			C. 对于SCSI 硬盘则标识为“sdx~”，SCSI 硬盘是用“sd”来表示分区所在设备的类型的，其余则
+			和IDE 硬盘的表示方法一样。
+		③ 使用lsblk 或者lsblk -l 指令查看当前系统的分区情况
+			A. lsblk可以查看分区的大小
+			B. lsblk -l可以查看具体的分区情况比如：挂载类型、唯一标识分区的40位不重复的字符串（uuid）
+	3. 挂载的经典案例
+		① 需求是给我们的Linux 系统增加一个新的硬盘，并且挂载到/home/newdisk
+		② 如何增加一块硬盘
+			A. 虚拟机添加硬盘
+			B. 分区fdisk /dev/sdb
+			C. 格式化mkfs -t ext4 /dev/sdb1
+			D. 挂载先创建一个/home/newdisk , 挂载mount /dev/sdb1 /home/newdisk（临时挂载）
+			E. 设置可以自动挂载(永久挂载，当你重启系统，仍然可以挂载到/home/newdisk) 。
+			vim /etc/fstab
+			/dev/sdb1 /home/newdisk ext4 defaults 0 0
+	4. 具体的操作步骤整理
+		① 虚拟机增加硬盘步骤1：虚拟机添加硬盘
+			在【虚拟机】菜单中，选择【设置】，然后设备列表里添加硬盘，然后一路【下一步】，中间只
+			有选择磁盘大小的地方需要修改，至到完成。然后重启系统（才能识别）
+		② 虚拟机增加硬盘步骤1：对硬盘进行分区
+			A. 分区命令fdisk /dev/sdb
+			B. 开始对/sdb 分区
+				a. m: 显示命令列表
+				b. p: 显示磁盘分区同fdisk –l
+				c. n: 新增分区
+				d. d: 删除分区
+				E. w: 写入并退出
+			C. 说明：开始分区后输入n，新增分区，然后选择p ，分区类型为主分区，输入1默认为1号分区。
+			两次回车默认剩余全部空间。最后输入w 写入分区并退出，若不保存退出输入q。
+		③ 虚拟机增加硬盘步骤3：格式化磁盘
+			A. mkfs -t ext4 /dev/sdb1
+			B. 其中ext4 是分区类型
+		④ 虚拟机增加硬盘步骤4：挂载:
+			A. 挂载: 将一个分区与一个目录联系起来，
+			B. mount 设备名称挂载目录
+				例如： mount /dev/sdb1 /newdisk
+			C. umount 设备名称或者挂载目录
+				例如： umount /dev/sdb1 或者umount /newdisk
+		⑤ 虚拟机增加硬盘步骤5：永久挂载
+			A. 永久挂载: 通过修改/etc/fstab 实现挂载
+				/dev/sdb1 /home/newdisk ext4 defaults 0 0
+			B. 添加完成后执行mount –a 即刻生效
+	5. 磁盘情况查询
+		① 查询系统整体磁盘使用情况
+			A. 基本语法
+				df -h
+			B. 应用实例
+				查询系统整体磁盘使用情况：df -lh
+				文件系统                 容量  已用  可用 已用% 挂载点
+				/dev/mapper/centos-root   17G  5.3G   12G   31% /
+				devtmpfs                 897M     0  897M    0% /dev
+				tmpfs                    912M  4.0K  912M    1% /dev/shm
+				tmpfs                    912M  9.2M  903M    1% /run
+				tmpfs                    912M     0  912M    0% /sys/fs/cgroup
+				/dev/sda1               1014M  179M  836M   18% /boot
+				tmpfs                    183M   24K  183M    1% /run/user/0
+				/dev/sr0                 4.3G  4.3G     0  100% /run/media/root/CentOS 7 x86_64
+				/dev/sdb1                2.0G  6.0M  1.9G    1% /home/newdisk
+		②查询指定目录的磁盘占用情况
+			A. 基本语法
+				a. du -h /目录
+				b. 查询指定目录的磁盘占用情况，默认为当前目录
+					-s 指定目录占用大小汇总
+					-h 带计量单位
+					-a 含文件
+					--max-depth=1 子目录深度
+					-c 列出明细的同时，增加汇总值
+			B. 应用实例
+				查询/opt 目录的磁盘占用情况，深度为1
+					du -ach --max-depth=1 /home
+					4.2M	/home/yucx
+					420K	/home/test
+					24K	/home/LiXL
+					28K	/home/jack
+					28K	/home/jerry
+					24K	/home/li
+					24K	/home/yu
+					12K	/home/ts
+					24K	/home/ss
+					28K	/home/wk
+					24K	/home/bj
+					20K	/home/newdisk
+					4.9M	/home
+					4.9M	总用量
+	6. 磁盘情况-工作实用指令
+		① 统计/home 文件夹下文件的个数
+			ls -l /home/ | grep "^-" | wc -l
+		② 统计/home 文件夹下目录的个数
+			ls -l /home/ | grep "^d" | wc -l
+		③ 统计/home 文件夹下文件的个数，包括子文件夹里的(-R递归查询子目录)
+			ls -Rl /home/ | grep "^-" | wc -l
+		④ 统计文件夹下目录的个数，包括子文件夹里的
+			ls -Rl /home/ | grep "^d" | wc -l
+		⑤ 以树状显示目录结构
+四、进程管理			 
+	1. 进程的基本介绍
+		① 在LINUX 中，每个执行的程序（代码）都称为一个进程。每一个进程都分配一个ID 号。
+		② 每一个进程，都会对应一个父进程，而这个父进程可以复制多个子进程。例如www 服务器。
+		③ 每个进程都可能以两种方式存在的。前台与后台，所谓前台进程就是用户目前的屏幕上可以进
+		行操作的。后台进程则是实际在操作，但由于屏幕上无法看到的进程，通常使用后台方式执行。
+		④ 一般系统的服务都是以后台进程的方式存在，而且都会常驻在系统中。直到关机才才结束。
+	2. 显示系统执行的进程
+		① 说明：查看进行使用的指令是ps ,一般来说使用的参数是ps -aux
+			A. -a: 显示当前终端的所有进程信息
+			B. -u: 以用户的格式显示进程信息
+			C. -x: 显示后台进程运行的参数
+		② ps先回的信息选项
+			A. System V 展示风格
+			B. USER：用户名称
+			C. PID：进程号
+			D. %CPU：进程占用CPU 的百分比
+			E. %MEM：进程占用物理内存的百分比
+			F. VSZ：进程占用的虚拟内存大小（单位：KB）
+			G. RSS：进程占用的物理内存大小（单位：KB）
+			H. TT：终端名称,缩写.
+			I. STAT：进程状态，其中S-睡眠，s-表示该进程是会话的先导进程，N-表示进程拥有比普通优先
+			级更低的优先级，R-正在运行，D-短期等待，Z-僵死进程，T-被跟踪或者被停止等等
+			J. STARTED：进程的启动时间
+			K. TIME：CPU 时间，即进程使用CPU 的总时间
+			L. COMMAND：启动进程所用的命令和参数，如果过长会被截断显示
+		③ ps 指令详解：
+			A. 分页查看进程：ps -aux | more
+			B. 查看某个服务：ps –aux|grep xxx
+			C. 以全格式显示当前所有的进程，查看进程的父进程：ps -ef | more
+				a. ps -ef 是以全格式显示当前所有的进程
+				b. -e 显示所有进程。-f 全格式。
+			D. 以全格式显示某个服务的父进程号：ps -ef|grep xxx
+				a. UID：用户ID
+				b. PID：进程ID
+				c. PPID：父进程ID
+				d. C：CPU 用于计算执行优先级的因子。数值越大，表明进程是CPU 密集型运算，执行优先级会
+				降低；数值越小，表明进程是I/O 密集型运算，执行优先级会提高
+				e. STIME：进程启动的时间
+				f. TTY：完整的终端名称
+				g. TIME：CPU 时间
+				h. CMD：启动进程所用的命令和参数
+	3. 终止进程kill 和killall
+		① 介绍:
+			若是某个进程执行一半需要停止时，或是已消了很大的系统资源时，此时可以考虑停止该进程。
+			使用kill 命令来完成此项任务。
+		② 基本语法：
+			A. kill [选项] 进程号（功能描述：通过进程号杀死进程）
+			B. killall 进程名称（功能描述：通过进程名称杀死进程，也支持通配符，这在系统因负载过大而变
+			得很慢时很有用）
+		③ 常用选项：
+			-9 :表示强迫进程立即停止
+		④ 最佳实践：
+			A. 案例1：踢掉某个非法登录用户
+				a. 查询用户的进程号：ps -aux | grep sshd
+				b. 查询结果：LiXL      34247  0.1  0.1 149980  2312 ?        S    15:56   0:00 sshd: LiXL@pts/1
+				c. 杀死进程：kill 34247
+			B. 案例2: 终止远程登录服务sshd, 在适当时候再次重启sshd 服务
+				a. 查询sshd 服务的进程号：ps -aux | grep sshd
+				b. 查询结果：root       1300  0.0  0.0 106044   340 ?        Ss   13:07   0:00 /usr/sbin/sshd -D
+				c. 杀死进程：kill 1300
+				d. 注意：杀死sshd进程之后再使用ps -aux | grep sshd查询进程时，就没有sshd服务，并且其他用户无法再远程登录
+			C. 案例3: 终止多个gedit 编辑器【killall , 通过进程名称来终止进程】
+				a. 使用多个终端打开多个gedit文本编辑器
+				b. 使用killall gedit关闭多个gedit文本编辑器
+			D. 案例4：强制杀掉一个终端
+				a. 终端的服务名为：bash
+				b. 查询终端的进程号：ps -aux | grep bash
+				c. 查询结果：root      35003  0.0  0.1 116296  2520 pts/1    Ss+  16:02   0:00 bash
+				d. 强制杀掉一个终端: kill -9 35003
+	4. 查看进程树pstree
+		① 基本语法：
+			pstree [选项] ,可以更加直观的来看进程信息
+		② 常用选项：
+			-p :显示进程的PID
+			-u :显示进程的所属用户
+		③ 应用实例：
+			A. 案例1：请你树状的形式显示进程的pid
+				pstree -p
+			B. 案例2：请你树状的形式进程的用户id
+				pstree -u
+	5. 服务(Service)管理（以下在CentOS6下进行）
+		① 介绍:
+		服务(service) 本质就是进程，但是是运行在后台的，通常都会监听某个端口，等待其它程序的请
+		求，比如(mysql , sshd 防火墙等)，因此我们又称为守护进程，是Linux 中非常重要的知识点。
+		②service 管理指令：
+			service 服务名[start | stop | restart | reload | status]
+			在CentOS7.0 后不再使用service ,而是systemctl
+		③使用案例：
+		查看当前防火墙的状况，关闭防火墙和重启防火墙。
+			A. 查看当前防火墙的状况：service iptables status
+			B. 关闭防火墙：service iptables stop
+			C. 重启防火墙：service iptables status
+		④细节讨论：
+			A. 关闭或者启用防火墙后，立即生效。
+			B. telnet 测试某个端口是否开启：telnet ip地址 端口号（telnet 192.168.107.8 22）
+			C. 这种方式只是临时生效，当重启系统后，还是回归以前对服务的设置
+			D. 如果希望设置某个服务自启动或关闭永久生效，要使用chkconfig 指令，马
+		⑤查看服务名:
+			A. 方式1：使用setup -> 系统服务就可以看到。
+			B. 方式2: ls -l /etc/init.d/ 列出系统的服务名称
+		⑥服务的运行级别(runlevel):
+			A. 查看或者修改默认级别： vi /etc/inittab
+			B. Linux 系统有7 种运行级别(runlevel)：常用的是级别3 和5
+				a. 运行级别0：系统停机状态，系统默认运行级别不能设为0，否则不能正常启动
+				b. 运行级别1：单用户工作状态，root 权限，用于系统维护，禁止远程登陆
+				c. 运行级别2：多用户状态(没有NFS)，不支持网络
+				d. 运行级别3：完全的多用户状态(有NFS)，登陆后进入控制台命令行模式
+				e. 运行级别4：系统未使用，保留
+				f. 运行级别5：X11 控制台，登陆后进入图形GUI 模式
+				g. 运行级别6：系统正常关闭并重启，默认运行级别不能设为6，否则不能正常启动
+		⑦开机的流程说明
+			开机 → BIOS（自检） → /boot（root引导） → init进程1（初始进程，所有进程的父进程） 
+			→ 运行级别（读取/etc/inittab配置文件，查看运行级别） → 运行级别对应的服务（自启）
+		⑧chkconfig 指令
+			A. 介绍：通过chkconfig 命令可以给每个服务的各个运行级别设置自启动/关闭
+			B. 基本语法
+				a. 查看服务chkconfig --list[ | grep xxx]
+				查看所有服务：chkconfig --list
+				NetworkManager 	0:关闭	1:关闭	2:启用	3:启用	4:启用	5:启用	6:关闭
+				abrt-ccpp      	0:关闭	1:关闭	2:关闭	3:启用	4:关闭	5:启用	6:关闭
+				查看sshd服务：chkconfig --list | grep sshd
+				sshd           	0:关闭	1:关闭	2:启用	3:启用	4:启用	5:启用	6:关闭
+				b. 查看某个服务：chkconfig 服务名--list
+				查看sshd服务：chkconfig sshd --list
+				sshd           	0:关闭	1:关闭	2:启用	3:启用	4:启用	5:启用	6:关闭
+				c. 开启/关闭服务：chkconfig --level 5 服务名on/off
+				关闭sshd在运行级别为5的开机自启：chkconfig --level 5 sshd off
+				重新启动系统：reboot，XShell6无法远程连接，因为sshd服务没开启，也其管理的端口号无法向外开放
+				查看sshd的运行级别：chkconfig sshd --list
+				chkconfig sshd --list
+				sshd           	0:关闭	1:关闭	2:启用	3:启用	4:启用	5:关闭	6:关闭
+				重新启动sshd服务：service sshd start
+				重新设置sshd在运行级别为5的开机自启：chkconfig --level 5 on
+		⑨ 应用实例：
+			A. 案例1： 请显示当前系统所有服务的各个运行级别的运行状态
+			chkconfig --list
+			B. 案例2 ：请查看sshd 服务的运行状态
+			service sshd status
+			C. 案例3： 将sshd 服务在运行级别5 下设置为不自动启动，看看有什么效果？
+			chkconfig --level 5 sshd off
+			D. 案例4： 当运行级别为5 时，关闭防火墙。
+			chkconfig --level 5 iptables off
+			E. 案例5： 在所有运行级别下，关闭防火墙
+			chkconfig iptables off
+			F. 案例6： 在所有运行级别下，开启防火墙
+			chkconfig iptables on
+		⑩使用细节
+			chkconfig 重新设置服务后自启动或关闭，需要重启机器reboot 才能生效.
+	6. 动态监控进程
+		① 介绍：top 与ps 命令很相似。它们都用来显示正在执行的进程。Top 与ps 最大的不同之处，在于top 在
+		执行一段时间可以更新正在运行的的进程。
+		② 基本语法：top [选项]
+		③ 选项说明：
+			A. -d 秒数：指定top命令每隔几秒钟更新，默认是3秒。在top命令的交互中可以执行的命令
+			B. -i：使top不显示任何和闲置或者将僵死进程
+			C. -p：通过指定监控进程ID来仅仅监控某个进程的状态
+		④ 交互说明：
+			A. P：以CPU使用率排序，默认是按CPU排序
+			B. M：以内存的使用率排序
+			C. N：以PID排序
+			D. q：退出top
+		⑤ 应用案例：
+			A. 案例1: 监视特定用户	
+				a. top：输入此命令，按回车键，查看执行的进程。会出现以下信息+正在执行的进程
+					top - 19:19:52 up  1:36,  3 users,  load average: 0.15, 0.11, 0.17
+					Tasks: 203 total,   1 running, 202 sleeping,   0 stopped,   0 zombie
+					Cpu(s):  0.1%us,  0.1%sy,  0.0%ni, 99.8%id,  0.0%wa,  0.0%hi,  0.0%si,  0.0%st
+					Mem:   2038376k total,   656660k used,  1381716k free,    31736k buffers
+					Swap:  2097148k total,        0k used,  2097148k free,   307868k cached
+					(1) 19:19:52: 当前时间
+					(2) 1:36: 当前系统一共运行了多长时间
+					(3)3 users: 该系统目前的用户数
+					(4) load average: 0.15, 0.11, 0.17: 当前系统的负载均衡，当平均值超过0.7，则该系统性能会下降
+					(5)Tasks: 203 total,   1 running, 202 sleeping,   0 stopped,   0 zombie: 当前系统任务数公共203个
+					1个正在运行，202正在睡眠，0个进行停止，0个僵死进程
+					(6)Cpu(s):  0.1%us,  0.1%sy,  0.0%ni, 99.8%id,  0.0%wa,  0.0%hi,  0.0%si,  0.0%st: 当前系统用户占有
+					CPU：0.1%，系统占有CPU：0.1，99.8%是空闲的
+					(7) Mem:   2038376k total,   656660k used,  1381716k free,    31736k buffers: 内存使用情况，
+					总共2G内容，使用了0.65G，还有1.3G内存空闲，
+					(8) Swap:  2097148k total,        0k used,  2097148k free,   307868k cached: 内存与硬盘交换空间
+					总共2G，使用0，剩余2G空闲。
+				b. u：然后输入“u”回车，再输入用户名，即可
+			B. 案例2：终止指定的进程。
+				a. top：输入此命令，按回车键，查看执行的进程。
+				b. k：然后输入“k”回车，再输入要结束的进程ID 号
+			C. 指定系统状态更新的时间(每隔10 秒自动更新， 默认是3 秒)：
+	7. 查看系统网络情况netstat(重要)
+	① 基本语法：
+		A. netstat [选项]
+		B. 一般使用：netstat -anp指令查看网络服务状态
+	② 选项说明
+		A. -an 按一定顺序排列输出
+		B. -p 显示哪个进程在调用
+	③ 应用案例
+		A. 查看系统所有的网络服务
+			netstat -anp | more
+		B. 请查看服务名为sshd 的服务的信息。
+			netstat -anp | grep sshd
+			tcp        0      0 0.0.0.0:22                  0.0.0.0:*                   LISTEN      3324/sshd           
+			本机监听的状态，一般支持IPv4的客户机进行连接
+			tcp        0     64 192.168.107.8:22            192.168.107.48:63565        ESTABLISHED 3327/sshd
+			外部的一个ip地址为192.168.107.48远程连接到22号端口
+			tcp        0      0 :::22                       :::*                        LISTEN      3324/sshd
+			本机监听的状态，一般支持IPv6的客户机进行连接
+	8. 查看程序端口占用情况
+		① 首先使用netstat命令查看其占用的端口：netstat -anp | grep 端口号
+		② 查到进程id之后，用ps命令查看进程的详情
+			ps -ef | grep 进程号 或者 ps -aux | grep  进程号
+		③ 关闭进程：kill -9 进程号
+六、 RPM 和YUM
+	1. rpm 包的管理
+		① 介绍：
+			一种用于互联网下载包的打包及安装工具，它包含在某些Linux 分发版中。它生成具有.RPM
+			扩展名的文件。RPM 是RedHat Package Manager（RedHat 软件包管理工具）的缩写，类似windows
+			的setup.exe，这一文件格式名称虽然打上了RedHat 的标志，但理念是通用的。
+			Linux 的分发版本都有采用（suse,redhat, centos 等等），可以算是公认的行业标准了。
+		② rpm 包的简单查询指令：
+			A. 查询已安装的rpm 列表rpm –qa|grep xx
+			B. 请查询看一下，当前的Linux 有没有安装firefox：rpm -qa | grep firebox
+		③ rpm 包名基本格式：
+			一个rpm 包名：firefox-45.0.1-1.el6.centos.x86_64.rpm
+			名称:firefox
+			版本号：45.0.1-1
+			适用操作系统: el6.centos.x86_64
+			表示centos6.x 的64 位系统
+			如果是i686、i386 表示32 位系统，noarch 表示通用
+		④ rpm 包的其它查询指令：
+			A. rpm -qa :查询所安装的所有rpm 软件包
+				a. 分页查询：rpm -qa | more
+				b. 查询某个rpm包：rpm -qa | grep X [rpm -qa | grep firefox ]
+			B. rpm -q 软件包名:查询软件包是否安装
+				查询是否安装 firefox：rpm -q firefox
+			C. rpm -qi 软件包名：查询软件包信息
+				a. rpm -qi file
+				b. 查询安装 firefox的信息：rpm -qi firefox
+			D.  rpm -qf 文件全路径名查询文件所属的软件包
+					rpm -qf /etc/passwd
+					rpm -qf /root/install.log
+		⑤ 卸载rpm 包
+			A. 基本语法：rpm -e RPM 包的名称
+			B. 应用案例
+				删除firefox 软件包：
+					a. 查看rpm包：rpm -qa | grep firefox
+					b. 删除rpm包：rpm -e firefox
+			C. 细节问题
+				a. 如果其它软件包依赖于您要卸载的软件包，卸载时则会产生错误信息。
+				如： $ rpm -e foo
+				removing these packages would break dependencies:foo is needed by bar-1.0-1
+				b. 如果我们就是要删除foo 这个rpm 包，可以增加参数--nodeps ,就可以强制删除，但是一般
+				不推荐这样做，因为依赖于该软件包的程序可能无法运行
+				如：$ rpm -e --nodeps foo
+				带上--nodeps 就是强制删除。
+		⑥ 安装rpm 包：
+			A. 基本语法：rpm -ivh RPM 包全路径名称
+			B. 参数说明
+				a. i=install 安装
+				b. v=verbose 提示
+				c. h=hash 进度条
+			C.  应用实例: 演示安装firefox 浏览器
+				a. 步骤：虚拟机 → 设置 → CD/DVD → 使用ISO映像文件 → 确认
+				b. 启动终端 → 进入 /media/ → 进入 CentOS_6.8_Final/目录 → 进入 Package/ → ls -l firefox-45.0.1-1.el6.centos.x86_64.rpm
+				c. 复制：cp firefox-45.0.1-1.el6.centos.x86_64.rpm /opt/ → cd /opt/
+				d. 安装即可rpm -ivh firefox-45.0.1-1.el6.centos.x86_64.rpm
+	2. yum
+		① 介绍：Yum 是一个Shell 前端软件包管理器。基于RPM 包管理，能够从指定的服务器自动下载RPM 包
+		并且安装，可以自动处理依赖性关系，并且一次安装所有依赖的软件包。使用yum 的前提是可以联
+		网。
+		② yum 的基本指令
+			A. 查询yum 服务器是否有需要安装的软件
+			yum list|grep xx 软件列表
+			B. 安装指定的yum 包
+			yum install xxx 下载安装
+		③ yum 应用实例：请使用yum 的方式来安装firefox
+			A. 查看yum是否存在firefox：yum list | grep firefox
+			B. 安装firefox, 默认安装最新版本的软件以及依赖的rpm: yum install firefox
+七、其他命令：
+	1. 查看主机名：hostname
+GRANT REPLICATION SLAVE ON *.* TO 'slave'@'%' IDENTIFIED BY '2648'
+
+server-id=1
+log-bin=mysql-bin
+binlog-ignore-db=mysql
+binlog-ignore-db=information_schema
+binlog-ignore-db=performance_schema
+binlog-do-db=testdb
+binlog_format=STATEMENT
+
+
+CHANGE MASTER TO MASTER_HOST='192.168.107.8',
+MASTER_USER='slave',
+MASTER_PASSWORD='2648',
+MASTER_LOG_FILE='mysql-bin.000001',MASTER_LOG_POS=319;
+
+
+
+
+				
