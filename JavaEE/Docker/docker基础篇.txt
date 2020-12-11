@@ -1,0 +1,323 @@
+一、简介
+	1. Docker 是什么
+		① 为什么会有 Docker 出现
+			A. 一款产品从开发到上线，从操作系统，到运行环境，再到应用配置。作为开发+运维之间的协作我们需要关心很多东西，这也是很多互联网公司都不得不面对
+			的问题，特别是各个版本的迭代之后，不同版本环境的兼容，对运维人员都是考验
+			B. Docker 之所以发展如此之迅速，也是因为它对此给出了一个标准化的解决方案
+			C. 环境配置如此麻烦，换一台机器，就要重来一次，费时费力。很多人想到，能不能从根本上解决问题，软件可以带环境安装？也就是说，安装的时候，把原始
+			环境一模一样地复制过来。开发人员利用 Docker 可以消除协作编码时“在我的电脑上可以正常工作”的问题
+			D. 之前在服务器配置一个应用得运行环境，要安装各种软件，Java/Tomcat/MySQL/JDBC驱动包等。安装和配置这些东西很麻烦，而且还不能跨平台，要移植也是
+			非常麻烦
+			E. 传统上认为，软件编码开发/测试结束后，所产生得成果即是程序或是能够编译执行的二进制字节码（Java 为例）。而为了让这些程序可以顺利执行，开发团
+			队也得准备完整的部署文件，让运维团队得以部署应用程序，开发需要清楚地告诉运维部署团队，用的全部配置文件+所有软件环境。不过，即便如此，仍然常常
+			发生部署失败的状况。Docker 镜像的设计，使得 Docker 得以打破过去（程序即应用）的观念。透过镜像（images）将作业系统核心除外，运作应用程序所需要
+			的系统环境，由下到上打包，达到应用程序跨平台的无缝接轨运作
+		② Docker 理念
+			A. Docker 是基于 GO 语言实现的云开源项目
+			B. Docker 的主要目标是“Build，Ship and Run Any App, Anywhere”，也就是通过对应组件的封装、分发、部署、运行等生命周期的管理，使得用户的 App（可
+			以是一个 WEB 应用或数据库应用等）及其运行环境能够做到“一次封装，到处运行”。
+			C. Linux 容器技术的出现就解决了这样一个问题，而Docker 就是在它的基础上发展过来的。将应用运行在 Docker 容器上面，而 Docker 容器在任何操作系统上
+			都是一致的，这就实现了跨平台、跨服务器。只需要一次配置好环境，换到别的机子就可以一键部署好，大大简化了操作。
+		③ 一句话：解决了运行环境和配置问题软件容器，方便做持续集成并有助于整体发布的容器虚拟化技术。
+	2. Docker 的作用：
+		① 之前的虚拟机技术
+			A. 虚拟机（virtual machine）就是带环境安装的一种解决方案
+			B. 它可以在一种操作系统里面运行另一种操作系统，比如在 Windows 系统里面运行 Linux 系统。应用程序对此毫无感知，因此虚拟机看上去跟真实系统一模一
+			样，而对于底层系统来说，虚拟机就是一个普通文件，不需要就删掉，对其他部分毫无影响。这类虚拟机完美的运行另一套系统，能够使得应用程序，操作系统和
+			硬件三者之间的逻辑不变。
+			C. 虚拟机的缺点：资源占用多、冗余步骤多、启动慢  
+		② 容器虚拟化技术
+			A. 由于前面虚拟机存在这些缺点，Linux 发展出了另一种虚拟化技术：Linux 容器（Linux Containers，缩写为 LXC）
+			B. Linux 容器不是模拟一个完整的操作系统，而是对进程进行隔离。有了容器，就可以将软件所需要的所有资源打包到一个隔离的容器中。容器于虚拟机不同，不
+			需要捆绑一整套操作系统，只需要软件工作所需要的库资源和设置。系统因此而变得高效轻量并保证部署在任何环境中的软件都能始终如一地运行。
+			C. 比较了Docker 和传统虚拟化方式的不同之处：
+				a. 传统虚拟机技术是虚拟出一套硬件，在其上运行一个完整操作系统，在该系统上运行所需要应用进程
+				b. 而容器内的应用进程直接运行于宿主机的内核，容器内没有自己的内核，而且也没有进行硬件虚拟。因此容器要比虚拟机更为轻便。
+				c. 每个容器之间互相隔离，每个容器有自己的文件系统，容器之间进行不会相互影响，能区分计算资源。
+		③ 开发/运维（DevOps）：一次构建、随处运行
+			A. 更快速的应用交付和部署：传统的应用开发完成之后，需要提供一堆安装程序和配置说明文档，安装部署后需要根据配置文档进行繁琐的配置才能正常执行。
+			Docker 化之后只需要交付少量容器镜像文件，在正式生产环境加镜像并运行即可，应用安装配置在镜像里已经内置好，大大节省部署配置和测试验证时间
+			B. 更便捷的升级扩容缩容
+			C. 更简单的系统运维
+			D. 更高效的计算资源利用
+	3. Docker 下载
+		① 官网：https://www.docker.com/
+		② 中文官网：https://www.docker-cn.com/
+		③ 仓库，Docker Hub 官网：https://hub.docker.com/
+二、Docker 安装
+	1. 前提说明
+		① CentOS Docker 安装
+			A. Docker 支持的 CentOS 版本：CentOS 7（64-bit）、CentOS 6.5（64-bit）或更高
+		② 前提条件
+			A. 目前，CentOS 仅发行版本中的内核支持 Docker
+			B. Docker 运行在 CentOS 7 上，要求系统为64位，系统内核版本为3.10以上
+			C. Docker 运行在 CentOS 6.5或更高的版本的 CentOS 上，要求系统为64位，系统版本内核为2.6.32-431或者更高版本
+		③ 查看自己的内核
+			A. uname 命令用于打印当前系统相关信息（内核版本号、硬件架构、主机名称和操作系统类型等）。
+				uname -r
+		④ 查看已安装的 CentOS 版本信息
+			a. lsb_release -a
+			b. cat /etc/redhat-release
+	2. Docker 的基本组成
+		① 镜像（Images）：
+			A. Docker 镜像（Image）就是一个只读的模板。镜像可以用来创建 Docker 容器，一个镜像可以创建很多个容器
+			B. 容器与镜像的关系类似于面向对象编程中的对象与类
+		② 容器（Container）:
+			A. Docker 利用容器（Container）独立运行的一个或一组应用。容器是用镜像创建的运行实例
+			B. 它可以被启动、开始、停止、删除。每个容器都是相互隔离的、保证安全的平台
+			C. 可以把容器看作是一个简易版的 Linux 环境（包括 root 用户权限、进程空间、用户空间和网络空间）和运行在其中的应用程序
+			D. 容器的定义和镜像几乎一模一样，也是一堆层的统一视角，唯一的区别在于容器的最上层是可读可写的
+		③ 仓库（Repository）:
+			A. 仓库（Repository）是集中存放镜像文件的场所
+			B. 仓库（Repository）和仓库注册服务器（Registry）是有区别的。仓库注册服务器上往往存放着多个仓库，每个仓库中又包含了多个镜像，每个镜像有不同的标签（tag）
+			C. 仓库分为公开仓库（Public）和私有仓库（Private）两种形式
+			D. 最大的公开仓库是 Docker Hub（https://hub.docker.com/），存放了数量庞大的镜像供用户下载。国内的公开仓库包括阿里云、网易云等。
+		④ 小总结：需要正确地理解仓储/镜像/容器这几个概念：
+			A. Docker 本身是一个容器运行载体或者称之为管理引擎。我们把应用程序和配置依赖打包好形成一个可交付的运行环境，这个打包好的运行环境就似乎 image 镜像文件。只
+			有通过这个文件才能生成 Docker 容器。image 文件可以看作是容器恶模板。Docker 根据 image 文件生成容器实例。同一个image 文件，可以生成多个同时运行的容器实例
+			B. iamge 文件生成的容器实例，本身也是一个文件，称为镜像文件
+			C. 一个容器运行一种服务，当我们需要的时候，就可以通过 Docker 客户端创建一个对应的运行实例，也就是我们的容器
+			D. 至于仓储，就是存放了一堆镜像的地方，我们可以把镜像发布到仓储中，需要的时候从仓储中拉下来就可以了。
+		⑤ cker 的架构图：
+										--------------------------------------			-----------------
+			----------------			|			  Docker_Host			 |			|	Registry	|
+			| 	 Client	   |			| ---------------------------------- |			| ------------- |
+			|			   |	|-------> | 		 Docker daemon         | | -----	| |           | |
+			| docker build | ---- |	|	| ---------------------------------- |	   |	| ------------- |
+			| docker pull  | ------	|	| ----------------	| 	------------ |	   |	| ------------- |
+			| docker run   | --------	| |  Conrainers  |  | 	|  Images  | |	 --|--- | |	  MySQL	  |	|
+			----------------			| |	------------ |	| 	| -------- | |	 |		| ------------- |
+										| |	|		   | |<-|-- | |	MySQL| | | <-|		| ------------- |
+										| |	------------ |   	| -------- | |			| |			  | |
+										| |	------------ |	 	| -------- | |			| ------------- |
+										| |	|		   | |   	| |	  	 | | |			-----------------
+										| |	------------ |	 	| -------- | |
+										| ----------------	 	------------ |
+										--------------------------------------
+	3. 安装步骤：
+		① CentOS 6.8 安装 Docker
+			A. Docker 使用 EPEL 发布，RHEL 系的 OS 首先要确保已经持有 EPEL 仓库，否则先检查 OS 的版本，然后安装相应的 EPEL 包。
+				yum install -y epel-release
+			B. yum install -y docker-io
+			C. 安装后的配置文件：/etc/sysconfig/docker
+			D. 启动 Docker 后台服务：service docker start
+			E. docker version验证
+		② CentOS 7 安装 Docker
+			A. 官网的 CentOS 7 安装步骤：https://docs.docker.com/engine/install/centos/
+			B. 确定是 CentOS 7 及以上版本：cat /etc/redhat-release
+			C. yum 安装gcc 相关
+				a. yum -y install gcc
+				b. yum -y install gcc-c++
+			D. 卸载 旧版本的 Docker（官网步骤）
+				sudo yum remove docker \
+                  docker-client \
+                  docker-client-latest \
+                  docker-common \
+                  docker-latest \
+                  docker-latest-logrotate \
+                  docker-logrotate \
+                  docker-engine
+			E. 需要安装的软件包（官网步骤）
+				sudo yum install -y yum-utils
+			F. 设置 stable 镜像仓库（官网步骤）
+				a. 不建议：sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+				b. 建议：sudo yum-config-manager --add-repo http://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+				c. 查看文件：/etc/yum.repos.d/docker-ce.repo
+			G. Optional: Enable the nightly or test repositories（官网步骤，可选的，忽略）
+				a. sudo yum-config-manager --enable docker-ce-nightly
+				b. sudo yum-config-manager --enable docker-ce-test
+				c. sudo yum-config-manager --disable docker-ce-nightly
+			H. 更新 yum 软件包索引（官网没有，建议执行）
+				yum makecache fast
+			I. 安装 Docker CE（官网步骤）
+				sudo yum install -y docker-ce docker-ce-cli containerd.io
+			J. 启动 Docker
+				systemctl start docker
+			L. 测试
+				docker version
+			M. 配置镜像加速,使用阿里云的镜像加速器
+				mkdir -p /etc/docker
+				
+				tee /etc/docker/daemon.json <<-'EOF'
+				{
+				"registry-mirrors": ["https://y8blvi1l.mirror.aliyuncs.com"]
+				}
+				EOF
+				
+				systemctl daemon-reload
+				systemctl restart docker
+			N. 卸载
+				systemctl stop docker
+				sudo yum remove docker-ce docker-ce-cli containerd.io
+				sudo rm -rf /var/lib/docker
+	4. Hello World
+		① 启动 Docker 后台容器，测试运行 hello-world
+			A. 用Docker 命令启动 hello-world 容器
+				docker run hello-world
+			B. 由于本地没有 hello-world 这个镜像，所以会下载一个 hello-world 的镜像，并在容器中运行
+				Unable to find image 'hello-world:latest' locally
+				latest: Pulling from library/hello-world
+			C. 输出这段提示后，hello-world 就会停止运行，容器自动终止
+				Hello from Docker!
+				This message shows that your installation appears to be working correctly.
+		② run 的工作流程
+												----------------------------------
+												| 以该镜像为模板生成容器实例运行 |
+												----------------------------------
+															  ↑
+															 是
+							-----------------				  |
+			--------		|  Docker在本机 |		  --------------------		   --------------------		  ----------------------------------
+			| 开始 | -----> |				| ------> | 本机是否有该镜像 |		   | 下载该镜像到本地 | ----> | 以该镜像为模板生成容器实例运行 |
+			--------		|  寻找该镜像   |		  --------------------		   --------------------		  ----------------------------------
+							-----------------				  |								↑
+															 否							   是
+															  ↓							    |
+												------------------------------		 ----------------		  --------------------------------
+												| 去 Docker Hub 上查找该镜像 | ----> | Hub 能否找到 | --否--> | 返回失败错误，查找不到该镜像 |
+												------------------------------		 ----------------		  --------------------------------
+	5. 底层原理
+		① Docker 是怎么工作的
+			A. Docker 是一个 Client-Server 结构的系统，Docker 守护进程运行在主机上，然后通过 Socket 连接从客户端访问，守护进程从客户端接受命令并管理运行
+			在主机上的容器。容器，是一个运行时环境，就是我们前面说的集装箱。
+		② 为什么 Docker 比 VM 快
+			A. Docker 有着比虚拟机更少的抽象层。由于 Docker 不需要 Hypervisor（连接虚拟机与宿主机的接口） 实现硬件资源虚拟化运行在 Docker 容器上的程序直
+			接使用的都是实际物理机的硬件资源。因此在 CPU、内存利用率上 Docker 将会在效率上有明显优势
+			B. Docker 利用的是宿主机的内核，而不需要 Guest OS（客户端操作系统），因此，当新建一个容器时，Docker 不需要和虚拟机一样重新加载一个操作系统内
+			核。仍而避免引寻、加载操作系统内核返而比较费时费资源的过程，当新建一个虚拟机时，虚拟机软件需要加载 Guest OS，返个新建过程是分钟级别的。而 
+			Docker 由于直接利用宿主机的操作系统，则省略了返个过程
+			C. Docker 容器与虚拟机 VM 比较
+				------------------------------------------------------------------------
+				|			 | Docker 容器				| 虚拟机 VM					   |
+				|----------------------------------------------------------------------|
+				| 操作系统 	 | 与宿主机共享 OS 			| 宿主机 OS 上运行虚拟机 OS    |
+				|----------------------------------------------------------------------|
+				| 存储大小	 | 镜像小，便于存储与传输	| 镜像庞大（vmdk、vdi等）	   |
+				|----------------------------------------------------------------------|
+				| 运行性能	 | 几乎无额外性能损失		| 操作系统额外的 CPU、内存消耗 |
+				|----------------------------------------------------------------------|
+				| 移植性	 | 轻便、灵活、适应于 Linux | 笨重，与虚拟化技术耦合度高   |
+				|----------------------------------------------------------------------|
+				| 硬件亲和性 | 面向软件开发者			| 面向硬件运维者			   |
+				|----------------------------------------------------------------------|
+				| 部署速度	 | 快速、秒级				| 较慢，10s 以上			   |
+				------------------------------------------------------------------------
+三、Docker 常用命令
+	1. 帮助命令
+		① docker version：docker 的版本信息
+		② docker info：docker 的安装信息，比docker version更全面
+		③ docker --help：docker 的所有的操作选项、命令和可选参数
+	2. 镜像命令
+		① docker images：
+			A. 列出本地上的镜像：
+				a. 各个选项说明：
+					(1) REPOSITORY：表示镜像的仓库源
+					(2) TAG：镜像的标签
+					(3) IMAGE ID：镜像 ID
+					(4) CREATED：镜像创建时间
+					(5) SIZE：镜像大小
+				b. 同一仓库源可以有多个 TAG，代表这个仓库源的不同版本，我们使用 REPOSITORY:TAG 来定义不同得镜像。如果不指定一个镜像得版本标签，例如只使用mysql，
+				docker 将默认使用 mysql:latest 镜像
+			B. OPTION说明：
+				a. -a：列出本地所有的镜像（含中间映像层）
+				b. -q：只显示镜像 ID
+				c. --digests：显示镜像的摘要信息
+				d. --no-trunc：显示完整的镜像信息
+			C. 举例：
+				a. docker images -qa：列出所有镜像 ID
+				b. docker images --digests --no-trunc：列出所有镜像的摘要信息和完整信息
+		② docker search 某个镜像的名字：
+			A. 网站：https://registry.hub.docker.com/
+			B. 命令：docker search [option]：镜像名字
+			C. option 说明：
+				a. --no-trunc：显示镜像的完整描述
+				b. -s：列出收藏数不小于指定值的镜像
+				c. -automated：只列出 automated build（自动构建）类型的镜像
+			D. 举例：	
+				docker search --no-trunc -s 30 tomcat：查看点赞数超过 30 的所有 tomcat 的完整镜像信息。
+		③ docker pull 某个镜像名字：
+			A. 下载镜像
+			B. docker pull 某个镜像名字
+			C. 举例：
+				docker pull tomcat：下载 tomcat 镜像，默认最新版
+		④ docker rmi 某个镜像名字或者ID：删除镜像
+			A. 删除单个
+				a. 命令：docker rmi hello-world
+				b. 如果镜像生成的容器在后台使用，则会报错，删除失败，需要强制删除，docker rmi -f hello-world
+					Error response from daemon: conflict: unable to remove repository reference "hello-world" (must force) - container 18281ee972a2 is using its 
+					referenced image bf756fb1ae65
+			B. 删除多个
+				a. 命令：docker rmi -f 镜像名1:TAG 镜像名1:TAG
+				b. 举例：
+					docker rmi -f tomcat:latest hello-world:latest
+			C. 删除全部：docker rmi -f $(docker images -qa)
+	3. 容器命令	
+		① 有镜像才能创建容器，这是根本前提（下载一个 CentOS 镜像演示）：docker pull centos
+		② 新建并启动容器：docker run [options] IMAGE [COMMAND][ARG...]
+			A. OPTIONS说明：有些是一个减号，有些是两个减号
+			B. --name="容器的名字"：为容器指定一个名称
+			
+	4. 小总结
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
