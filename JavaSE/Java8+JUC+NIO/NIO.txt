@@ -1,0 +1,1320 @@
+一、Java NIO
+	1. 主要内容
+		① Java NIO 简介
+		② Java NIO 与 IO 的主要区别
+		③ 缓冲区（Buffer）和通道（Channel）
+		④ 文件通道（FileChannel）
+		⑤ NIO 的非阻塞式网络通信
+			A. 选择器（Selector）
+			B. SocketChannel、ServerSocketChannel 和 DatagramChannel
+		⑥ 管道（Pipe）
+		⑦ Java NIO2（Path、Paths 与 Files）
+	2. Java NIO 简介
+		① Java NIO（New IO / Non Blocking IO）是从 Java 4 版本开始引入的一个新的 IO API，可以替代标准的 Java IO API。NIO 与原来的 IO 有同样的作用
+		和目的，但是使用的方式完全不同，NIO 支持面向缓冲区的、基于通道的 IO 操作。NIO 将以更高效率的方式进行文件的读写操作。
+	3. Java NIO 与 IO 的主要区别
+		---------------------------------------------------------------------
+		| IO							| NIO								|
+		|-------------------------------------------------------------------|
+		| 面向流（Stream Oriented）		| 面向缓冲区（Buffer Oriented）		|
+		|-------------------------------------------------------------------|
+		| 阻塞 IO（Blocking IO）		| 非阻塞 IO（Non Blocking IO）		|
+		|-------------------------------------------------------------------|
+		| 无							| 选择器（Selector）				|
+		---------------------------------------------------------------------
+二、缓冲区（Buffer）和通道（Channel）
+	1. 通道和缓冲区
+		① Java NIO 系统的核心在于：通道（Channel）和缓冲区（Buffer）。通道表示打开 IO 设备（例如：文件、套接字）的连接。若需要使用 NIO 系统，需要获取
+		用于连接 IO 设备的通道以及用于容纳数据的缓冲区。然后操作缓冲区，对数据进行处理
+		② 简而言之：Channel 负责传输，Buffer 负责存储。
+	2. 缓冲区（Buffer）
+		① 缓冲区（Buffer）：一个用于特定基本数据类型的容器。由 java.nio 包定义的，所有缓冲区都是 Buffer 抽象类的子类。
+		② Java NIO 中的 Buffer 主要用于与 NIO 通道进行交互，数据是从通道读入缓冲区，从缓冲区写入通道中的。
+		③ 根据 数据类型不同（Boolean 除外），提供了相应类型的缓冲区，缓冲区管理方式几乎一致，通过 其对应的allocate() 获取
+			A. ByteBuffer
+			B. ShortBuffer
+			C. IntBuffer
+			D. LongBuffer
+			E. FloatBuffer
+			F. DoubleBuffer
+			G. CharBuffer
+		④ 缓冲区存取数据的API：
+			A. static ByteBuffer allocate(int capacity)：创建非直接缓冲区
+			B. static ByteBuffer allocateDirect(int capacity)：创建直接缓冲区
+			C. put()：存入数据到缓冲区中（核心方法）
+			D. get()：获取缓冲区中的数据（核心方法）
+			E. filp()：切换读取数据模式
+			F. rewind()：可重复读取数据
+			G. clear()：清空缓冲区，重回些写状态，但是缓冲区中的数据依然存在，只是处于“被遗忘”状态
+			H. mark()：标记 position 的位置
+			I. reset()：恢复 position 到 mark 的位置
+			J. hasRemaining()：判断缓冲区中是否还有数据
+			L. remaining()：获取缓冲区中数据的数量
+			M. isDirect()：判断缓冲区是直接缓冲区还是非直接缓冲区，直接缓冲区返回true
+		⑤ 缓冲区中的四大核心属性：
+			A. capacity：容量，表示缓冲区中最大存储数据的容量。一旦声明不能改变
+			B. limit：界限，表示缓冲区中可以操作数据的大小（limit 后面的数据不能进行读写）
+			C. position：位置，表示缓冲区中正在操作数据的位置。
+			D. mark：标记，表示记录当前 position 的位置（非核心）。
+			E. 0 <= mark <= position <= limit <= capacity
+		⑥ 举例：
+			@Test
+			public void testBuffer() {
+
+				// 利用 allocate() 创建非直接缓冲区，allocateDirect() 创建直接缓冲区
+				ByteBuffer buffer = ByteBuffer.allocate(20);
+				ByteBuffer directBuffer = ByteBuffer.allocateDirect(20);
+
+				// 利用 isDirect() 判断缓冲区是直接缓冲区还是非直接缓冲区
+				System.out.println("--------- isDirect(20) ----------");
+				System.out.println(directBuffer.isDirect());
+
+				System.out.println("--------- allocate(20) ----------");
+				System.out.println(buffer.position()); // 0
+				System.out.println(buffer.limit()); // 20
+				System.out.println(buffer.capacity()); // 20
+
+				// 利用 put() 将数据存入 缓冲区中
+				System.out.println("------------ put() --------------");
+				String str = "LiXL";
+				buffer.put(str.getBytes());
+				System.out.println(buffer.position()); // 4
+				System.out.println(buffer.limit()); // 20
+				System.out.println(buffer.capacity()); // 20
+
+				// 利用 flip() 切换读取数据模式
+				System.out.println("------------ flip() --------------");
+				buffer.flip();
+				System.out.println(buffer.position()); // 0
+				System.out.println(buffer.limit()); // 4
+				System.out.println(buffer.capacity()); // 20
+
+				// 利用 get() 将缓冲区中的数据读到 byte数组中
+				System.out.println("------------ get() --------------");
+				byte[] bytes = new byte[buffer.limit()];
+				buffer.get(bytes);
+				System.out.println(new String(bytes, 0, bytes.length)); //LiXL
+				System.out.println(buffer.position()); // 4
+				System.out.println(buffer.limit()); // 4
+				System.out.println(buffer.capacity()); // 20
+
+				// 利用 rewind()，可重复读取数据
+				System.out.println("----------- rewind() -------------");
+				buffer.rewind();
+				System.out.println(buffer.position()); // 0
+				System.out.println(buffer.limit()); // 4
+				System.out.println(buffer.capacity()); // 20
+
+				// 利用 mark() 标记 position 的位置
+				System.out.println("----------- mark() -------------");
+				buffer.get(bytes, 0, 2);
+				System.out.println(new String(bytes, 0, 2)); // Li
+				System.out.println(buffer.position()); // 2
+				buffer.mark();
+
+				// 利用 reset() 恢复 position 到 mark 的位置
+				System.out.println("----------- reset() -------------");
+				buffer.get(bytes, 2, 2);
+				System.out.println(new String(bytes, 2, 2)); // XL
+				System.out.println(buffer.position()); // 4
+				buffer.reset();
+				System.out.println(buffer.position()); // 2
+
+				// 利用 hasRemaining() 判断缓冲区中是否还有数据，remaining()获取缓冲区中数据的数量
+				System.out.println("-- hasRemaining()、remaining() --");
+				if (buffer.hasRemaining()) {
+					System.out.println(buffer.remaining()); // 2
+				}
+
+				// 利用 clear() 清空缓冲区，重回些写状态，但是缓冲区中的数据依然存在，只是处于“被遗忘”状态
+				System.out.println("----------- clear() -------------");
+				buffer.clear();
+				System.out.println(buffer.position()); // 0
+				System.out.println(buffer.limit()); // 20
+				System.out.println(buffer.capacity()); // 20
+			}
+		⑦ 直接缓冲区和非直接缓冲区：
+			A. 非直接缓冲区：通过 allocate() 方法分配非直接缓冲区，将缓冲区建立在 JVM 的内存中。
+			B. 直接缓冲区：通过 allocateDirect() 方法分配直接缓冲区，将缓存建立在 OS 的物理内存中。某种情况下可以提高效率，只有ByteBuffer支持
+			C. 字节缓冲区要么是直接的，要么是非直接的，如果为直接字节缓冲区，则 Java 虚拟机会尽最大努力直接在此缓冲区上执行本机 I/O 操作。也就是说，
+			在每次调用基础操作系统的一个本机 I/O 操作之前（或者之后），虚拟机都会尽量避免将缓冲区的内容复制到中间缓冲区中（或从中间缓冲区中复制内容）。
+			D. 直接字节缓冲区可以通过调用此类的 allocateDirect() 工厂方法来创建，此方法返回的缓冲区进行分配和取消分配所需成本通常高于非直接缓冲区。直
+			接缓冲区的内容可以驻留在垃圾回收堆之外。因此，它们对应用程序的内容需求量造成的影响可能并不明显。所以，建议将直接缓冲区主要分配给那些容易受
+			基础操作系统的本机 I/O 操作影响的大型、持久的缓冲区。一般情况下，最好仅在直接缓冲区能在程序性能方面带来明显好处时分配他们。
+			E. 直接字节缓冲区还可以通过 FileChannel 的 map()方法将文件区域直接映射到内存中来创建，该方法返回 MappedByteBuffer。Java 平台的实现有助于通过
+			JNI 从本机代码创建直接字节缓冲区，如果以上这些缓冲区中的某个缓冲区实例指的是不可访问的内存区域。则试图访问该区域不会更改该缓冲区的内容，并且
+			将会在访问期间或稍后的某个时间导致抛出不确定的异常。
+			F. 字节缓冲区是直接还是非直接缓冲区可通过调用其 isDirect() 方法来确定。提供此方法是为了能够在性能关键型代码中执行显示缓冲区管理。
+			G. 非直接缓冲区示意图
+			
+									----------------------	|  ----------------------
+									|					 |	|  |					|
+									|  ----------------  |	|  |  ----------------	|
+									|  | 内核地址空间 |  |	|  |  | 用户地址空间 |	|
+									|  |      OS      |  |	|  |  |		JVM   	 |	|
+									|  |  ----------  |  |	|  |  |  ----------  |	|
+									|  |  |        |  |  |	|  |  |  |		  |  |	|
+				--------   read()	|  |  |        | copy()	|  |  |  |        |  |	|   read()	    --------
+				| 物理 | ---------------> |  缓存  | --------------> |  缓存  | ------------------> | 应用 |
+				| 磁盘 | <--------------- |        | <-------------- |		  | <------------------ | 程序 |
+				--------  write()	|  |  |        |  |  |	| copy() |		  |  |	|   write()	    --------
+									|  |  ----------  |  |	|  |  |  ----------  |	|
+									|  |              |  |	|  |  |				 |	|
+									|  ----------------  |	|  |  ---------------- 	|
+									|                    |	|  |					|
+									----------------------	|  ----------------------
+			H. 直接缓冲区示意图
+					
+									----------------------	|  ----------------------
+									|					 |	|  |					|
+									|  ----------------  |	|  |  ----------------	|
+									|  | 内核地址空间 |  |	|  |  | 用户地址空间 |	|
+									|  |      OS      |  |	|  |  |		JVM   	 |	|
+									|  |  ----------  |  |	|  |  |  ----------  |	|
+									|  |  |        |  |  |	|  |  |  |		  |  |	|
+				--------   read()	|  |  |        | copy()	|  |  |  |        |  |	|   read()	    --------
+				| 物理 | ---------------> |  缓存  | ----\/---\/---> |  缓存  | ------------------> | 应用 |
+				| 磁盘 | <--------------- |        | <---/\---/\---- |		  | <------------------ | 程序 |
+				--------  write()	|  |  |        |  |  |	| copy() |		  |  |	|   write()	    --------
+					↑				|  |  ----------  |  |	|  |  |  ----------  |	|					↑
+					|				|  |       |      |  |	|  |  |		  |		 |	|					|
+					|				|  --------|-------  |	|  |  --------|------- 	|					|
+					|				|          |         |	|  |		  |			|					|
+					|				-----------|----------	|  -----------|----------					|
+					|						   |						  |								|
+					|						   |--------------------------|								|
+					|										↓											|
+					|								   ------------	 									|
+					---------------------------------- | 物理内存 | -------------------------------------
+													   | 映射文件 |
+													   ------------
+	3. 通道（Channel）
+		① 通道（Channel）：由 java.nio.channels 包定义的。Channel 表示 IO 源与目标打开的连接。Channel 类似于传统的“流”。只不过 Channel 本身不能直接访问数据，
+		只能与 Buffer 进行交互
+			A. 早期操作系统，当应用程序发起请求时，CPU 负责读取磁盘的数据交给内存计算，所有的 I/O 接口由 CPU 独立负责，当大量发起读写请求时，会大量占用 CPU 的资源，
+			以至于CPU无法进行其他工作，从而导致 CPU 的利用率降低，性能下降，早期操作系统 IO 示意图
+														  ----------------------  |  ----------------------
+														  |					   |  |  |					  |
+														  |  ----------------  |  |  |  ----------------  |
+				-------				  --------		      |  | 内核地址空间 |  |  |  |  | 用户地址空间 |  |
+				| 物理 |			  | I/O  |		      |  |      OS      |  |  |  |  |		JVM    |  |
+				| 内存 |	  |-----> | 接口 |		      |  |  ----------  |  |  |  |  |  ----------  |  |
+				-------		  |		  --------			  |  |  |        |  |  |  |  |  |  |		|  |  |
+							  |		  --------   read()	  |  |  |        | copy() |  |  |  |        |  |  |   read()	--------
+				--------	  |		  | I/O  | ---------------> |  缓存  | --------------> |  缓存  | ----------------> | 应用 |
+				| CPU  | -----|-----> | 接口 | <--------------- |        | <-------------- |		| <---------------- | 程序 |
+				--------	  |		  --------  write()	  |  |  |        |  |  |  | copy() |		|  |  |   write()	--------
+							  |		  --------			  |  |  ----------  |  |  |  |  |  ----------  |  |
+				--------	  |		  | I/O  |			  |  |              |  |  |  |  |			   |  |
+				| 内存 |	  |-----> | 接口 |			  |  ----------------  |  |  |  ----------------  |
+				--------	 		  --------			  |                    |  |  |					  |
+														  ----------------------  |  ----------------------
+			B. 后期的操作系统，在物理内存和 I/O就接口中开辟 DMA（直接存储器存储），当应用程序对操作系统发起一个读写请求时，DMA 先向 CPU 申请权限，CPU 发放权限，所有的
+			I/O 请求 将全权由 DMA 负责，从而不需要 CPU 干预。内存与 I/O 接口之间存在 DMA 总线，传统的数据传输方式实际上是 DMA，即 I/O 流。DMA数据传输方式存在问题：当
+			非常大型的应用程序发起大量的读写请求时，内存与 I/O 接口间存在大量 DMA 总线，DMA 总线之间会发生冲突，最终也会影响性能。DMA 数据传输示意图	
+														  ----------------------  |  ----------------------
+														  |					   |  |  |					  |
+														  |  ----------------  |  |  |  ----------------  |
+				-------				  --------		      |  | 内核地址空间 |  |  |  |  | 用户地址空间 |  |
+				| 物理 |			  | I/O  |		      |  |      OS      |  |  |  |  |		JVM    |  |
+				| 内存 |	  |-----> | 接口 |		      |  |  ----------  |  |  |  |  |  ----------  |  |
+				-------		  |		  --------			  |  |  |        |  |  |  |  |  |  |		|  |  |
+							  |		  --------   read()	  |  |  |        | copy() |  |  |  |        |  |  |   read()	--------
+				--------  \	  |		  | I/O  | ---------------> |  缓存  | --------------> |  缓存  | ----------------> | 应用 |
+				| CPU  | --\--|-----> | 接口 | <--------------- |        | <-------------- |		| <---------------- | 程序 |
+				--------	\ |		  --------  write()	  |  |  |        |  |  |  | copy() |		|  |  |   write()	--------
+					|-------> |		  --------			  |  |  ----------  |  |  |  |  |  ----------  |  |
+				--------  DMA |		  | I/O  |			  |  |              |  |  |  |  |			   |  |
+				| 内存 |	  |-----> | 接口 |			  |  ----------------  |  |  |  ----------------  |
+				--------	 		  --------			  |                    |  |  |					  |
+														  ----------------------  |  ----------------------
+			C. 通道（Channel），即内存与 I/O 之间的 DMA 总线改成通道（Channel）,	通道（Channel）是一个完全独立的处理器，拥有自己的数据传输方式专门用于 I/O 操作，使用 
+			I/O 操作完全与 CPU 隔离，因此性能相较于其他方式更高，CPU 利用率也更高。通道（Channel）数据传输示意图。
+														  ----------------------  |  ----------------------
+														  |					   |  |  |					  |
+														  |  ----------------  |  |  |  ----------------  |
+				-------				    --------		  |  | 内核地址空间 |  |  |  |  | 用户地址空间 |  |
+				| 物理 |			    | I/O  |		  |  |      OS      |  |  |  |  |		JVM    |  |
+				| 内存 |	    |-----> | 接口 |		  |  |  ----------  |  |  |  |  |  ----------  |  |
+				-------		    |		--------		  |  |  |        |  |  |  |  |  |  |		|  |  |
+								|		--------   read() |  |  |        | copy() |  |  |  |        |  |  |   read()	--------
+				--------   \	|		| I/O  | -------------> |  缓存  | --------------> |  缓存  | ----------------> | 应用 |
+				| CPU  | ---\-- |-----> | 接口 | <------------- |        | <-------------- |		| <---------------- | 程序 |
+				--------	 \  |		--------  write() |  |  |        |  |  |  | copy() |		|  |  |   write()	--------
+					|---------> |		--------		  |  |  ----------  |  |  |  |  |  ----------  |  |
+				-------- 通道   |		| I/O  |		  |  |              |  |  |  |  |			   |  |
+				| 内存 |Channel	|-----> | 接口 |		  |  ----------------  |  |  |  ----------------  |
+				--------	 		    --------		  |                    |  |  |					  |
+		 											 	  ----------------------  |  ----------------------
+		② Java 为 Channel 接口提供的最主要实现类如下：
+			A. FileChannel：用于读取、写入、映射和操作文件的通道
+			B. DatagramChannel：通过 UDP 读写网络中的数据通道
+			C. SocketChannel：通过 TCP 读写网络中的数据
+			D. ServerSocketChannel：可以监听新进来的 TCP 连接，对每一个进来的连接都会创建一个 SocketChannel
+		③ 获取通道
+			A. Java 针对支持通道的类 提供了 getChannel() 方法
+				a. 本地 I/O 操作
+					(1) FileInputStream / FileOutputStream：输入输出流
+					(2) RandomAccessFile：随机存储文件流
+				b. 网络 I/O 操作
+					(1) Socket
+					(2) ServerSocke
+					(3) DatagramSocke
+			B. 在 JDK 1.7 中的 NIO2 针对各个通道提供了静态方法 open()
+			C. 在 JDK 1.7 中的 NIO2 的 Files 工具类提供的 newByteChannel()
+三、文件通道（FileChannel）
+	1. 使用输入输出流的 FileChannel 和 非直接缓冲区完成文件的复制
+		① 获取输入输出流
+			fis = new FileInputStream("1.sql");
+            fos = new FileOutputStream("2.sql");
+		② 获取输入输出流对应的通道
+			inChannel = fis.getChannel();
+            outChannel = fos.getChannel();
+		③ 获取非直接缓冲区，并指定大小
+            ByteBuffer buffer = ByteBuffer.allocate(1024);
+		④ 将通道中的数据通过缓冲区进行读写
+			while (inChannel.read(buffer) != -1) {
+                // 切换读取数据模式
+                buffer.flip();
+                // 将缓冲区中的数据写入通道中
+                outChannel.write(buffer);
+                // 清空缓冲区
+                buffer.flip();
+            }
+		⑤ 关闭通道
+		⑥ 示例：
+			public void testFileStreamChannel() {
+				// 利用通道完成文件的复制（使用非直接缓冲区）
+
+				FileInputStream fis = null;
+				FileOutputStream fos = null;
+				FileChannel inChannel = null;
+				FileChannel outChannel = null;
+				try {
+					LocalDateTime start = LocalDateTime.now();
+
+					// 获取文件的输入输出流
+					fis = new FileInputStream("1.sql");
+					fos = new FileOutputStream("2.sql");
+
+					// 获取输入输出流对应的通道
+					inChannel = fis.getChannel();
+					outChannel = fos.getChannel();
+
+					// 获取非直接缓冲区，并指定大小
+					ByteBuffer buffer = ByteBuffer.allocate(1024);
+
+					// 将通道中的数据存入缓冲区中
+					while (inChannel.read(buffer) != -1) {
+						// 切换读取数据模式
+						buffer.flip();
+						// 将缓冲区中的数据写入通道中
+						outChannel.write(buffer);
+						// 清空缓冲区
+						buffer.flip();
+					}
+
+					LocalDateTime end = LocalDateTime.now();
+					System.out.println("消耗的时间为：" + Duration.between(start, end).toMillis()); // 3 1418
+				} catch (IOException e) {
+					e.printStackTrace();
+				} finally {
+					if (outChannel != null) {
+						try {
+							outChannel.close();
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					}
+
+					if (inChannel != null) {
+						try {
+							inChannel.close();
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					}
+
+					if (fos != null) {
+						try {
+							fos.close();
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					}
+
+					if (fis != null) {
+						try {
+							fis.close();
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					}
+				}
+			}
+	2. 使用FileChannel.open() 获取通道 和 直接缓冲区（内存映射文件）区完成文件的复制
+		① 获取文件输入输出通道，FileChannel.open(Path path, OpenOption... options) 需要以下参数
+			A. Path：表示着文件的路径，可以使用 Paths 工具类的 get(String first, String... more) 方法获取，get 方法的参数需要指定一个路径字符串，并且提供可变字符串
+			进行路径目录的拼接
+			B. OpenOption：表示对文件的操作，该参数是一个可变参数，可以提供多个文件操作方式
+				a. StandardOpenOption.READ：读操作
+				b. StandardOpenOption.WRITE：写操作
+				c. StandardOpenOption.CREATE：若文件不存在，则创建，若存在，则覆盖
+				d. StandardOpenOption.CREATE_NEW：若文件不存在，则创建，若存在，则报错
+			C. 举例
+				// 获取文件输入输出通道
+				
+				// 输入通道只需要进行读操作
+				inFileChannel = FileChannel.open(Paths.get("1.sql"), StandardOpenOption.READ);
+				// 输出通道由于输出缓冲区指定的模式为读写，因此需要指定读、写操作，并指定文件创建方式
+				outFileChannel = FileChannel.open(Paths.get("3.sql"), StandardOpenOption.READ, StandardOpenOption.WRITE, StandardOpenOption.CREATE);
+		② 获取直接缓冲区（内存映射文件），map(MapMode mode, long position, long size)需要以下参数	
+			A. MapMode：表示对缓冲区的读写状态
+				a. FileChannel.MapMode.READ_ONLY：表示只读
+				b. FileChannel.MapMode.READ_WRITE：表示读写
+			B. position：表示读取数据的起始位置
+			C. size：表示缓冲区的大小
+			D. 举例：
+				MappedByteBuffer inMappedByteBuffer = inFileChannel.map(FileChannel.MapMode.READ_ONLY, 0, inFileChannel.size());
+				MappedByteBuffer outMappedByteBuffer = outFileChannel.map(FileChannel.MapMode.READ_WRITE, 0, inFileChannel.size());
+			E. 直接在缓冲区进行数据的读写
+				byte[] dst = new byte[inMappedByteBuffer.limit()];
+				inMappedByteBuffer.get(dst);
+				outMappedByteBuffer.put(dst);
+			F. 关闭通道
+		③ 示例
+			public void testFileOpenChannel() {
+				// 利用通道完成文件的复制（使用直接缓冲区，内存映射文件）
+
+				FileChannel inFileChannel = null;
+				FileChannel outFileChannel = null;
+				try {
+					LocalDateTime start = LocalDateTime.now();
+
+					// 获取文件输入输出通道
+
+					// 输入通道只需要进行读操作
+					inFileChannel = FileChannel.open(Paths.get("1.sql"), StandardOpenOption.READ);
+					// 输出通道由于输出缓冲区指定的模式为读写，因此需要指定读、写操作，并指定文件创建方式
+					outFileChannel = FileChannel.open(Paths.get("3.sql"), StandardOpenOption.READ, StandardOpenOption.WRITE, StandardOpenOption.CREATE);
+
+					// 获取内存映射文件
+					MappedByteBuffer inMappedByteBuffer = inFileChannel.map(FileChannel.MapMode.READ_ONLY, 0, inFileChannel.size());
+					MappedByteBuffer outMappedByteBuffer = outFileChannel.map(FileChannel.MapMode.READ_WRITE, 0, inFileChannel.size());
+
+					// 直接在缓冲区进行数据的读写
+					byte[] dst = new byte[inMappedByteBuffer.limit()];
+					inMappedByteBuffer.get(dst);
+					outMappedByteBuffer.put(dst);
+
+					LocalDateTime end = LocalDateTime.now();
+					System.out.println("消耗的时间为：" + Duration.between(start, end).toMillis()); // 6 375
+				} catch (IOException e) {
+					e.printStackTrace();
+				} finally {
+					if (outFileChannel != null) {
+						try {
+							outFileChannel.close();
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					}
+
+					if (inFileChannel != null) {
+						try {
+							inFileChannel.close();
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					}
+				}
+			}
+	3. 利用 transferTo()、transferFrom() 完成数据在通道间的传输，使用的缓冲区是直接缓冲区
+		① transferTo(long position, long count, WritableByteChannel target)：表示将当前通道的数据复制到目标通道
+		② transferFrom(ReadableByteChannel src, long position, long count)：表示将目标通道的数据复制到当前通道
+		③ 示例：
+			public void testTransfer() {
+				// 利用 transferTo()、transferFrom() 完成数据在通道间的传输，使用的是直接缓冲区
+
+				FileChannel inFileChannel = null;
+				FileChannel outFileChannel = null;
+				try {
+					LocalDateTime start = LocalDateTime.now();
+
+					// 获取文件输入输出通道
+					inFileChannel = FileChannel.open(Paths.get("1.sql"), StandardOpenOption.READ);
+					outFileChannel = FileChannel.open(Paths.get("5.sql"), StandardOpenOption.READ, StandardOpenOption.WRITE, StandardOpenOption.CREATE);
+
+					// inFileChannel.transferTo(0, inFileChannel.size(), outFileChannel);
+					outFileChannel.transferFrom(inFileChannel, 0, inFileChannel.size());
+					LocalDateTime end = LocalDateTime.now();
+					System.out.println("消耗的时间为：" + Duration.between(start, end).toMillis()); // 183 184
+				} catch (IOException e) {
+					e.printStackTrace();
+				} finally {
+					if (outFileChannel != null) {
+						try {
+							outFileChannel.close();
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					}
+
+					if (inFileChannel != null) {
+						try {
+							inFileChannel.close();
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					}
+				}
+			}
+	4. 分散（Scatter）与 聚集（Gather）
+		① 分散读取（Scattering Reads）：将通道中的数据分散到多个缓冲区中，注意：按照缓冲区的顺序，从 Channel 中读取的数据依次将 Buffer 填满。
+		② 聚集写入（Gathering Writes）：将多个缓冲区中的数据聚集到通道中，注意：按照缓冲区的顺序，写入 position 和 limit 之间的数据到 Channel
+		③ 举例：
+			public class FileChannelTest {
+
+			@Test
+			public void testRandomAccessFile() {
+
+				RandomAccessFile raf1 = null;
+				RandomAccessFile raf2 = null;
+				FileChannel inChannel = null;
+				FileChannel outChannel = null;
+				try {
+					LocalDateTime start = LocalDateTime.now();
+
+					// 获取文件随机存储流
+					raf1 = new RandomAccessFile("1.sql", "rw");
+					raf2 = new RandomAccessFile("2.sql", "rw");
+
+					// 获取对应的通道
+					inChannel = raf1.getChannel();
+					outChannel = raf2.getChannel();
+
+					// 获取非直接缓冲区
+					ByteBuffer buffer1 = ByteBuffer.allocate(100);
+					ByteBuffer buffer2 = ByteBuffer.allocate(1024);
+
+					// 分散读取
+					ByteBuffer[] buffers = new ByteBuffer[] {buffer1, buffer2};
+
+					while ((inChannel.read(buffers)) != -1) {
+						// 切换读取数据模式
+						for (ByteBuffer buffer : buffers) {
+							buffer.flip();
+						}
+
+						// 聚集写入
+						outChannel.write(buffers);
+
+						// 清空缓冲区
+						for (ByteBuffer buffer : buffers) {
+							buffer.clear();
+						}
+					}
+
+					LocalDateTime end = LocalDateTime.now();
+					System.out.println("消耗的时间为：" + Duration.between(start, end).toMillis()); // 1721
+				} catch (IOException e) {
+					e.printStackTrace();
+				} finally {
+					if (outChannel != null) {
+						try {
+							outChannel.close();
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					}
+
+					if (inChannel != null) {
+						try {
+							inChannel.close();
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					}
+
+					if (raf2 != null) {
+						try {
+							raf2.close();
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					}
+
+					if (raf1 != null) {
+						try {
+							raf1.close();
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					}
+				}
+			}
+	5. 字符集 Charset
+		① 编码：字符串 -> 字节数组
+		② 解码：字节数组 -> 字符串
+		③ 举例：
+			@Test
+			public void testCharset() {
+
+				// 获取字符集
+				Charset charset = Charset.forName("UTF-8");
+				// 获取编码器
+				CharsetEncoder ce = charset.newEncoder();
+				// 获取解码器
+				CharsetDecoder cd = charset.newDecoder();
+
+				// 获取字符缓冲区，并写入数据
+				CharBuffer buffer = CharBuffer.allocate(100);
+				buffer.put("李晓亮");
+				buffer.flip();
+
+				// 编码
+				try {
+					ByteBuffer byteBuffer = ce.encode(buffer);
+					for (int i = 0; i < byteBuffer.limit(); i++) {
+						System.out.println(byteBuffer.get());
+					}
+
+					// 切换读取数据模式
+					byteBuffer.flip();
+					
+					// 解码
+					CharBuffer charBuffer = cd.decode(byteBuffer);
+					System.out.println(charBuffer.toString());
+				} catch (CharacterCodingException e) {
+					e.printStackTrace();
+				}
+			}
+
+			@Test
+			public void testCharsetMap() {
+				Map<String, Charset> map = Charset.availableCharsets();
+				for (Map.Entry<String, Charset> entry : map.entrySet()) {
+					System.out.println(entry.getKey() + "=" + entry.getValue());
+				}
+			}
+四、NIO 的非阻塞式网络通信
+	1. 阻塞与非阻塞
+		① 传统的 IO 流都是阻塞式的。也就是说，当一个线程调用 read() 或 writer() 时，该线程被阻塞，直到有一些数据被读入或者写出，该线程在此期间
+		不能执行其他任务。因此在完成网络通信进行 IO 操作时，由于线程会阻塞，所以服务器端必须为每个客户端都提供一个独立的线程进行处理，当服务器
+		端需要处理大量客户端时，性能急剧下降。
+		② Java NIO 是非阻塞式的，当线程从某通道进行读写数据时，若没有数据可用时，该线程可以进行其他任务。线程通常将非阻塞 IO 的空闲时间用于在
+		其他通道上执行 IO 操作，所以单独的线程可以管理多个输入和输出通道。因此，NIO 可以让服务端使用一个或者有限几个线程来同时处理连接到服务器
+		端的所有客户端。
+		③ 注：非阻塞式 IO 操作 相对于网络通道（SocketChannel、ServerSocketChannel 和 DatagramChannel） 而言的，而本地文件通道（FileChannel）不
+		能切换成非阻塞式的。
+	2. 使用 NIO 完成网络通信的三个核心
+		① 通道（Channel）：负责连接，数据传输
+			java.nio.channels.channel 接口	
+				|-- SelectableChannel
+					|-- SocketChannel
+					|-- ServerSocketChannel
+					|-- DatagramChannel
+					
+					|-- Pipe.SinkChannel
+					|-- Pipe.SourceChannel
+		② 缓冲区（Buffer）：负责数据存取
+		③ 选择器（Selector）：
+			A. 是 SelectableChannel 对象的多路复用器。可以同时监控多个 SelectableChannel 的 IO 状况，也就是说，利用Selector可以使
+			B. 选择器的应用
+				a. 当调用register(Selector sel, int ops)将通道注册到选择器上时，选择器对通道的监听事件，需要通过第二个参数 OPS 指定
+				b. 可以监听的事件类型（可使用SelectionKey 的四个常量表示）：
+					(1) 读：SelectionKey.OP_READ（1）
+					(2) 写：SelectionKey.OP_WRITE（4）
+					(3) 连接：SelectionKey.OP_CONNECT（8）
+					(4) 接收：SelectionKey.OP_ACCEPT（16）
+				c. 若注册时不止监听一个事件，则可以使用“位或”操作符连接
+			C. Selector 的常用方法
+				a. Set<SelectionKey> keys()：所有的 SelectionKey 集合。代表注册在该 Selector 上的 Channel
+				b. Set<SelectionKey> selectedKeys()：被选择的 SelectionKey 集合。返回次 Selector 的已选选择键集
+				c. int select()：监控所有注册的 channel，当他们中间有需要处理的 IO 操作时，该方法返回，并将对应的 SelectionKey 加入 被选择的 SelectionKey
+				集合中，该方法返回这些 Channel 的数量
+				d. int select(long timeout)：可以设置 超时时长的 select() 操作
+				e. int selectNow()：执行一个立即返回的 select()操作，该方法不会阻塞线程
+				f. Selector wakeup()：使一个还未返回的 select() 方法立即返回
+				g. void close()：关闭该选择器
+			D. SelectionKey
+				a. 表示 SelectableChannel 和 Selector 之间的注册关系。每次向选择器注册通道时就会选择一个事件（选择键）。选择键包含两个表示为整数值的操作集。
+				操作集的每一位都表示该键的通道所支持的一类可选择操作
+				b. 方法：
+					(1) int interestOps()：获取感兴趣事件集合
+					(2) int readyOps()：获取通道已经准备就绪的操作的集合
+					(3) SelectableChannel channel()：获取注册通道
+					(4) Selector selector()：返回选择器
+					(5) boolean isWritable()：检测 Channel 中读事件是否就绪
+					(6) boolean isConnectable()：检测 Channel 写读事件是否就绪
+					(7) boolean isReadable()：检测 Channel 中连接是否就绪
+					(8) boolean isAcceptable()：检测 Channel 中接收是否就绪
+					
+		一个单独的线程管理多个Channel。Selector 是非阻塞 IO 的核心
+	3. SocketChannel 和 ServerSocketChannel采用阻塞式 IO 进行数据传输
+		① 建立一个 tcp 客户端连接，给服务端发送图片
+			A. 获取客户端连接 SocketChannel 通道，使用对应的 open(SocketAddress remote) 方法，需要 SocketAddress 参数，使用其子类 InetSocketAddress 获取对象，需要两个
+			参数用于 TCP 连接，分别是IP 和 端口
+				socketChannel = SocketChannel.open(new InetSocketAddress("127.0.0.1", 2648));
+			B. 获取缓冲区
+				ByteBuffer buffer = ByteBuffer.allocate(1024);
+			C. 获取本地文件的 FileChannel 通道，指定该通道为只读
+				fileChannel = FileChannel.open(Paths.get("1.jpg"), StandardOpenOption.READ);
+			D. 将本地文件 FileChannel 通道的数据写入缓冲区中，并将缓冲区中的数据写入 SocketChannel 通道中
+				while (fileChannel.read(buffer) != -1) {
+					// 切换缓冲区为读模式
+					buffer.flip();
+
+					// 将缓冲区中的数据写入 SocketChannel 通道中
+					socketChannel.write(buffer);
+
+					// 清空缓冲区
+					buffer.clear();
+				}
+			E. 关闭通道
+			F. 举例：
+				@Test
+				public void testClient() {
+					// 使用 SocketChannel 建立一个客户端通道 给服务端发送数据
+
+					SocketChannel socketChannel = null;
+					FileChannel fileChannel = null;
+					try {
+						// 获取 客户端 SocketChannel 通道
+						socketChannel = SocketChannel.open(new InetSocketAddress("127.0.0.1", 2648));
+
+						// 获取缓冲区
+						ByteBuffer buffer = ByteBuffer.allocate(1024);
+
+						// 获取本地文件 FileChannel 通道
+						fileChannel = FileChannel.open(Paths.get("1.jpg"), StandardOpenOption.READ);
+
+						// 将本地文件通道 FileChannel 的数据写入缓冲区中
+						while (fileChannel.read(buffer) != -1) {
+							// 切换缓冲区为读模式
+							buffer.flip();
+
+							// 将缓冲区中的数据写入 SocketChannel 通道中
+							socketChannel.write(buffer);
+
+							// 清空缓冲区
+							buffer.clear();
+						}
+					} catch (IOException e) {
+						e.printStackTrace();
+					} finally {
+						if (fileChannel != null) {
+							try {
+								fileChannel.close();
+							} catch (IOException e) {
+								e.printStackTrace();
+							}
+						}
+
+						if (socketChannel != null) {
+							try {
+								socketChannel.close();
+							} catch (IOException e) {
+								e.printStackTrace();
+							}
+						}
+					}
+				}
+		② 建立一个 tcp 服务端，接收客户端的数据
+			A. 获取服务端 ServerSocketChannel 通道，使用其 对应的 open() 方法，不需要指定参数
+				serverSocketChannel = ServerSocketChannel.open();
+			B. 给服务端通道绑定端口，等待客户端的连接，bind(SocketAddress local) 需要一个 SocketAddress 对象，使用其实现类 InetSocketAddress 创建对象，
+			该实现类需要传入一个参数表示端口号
+				serverSocketChannel.bind(new InetSocketAddress(2648));
+			C. 获取客户端连接 SocketChannel 通道
+				socketChannel = serverSocketChannel.accept();
+			D. 获取本地本地文件 FileChannel 通道，并指定为可读、可写以及文件覆盖的模式
+				fileChannel = FileChannel.open(Paths.get("2.jpg"), StandardOpenOption.READ,
+                    StandardOpenOption.WRITE, StandardOpenOption.CREATE);
+			E. 获取缓冲区
+				ByteBuffer buffer = ByteBuffer.allocate(1024);
+			F. 将客户端中的数据写入缓冲区
+				while (socketChannel.read(buffer) != -1) {
+					buffer.flip();
+					fileChannel.write(buffer);
+					buffer.clear();
+				}
+			G. 关闭所有的通道
+			H. 举例：
+				@Test
+				public void testServer() {
+					// 使用 ServerSocketChannel 建立一个服务端通道，接收客户端的数据
+
+					ServerSocketChannel serverSocketChannel = null;
+					SocketChannel socketChannel = null;
+					FileChannel fileChannel = null;
+					try {
+						// 获取服务端 ServerSocketChannel 通道
+						serverSocketChannel = ServerSocketChannel.open();
+
+						// 绑定端口号，等待客户端连接
+						serverSocketChannel.bind(new InetSocketAddress(2648));
+
+						// 获取客户端连接 SocketChannel 通道
+						socketChannel = serverSocketChannel.accept();
+
+						// 获取本地本地文件 FileChannel 通道
+						fileChannel = FileChannel.open(Paths.get("2.jpg"), StandardOpenOption.READ,
+								StandardOpenOption.WRITE, StandardOpenOption.CREATE);
+
+						// 获取缓冲区
+						ByteBuffer buffer = ByteBuffer.allocate(1024);
+
+						// 将客户端中的数据写入缓冲区
+						while (socketChannel.read(buffer) != -1) {
+							buffer.flip();
+							fileChannel.write(buffer);
+							buffer.clear();
+						}
+					} catch (IOException e) {
+						e.printStackTrace();
+					} finally {
+
+						// 关闭通道
+						if (fileChannel != null) {
+							try {
+								fileChannel.close();
+							} catch (IOException e) {
+								e.printStackTrace();
+							}
+						}
+
+						if (socketChannel != null) {
+							try {
+								socketChannel.close();
+							} catch (IOException e) {
+								e.printStackTrace();
+							}
+						}
+
+						if (serverSocketChannel != null) {
+							try {
+								serverSocketChannel.close();
+							} catch (IOException e) {
+								e.printStackTrace();
+							}
+						}
+					}
+				}
+		③ 测试：首先开启服务端，再开启客户端，如果服务端与客户端完成数据传输并正常关闭，则测试通过
+	4. SocketChannel 和 ServerSocketChannel采用阻塞式 IO 进行数据传输，并进行消息反馈
+		① 建立一个 tcp 客户端连接，给服务端发送图片，并接收反馈信息
+			A. 客户端 SocketChannel 通道给服务端发送完数据后，需要手动关闭，告诉服务端数据已经发送完毕，不然服务端不知道客户端已经发送完数据会处于阻塞状态，客户端
+			没有接收到反馈数据也处于阻塞状态，也可以采用选择器的方式实现非阻塞式。
+				socketChannel.shutdownOutput();
+			B. 接收服务端的反馈
+				while (socketChannel.read(buffer) != -1) {
+					buffer.flip();
+					System.out.println(new String(buffer.array(), 0, buffer.limit()));
+					buffer.clear();
+				}
+			C. 举例：
+				@Test
+				public void testClient() {
+
+					SocketChannel socketChannel = null;
+					FileChannel fileChannel = null;
+					try {
+						socketChannel = SocketChannel.open(new InetSocketAddress("127.0.0.1", 2648));
+						fileChannel = FileChannel.open(Paths.get("1.jpg"), StandardOpenOption.READ);
+						ByteBuffer buffer = ByteBuffer.allocate(1024);
+						while (fileChannel.read(buffer) != -1) {
+							buffer.flip();
+							socketChannel.write(buffer);
+							buffer.clear();
+						}
+
+						// 告诉服务端，数据已经发送完毕
+						socketChannel.shutdownOutput();
+
+						// 接收服务端的反馈
+						while (socketChannel.read(buffer) != -1) {
+							buffer.flip();
+							System.out.println(new String(buffer.array(), 0, buffer.limit()));
+							buffer.clear();
+						}
+					} catch (IOException e) {
+						e.printStackTrace();
+					} finally {
+						if (fileChannel != null) {
+							try {
+								fileChannel.close();
+							} catch (IOException e) {
+								e.printStackTrace();
+							}
+						}
+
+						if (socketChannel != null) {
+							try {
+								socketChannel.close();
+							} catch (IOException e) {
+								e.printStackTrace();
+							}
+						}
+					}
+				}
+		② 建立一个 tcp 服务端，接收客户端的数据，并发送反馈消息
+			A. 服务端接收客户端数据后，发送反馈数据给客户端
+				buffer.put("服务端接收数据成功".getBytes());
+				buffer.flip();
+				socketChannel.write(buffer);
+			B. 举例：
+				@Test
+				public void testServer() {
+					ServerSocketChannel serverSocketChannel = null;
+					SocketChannel socketChannel = null;
+					FileChannel fileChannel = null;
+					try {
+						serverSocketChannel = ServerSocketChannel.open();
+						serverSocketChannel.bind(new InetSocketAddress(2648));
+						socketChannel = serverSocketChannel.accept();
+						fileChannel = FileChannel.open(Paths.get("3.jpg"), StandardOpenOption.READ,
+								StandardOpenOption.WRITE, StandardOpenOption.CREATE);
+						ByteBuffer buffer = ByteBuffer.allocate(1024);
+						while (socketChannel.read(buffer) != -1) {
+							buffer.flip();
+							fileChannel.write(buffer);
+							buffer.clear();
+						}
+						// 发送反馈数据给客户端
+						buffer.put("服务端接收数据成功".getBytes());
+						buffer.flip();
+						socketChannel.write(buffer);
+					} catch (IOException e) {
+						e.printStackTrace();
+					} finally {
+						if (fileChannel != null) {
+							try {
+								fileChannel.close();
+							} catch (IOException e) {
+								e.printStackTrace();
+							}
+						}
+
+						if (socketChannel != null) {
+							try {
+								socketChannel.close();
+							} catch (IOException e) {
+								e.printStackTrace();
+							}
+						}
+
+						if (serverSocketChannel != null) {
+							try {
+								serverSocketChannel.close();
+							} catch (IOException e) {
+								e.printStackTrace();
+							}
+						}
+					}
+				}
+		③ 测试：首先开启服务端，再开启客户端，如果服务端与客户端完成数据传输并正常关闭，则测试通过
+	5. SocketChannel 和 ServerSocketChannel采用Selector(非阻塞式 IO)进行数据传输
+		① 建立一个 tcp 客户端连接，采用非阻塞式，给服务端发送消息
+			A. 建立一个非阻塞式客户端，获取客户端 SocketChannel 通道后，将切换成非阻塞式
+				socketChannel = SocketChannel.open(new InetSocketAddress("127.0.0.1", 2648));
+				socketChannel.configureBlocking(false);
+			B. 循环写入数据，实现聊天
+				Scanner scanner = new Scanner(System.in);
+				while (scanner.hasNext()) {
+					String message = scanner.next();
+					buffer.put((LocalDateTime.now().toString() + "\n" + message).getBytes());
+					buffer.flip();
+					socketChannel.write(buffer);
+					buffer.clear();
+			C. 举例：
+				@Test
+				public void testClient() {
+
+					// 建立一个非阻塞式客户端
+					SocketChannel socketChannel = null;
+					FileChannel fileChannel = null;
+					try {
+
+						// 获取客户端 SocketChannel 通道
+						socketChannel = SocketChannel.open(new InetSocketAddress("127.0.0.1", 2648));
+
+						// 切换成非阻塞式
+						socketChannel.configureBlocking(false);
+
+						// 获取缓冲区
+						ByteBuffer buffer = ByteBuffer.allocate(1024);
+
+						// 写入数据到缓冲区，并将缓冲区的数据写入 SocketChannel 通道中
+						Scanner scanner = new Scanner(System.in);
+						while (scanner.hasNext()) {
+							String message = scanner.next();
+							buffer.put((LocalDateTime.now().toString() + "\n" + message).getBytes());
+							buffer.flip();
+							socketChannel.write(buffer);
+							buffer.clear();
+						}
+					} catch (IOException e) {
+						e.printStackTrace();
+					} finally {
+						if (fileChannel != null) {
+							try {
+								fileChannel.close();
+							} catch (IOException e) {
+								e.printStackTrace();
+							}
+						}
+
+						if (socketChannel != null) {
+							try {
+								socketChannel.close();
+							} catch (IOException e) {
+								e.printStackTrace();
+							}
+						}
+					}
+				}
+		② 建立一个 tcp 客户端连接，采用非阻塞式，接收客户端消息
+			A. 获取 服务端 ServerSocketChannel 通道
+				ServerSocketChannel serverSocketChannel = ServerSocketChannel.open();
+			B. 将服务端 ServerSocketChannel 通道切换成非阻塞式
+				serverSocketChannel.configureBlocking(false);
+			C. 服务端绑定端口号，等待客户端连接
+				serverSocketChannel.bind(new InetSocketAddress(2648));
+			D. 获取选择器
+				Selector selector = Selector.open();
+			E. 将服务端 ServerSocketChannel 通道注册在选择器上，并指定“监听接收事件”
+				serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
+			F. 轮询式的获取选择器上已经“准备就绪”的事件
+				while (selectionKeys.hasNext()) {
+
+                    // 获取“准备就绪”的事件
+                    SelectionKey selectionKey = selectionKeys.next();
+                    if (selectionKey.isAcceptable()) {
+                        // 如果是接收就绪状态通道，则获取客户端连接，接收客户端数据
+                        socketChannel = serverSocketChannel.accept();
+
+                        // 将客户端 SocketChannel 通道切换成非阻塞式
+                        socketChannel.configureBlocking(false);
+
+                        // 将客户端 SocketChannel 通道注册在 selector 选择器上，并监听该通道的读就绪
+                        socketChannel.register(selector, SelectionKey.OP_READ);
+                    } else if (selectionKey.isReadable()){
+                        // 若是读就绪状态的通道，则获取该通道
+                        socketChannel = (SocketChannel) selectionKey.channel();
+
+                        // 将通道中的数据读取到缓冲区，并将缓冲区的数据读入
+                        ByteBuffer buffer = ByteBuffer.allocate(1024);
+                        while (socketChannel.read(buffer) != -1) {
+                            buffer.flip();
+                            System.out.println(new String(buffer.array(), 0, buffer.limit()));
+                            buffer.clear();
+                        }
+
+                        // 发送反馈数据给客户端
+                        /*buffer.put("接收客户端数据成功".getBytes());
+                        buffer.flip();
+                        socketChannel.write(buffer);
+                        buffer.clear();*/
+                    }
+
+                    // 取消选择键，不然该选择键将一直有效
+                    selectionKeys.remove();
+                }
+			G. 举例：
+				@Test
+				public void testServer() {
+
+					SocketChannel socketChannel = null;
+					try {
+						// 获取 ServerSocketChannel 通道
+						ServerSocketChannel serverSocketChannel = ServerSocketChannel.open();
+
+						// 将通道切换成非阻塞式
+						serverSocketChannel.configureBlocking(false);
+
+						// 绑定端口号，等待客户端连接
+						serverSocketChannel.bind(new InetSocketAddress(2648));
+
+						// 获取选择器
+						Selector selector = Selector.open();
+
+						// 将通道注册在选择器上，并指定“监听接收事件”
+						serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
+
+						// 轮询式的获取选择器上已经“准备就绪”的事件
+						while (selector.select() > 0) {
+
+							// 获取当前选择器中所有注册的选择键（已就绪的监听事件）
+							Iterator<SelectionKey> selectionKeys = selector.selectedKeys().iterator();
+							while (selectionKeys.hasNext()) {
+
+								// 获取“准备就绪”的事件
+								SelectionKey selectionKey = selectionKeys.next();
+								if (selectionKey.isAcceptable()) {
+									// 如果是接收就绪状态通道，则获取客户端连接，接收客户端数据
+									socketChannel = serverSocketChannel.accept();
+
+									// 将客户端 SocketChannel 通道切换成非阻塞式
+									socketChannel.configureBlocking(false);
+
+									// 将客户端 SocketChannel 通道注册在 selector 选择器上，并监听该通道的读就绪
+									socketChannel.register(selector, SelectionKey.OP_READ);
+								} else if (selectionKey.isReadable()){
+									// 若是读就绪状态的通道，则获取该通道
+									socketChannel = (SocketChannel) selectionKey.channel();
+
+									// 将通道中的数据读取到缓冲区，并将缓冲区的数据读入
+									ByteBuffer buffer = ByteBuffer.allocate(1024);
+									while (socketChannel.read(buffer) != -1) {
+										buffer.flip();
+										System.out.println(new String(buffer.array(), 0, buffer.limit()));
+										buffer.clear();
+									}
+
+									// 发送反馈数据给客户端
+									/*buffer.put("接收客户端数据成功".getBytes());
+									buffer.flip();
+									socketChannel.write(buffer);
+									buffer.clear();*/
+								}
+
+								// 取消选择键，不然该选择键将一直有效
+								selectionKeys.remove();
+							}
+						}
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+		③ 测试，先开启服务端，服务端会一直等待客户端的连接，但是是非阻塞式的，再开启客户端，当客户端发送数据完毕之后会关闭，可以多个客户端连接服务端。
+	6. DatagramChannel
+		① Java NIO 中的 DatagramChannel 是一个能接收发 UDP 包的通道
+		② 操作步骤：
+			A. 打开 DatagramChannel
+			B. 接收/发送数据
+		③ 建立一个 UDP 发送端，采用非阻塞式，发送消息
+			A. 使用 DatagramChannel.open() 获取发送端 DatagramChannel 通道
+				datagramChannel = DatagramChannel.open();
+			B. 切换 DatagramChannel 通道为非阻塞模式
+				datagramChannel.configureBlocking(false);
+			C. 获取缓冲区，并往缓冲区中写入数据
+				ByteBuffer buffer = ByteBuffer.allocate(1024);
+				buffer.put((LocalDateTime.now().toString() + "\n" + "Hello").getBytes());
+				buffer.flip();
+			D. 使用 DatagramChannel 通道发送数据，使用 send(ByteBuffer src, SocketAddress target) 方法发送数据，需要指定缓冲区和连接信息两个参数
+				datagramChannel.send(buffer, new InetSocketAddress("127.0.0.1", 2648));
+			E. 举例：
+				@Test
+				public void testSend() {
+					DatagramChannel datagramChannel = null;
+					try {
+						// 获取 发送端 DatagramChannel 通道
+						datagramChannel = DatagramChannel.open();
+
+						// 切换 DatagramChannel 通道为非阻塞模式
+						datagramChannel.configureBlocking(false);
+
+						// 获取缓冲区，并往缓冲区中写入数据
+						ByteBuffer buffer = ByteBuffer.allocate(1024);
+						buffer.put((LocalDateTime.now().toString() + "\n" + "Hello").getBytes());
+						buffer.flip();
+
+						// 使用 DatagramChannel 通道发送数据
+						datagramChannel.send(buffer, new InetSocketAddress("127.0.0.1", 2648));
+						buffer.clear();
+					} catch (IOException e) {
+						e.printStackTrace();
+					} finally {
+						if (datagramChannel != null) {
+							try {
+								datagramChannel.close();
+							} catch (IOException e) {
+								e.printStackTrace();
+							}
+						}
+					}
+				}
+		④ 建立一个 UDP 接收端，采用非阻塞式，接收消息
+			A.使用 DatagramChannel.open() 获取接收端 DatagramChannel 通道
+				DatagramChannel datagramChannel = DatagramChannel.open();
+			B. 切换 DatagramChannel 通道为非阻塞式
+				datagramChannel.configureBlocking(false);
+			C. 绑定端口号等待客户端的连接
+				datagramChannel.bind(new InetSocketAddress(2648));	
+			D. 获取选择器
+				Selector selector = Selector.open();
+			E. 将通道注册在选择器上，并指定选择器为监听通道的读状态
+				datagramChannel.register(selector, SelectionKey.OP_READ);
+			F.  轮询式的获取选择器上已经“准备就绪”的事件
+				while (selector.select() > 0) {
+
+					// 获取所有已经“准备就绪”的选择键
+					Iterator<SelectionKey> selectionKeys = selector.selectedKeys().iterator();
+					while (selectionKeys.hasNext()) {
+
+						SelectionKey selectionKey = selectionKeys.next();
+						if (selectionKey.isReadable()) {
+
+							// 如果是读就绪状态，读取 DatagramChannel 通道的数据
+							ByteBuffer buffer = ByteBuffer.allocate(1024);
+							datagramChannel.receive(buffer);
+							buffer.flip();
+							System.out.println(new String(buffer.array(), 0, buffer.limit()));
+							buffer.clear();
+						}
+
+						// 移除选择键
+						selectionKeys.remove();
+					}
+				}
+			G. 举例
+				@Test
+				public void testReceive() {
+					try {
+
+						// 获取接收端 DatagramChannel 通道
+						DatagramChannel datagramChannel = DatagramChannel.open();
+
+						// 切换 DatagramChannel 通道为非阻塞式
+						datagramChannel.configureBlocking(false);
+
+						// 绑定端口号等待客户端的连接
+						datagramChannel.bind(new InetSocketAddress(2648));
+
+						// 获取选择器
+						Selector selector = Selector.open();
+
+						// 将通道注册在选择器上，并指定选择器为监听通道的读状态
+						datagramChannel.register(selector, SelectionKey.OP_READ);
+
+						// 轮询式的获取选择器上已经“准备就绪”的事件
+						while (selector.select() > 0) {
+
+							// 获取所有已经“准备就绪”的选择键
+							Iterator<SelectionKey> selectionKeys = selector.selectedKeys().iterator();
+							while (selectionKeys.hasNext()) {
+
+								SelectionKey selectionKey = selectionKeys.next();
+								if (selectionKey.isReadable()) {
+
+									// 如果是读就绪状态，读取 DatagramChannel 通道的数据
+									ByteBuffer buffer = ByteBuffer.allocate(1024);
+									datagramChannel.receive(buffer);
+									buffer.flip();
+									System.out.println(new String(buffer.array(), 0, buffer.limit()));
+									buffer.clear();
+								}
+
+								// 移除选择键
+								selectionKeys.remove();
+							}
+						}
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+		⑤ 测试：开启服务端，服务端会一直等待客户端的连接，但是是非阻塞式的，再开启客户端，当客户端发送数据完毕之后会关闭，可以多个客户端连接服务端。
+五、管道（Pipe）
+	1. Java NIO 管道是两个线程之间的单项数据连接。Pipe 有一个 source 通道和一个 sink 通道。数据会被写到 sink 通道，从 source 通道读取，示意图：
+						  --------------------------------------------
+						  |					Pipe					 |
+		------------	  |	----------------	  ------------------ |		------------
+		| Thread A | ---> | | Sink Chaneel | ---> | Source Channel | | ---> | Thread B |
+		------------	  |	---------------*	  ------------------ |		------------
+						  --------------------------------------------
+	2. 使用管道（Pipe）进行单项数据传输
+		public class PipeTest {
+
+			public static void main(String[] args) {
+				try {
+					PipeThread pipeThread = new PipeThread(Pipe.open());
+					new Thread(() -> pipeThread.sink()).start();
+					new Thread(() -> pipeThread.source()).start();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+
+		class PipeThread {
+
+			private Pipe pipe;
+
+			public PipeThread(Pipe pipe) {
+				this.pipe = pipe;
+			}
+
+			public synchronized void source() {
+
+				Pipe.SourceChannel sourceChannel = null;
+				try {
+					// 获取 SourceChannel 通道，用于接收数据
+					sourceChannel = pipe.source();
+
+					// 获取缓冲区
+					ByteBuffer buffer = ByteBuffer.allocate(1024);
+
+					// 将 SourceChannel 通道中的数据读到缓冲区中
+					sourceChannel.read(buffer);
+					buffer.flip();
+					System.out.println(new String(buffer.array(), 0, buffer.limit()));
+					buffer.clear();
+				} catch (IOException e) {
+					e.printStackTrace();
+				} finally {
+					if (sourceChannel != null) {
+						try {
+							sourceChannel.close();
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					}
+				}
+			}
+
+			public synchronized void sink() {
+
+				Pipe.SinkChannel sinkChannel = null;
+				try {
+					// 获取 SinkChannel 通道，用于发送数据
+					sinkChannel = pipe.sink();
+
+					// 获取缓冲区，并在缓冲区中写入数据
+					ByteBuffer buffer = ByteBuffer.allocate(1024);
+					buffer.put("通过单向管道发送数据".getBytes());
+					buffer.flip();
+
+					// 将缓冲区的数据写入 SinkChannel 通道
+					sinkChannel.write(buffer);
+					buffer.clear();
+				} catch (IOException e) {
+					e.printStackTrace();
+				} finally {
+					if (sinkChannel != null) {
+						try {
+							sinkChannel.close();
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					}
+				}
+			}
+		}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,211 @@
+反射（Java Reflection）: Reflection）(反射)是视为动态语言的关键，反射机制允许程序在执行期借助
+						 于ReflectionAPI取得任何类的内部信息，并能直接操作任意对象的内部属性及方法
+Java反射机制提供的功能
+	1. 在运行时判断任意一个对象所属的类
+	2. 在运行时构造任意一个类的对象
+	3. 在运行时判断任意一个类所具有的成员变量和方法
+	4. 在运行时调用任意一个对象的成员变量和方法
+	5. 生成动态代理
+反射相关的主要API
+	1. java.lang.Class:代表一个类
+	2. java.lang.reflect.Method:代表类的方法
+	3. java.lang.reflect.Field:代表类的成员变量
+	4. java.lang.reflect.Consteructor:代表类的构造方法
+一、Class类：
+	1. Class类：在Object类中定义了以下的方法，此方法将被所有子类继承：
+		A. public final Class getClass()
+			该方法返回值的类型是一Class类，此类是java反射的源头，实际上所谓反射从程序运行结果看也很好理解，
+			即：可以通过对象放射求出类的名称
+			正常方式：引入需要的“包类”名称->通过new实例化->取得实例化对象
+			反射方式：实例化对象->getClass()方法->得到完整的“包类”名称
+		B. java.lang.Class：反射的源头：Class clazz = new Person().getClass();
+			建立一个类，通过编译（javac.exe）,生成对应的.class文件，之后使用java.exe(JVM的类加载器完成的).class文件。
+			从.class文件加载到内存以后，就是一个运行时类，存在缓存区。则这个运行时类本身就是Class的实例
+				注：①一个运行时类只加载一次
+					②有了Class的实例后，可以实现如下的操作
+						1）创建对应运行时类的对象
+						2）获取运行时类的完整结构（属性、方法、构造器、内部类、父类、所在的包、异常、注解....）
+						3）调用对应的运行时类的指定结构（属性，方法，构造器）
+						4）反射的运用：动态代理
+		C. 通过Class反射后可以得到的信息：某个类的属性、方法和构造器、某个类到底实现了哪些接口。
+			对于每个类而言，JRE都为其保留一个不便不变的Class类型的对象。一个Class对象包含了特定某个类的有关信息
+		D. Class本身也是一个类
+		E. Class对象只能由系统建立对象
+		F. 一个类在JVM中只会有一个Class实例
+		G. 一个Class对象对应是一个加载到JVM的一个.class文件
+		H. 每个类的实例都会记得自己是由哪个Class实例所生产
+		I. 通过Class可以完整地得到一个类中的完整结构
+	2. 通过反射创建一个类的对象，并调用其中的结构的实例
+		A. 通过反射创建一个类的对象
+			Class 对象名c = 运行时类名.class
+		B. 创建Class对象对应的运行时类Person类的对象
+			运行时类名 对象名 = (运行时类名)Class对象.newInstance()
+		C. 通过反射调用运行时类的指定属性
+			①对于public权限修饰符修饰的属性
+				Field f = Class对象名.getField("类的属性名");
+				f.set(运行时类对象名，属性值)；
+			②对于private权限修饰符修饰的属性
+				Field f = Class对象名.getDeclareField("类的属性名");
+				f.setAccessible(true);
+				f.set(运行时了类对象名，属性值);
+		D. 通过反射调用运行时类的指定方法
+			Method m = Class对象名.getMethod("方法名"，参数对应类的Class类型,...,);
+			m.invoke(运行时类对象名，实际参数)
+	
+二、理解Class类并实例化Class类对象
+	1. 调用运行时类本身的.class属性（一个类对应一个.class属性）
+		Class clazz = 运行时类.class；获取的是类的在包下的具体路径
+	2. 通过运行时类的对象调用getClass()方法
+		Class clazz = new 运行时类().getClass;
+	3. 通过Class的静态方法获取,体现反射的动态性
+		Class clazz = Class.forName("运行时类在包下的具体名称");如“com.li.clazz.testClass”
+	4. 通过类的加载器
+		ClassLoader classLoader = this.getClass.getClassLoader()
+		Class clazz = classLoader.loadClass("运行时类在包下的具体名称");如“com.li.clazz.testClass”
+三、运行时创建类对象并获取类的完整结构
+	有了Class对象，能做什么？
+	1. 创建运行时类的对象：调用Class对象的newInstance()方法，实际调用了运行时类的空参构造器
+		要求：①类必须有一个无参的构造器
+			  ②类的构造器的访问权限需要足够
+		实例：
+			String clasName = "com.li.constructor.TestConstructor"
+			Class clazz = Class.forName(className);
+	2. 有参构造的前提下创建运行时类的对象
+		要求：只要在操作的时候明确的调用类中的构造方法，并将参数传递进去之后，才可以实例化操作。
+			①通过Class类的getDeclareConstructor(Class...parameterTypes)取得本类的指定形参类型的构造器
+				
+			②向构造器的形参中传递一个对象数组进去，里面包含了构造器中所需的各个参数
+	3. 获取对应的运行时类的属性
+		A. Field[] getFields()：只能获取运行时类及其父类中声明为public的属性
+		B. Field[] getdeclaredFields()：获取运行时类本身声明的所有属性
+		C. 获取每个属性的权限修饰符
+			int i = f.getModifiers();String str = Modifier.toString(i);
+		D. 获取属性的数据类型
+			Class type = f.getType();String str = type.getName()
+		E. 获取属性名：f.getName()
+	4. 获取对于的运行类的方法
+		A. 获取的是运行时类及其父类中所有声明为public的方法：Method[] getMethods()
+		B. 获取的是运行时类本身的所有方法：Method[] getDeclaredMethods()
+		C. 注解：Annotation[] getAnnotation()
+		D. 权限修饰符：String str = Modifier.toString(m.getModifiers());
+		E. 返回值类型 Class returnType = m.getReturnType();String str = returnType.getName();
+		F. 方法名：m.getName();
+		G. 形参列表：Class[] getParameterType(),params.getName();
+		H. 异常类型：Class[] getException(),exceptions.getName();
+	5. 获取对于运行时类本身的所有构造器
+		Constructor[] getDeclaredConstuctors()
+	6. 其他
+		A. 获取运行时类的父类：Class getSuperclass()
+		B. 获取带泛型的父类：Type type = clazz.getCenericSuperclass();
+		C. 获取父类的泛型：ParameterizedType param = (ParameterizedType)type;Type[] ars = param.getActualTypeArguments();(Class)ars[0].getName;
+		D. 获取实现的接口：Class[] getInterface();
+		E. 获取所在的包：Package pack = clazz.getPackage();
+		F. 获取注解：Annotation[] annotation = clazz.getAnnotations();		
+		
+四、通过反射调用类的指定方法、指定属性
+	1. 获取运行时类指定的public权限修饰符修饰的属性（如果获取私有的属性时，会报没属性异常（NotFieldException））
+		Class clazz = Person.class;
+		A. 获取指定的属性：Field name = clazz.getField("name");
+		B. 创建运行时类的对象：Person p = (Person)clazz.getInstance();
+		C. 将运行时类的指定属性赋值：name.set(p, "AA");
+	2. 获取运行时类指定的private权限修饰符修饰的属性
+		Class clazz = Person.class;
+		A. 获取指定的属性：Field name = clazz.getDeclaredField("name");
+		B. 创建运行时类的属性：Person p = (Person)clazz.getInstance();
+		C. 将属性设置为可访问的：name.setAccessib(true)（如果没有设置为可访问的，会报无法访问异常。当属性为Defualt时，不需要此操作）
+		D. 将运行时类的指定属性赋值：name.set(p, "AA");
+	3. 	调用运行时类中指定的public权限修饰符修饰的方法
+		Class clazz = Person.class;
+		A. 获取指定方法：Method m = clazz.getMethod("方法名",形参对于类.class,..);
+		B. 创建运行时类的对象：Person p = (Person)clazz.getInstance();
+		C. 调用运行时类的方法：Object returnVal = m.invoke(p, 实参,...);
+		
+	4. 	调用运行时类中指定的private权限修饰符修饰的方法
+		Class clazz = Person.class;
+		A. 获取指定方法：Method m = clazz.getDeclaredMethod("方法名",形参对于类.class,..);
+		B. 创建运行时类的对象：Person p = (Person)clazz.getInstance();
+		C. 将属性设置为可访问的：m.setAccessib(true)（如果没有设置为可访问的，会报无法访问异常。当属性为Defualt时，不需要此操作）
+		D. 调用运行时类的方法：Object returnVal = m.invoke(p, 实参,...);该方法具有返回值
+		
+	5. 	调用运行时类中指定的static修饰的静态方法
+		Class clazz = Person.class;
+		A. 获取指定方法：Method m = clazz.getMethod("方法名",形参对于类.class,..);
+		B. 调用运行时类的方法：Object returnVal = m.invoke(Person.class, 实参,...);
+	6. 调用运行时类中指定的构造器
+		Class clazz = Person.class;
+		A. 获取指定的构造器：Constructor cons = clazz.getDeclaredConstuctors(String.class, int.class);
+		B. 将指定的构造器设为可访问的：cons.setAccessible(true);
+		C. 调用构造器创建Person的对象：Person p = (Person)cons.newInstance();
+五、动态代理
+	1. 动态代理是指客户通过代理类来调用其他对象的方法，并且是在程序运行时根据需要动态创建目标类的代理对象
+	2. 动态代理使用场合
+		A. 调试
+		B. 远程方法调用
+	3. 代理设计模式的原理：
+		使用一个代理将对象包装起来，然后用该代 理对象取代原始对象，任何对原始对象的调用都要通过代理。
+			代理对象决定以及何时将方法调用转到原始对象上。
+	4. 动态代理与AOP
+		
+了解：类的加载过程
+	1、当程序主动使用某个类时，如果该类还未被加载到内存中，则系统会通知如下三个步骤还对该类进行初始化
+		①类的加载：将类的class文件读入内存，并为之创建一个Java.lang.Class对象，此过程由类加载器完成
+		②类的连接：将类的二进制数据合并到JRE中
+		③类的初始化：JVM负责对类进行初始化
+	2、ClassLoader：
+		类的加载器是用来把类（class）转载进内存的。JVM规范定义了两种类型的加载器：启动类加载器（bootstrap）
+			和用户自定义加载器（user-defined class loader）。JVM在运行时产生3个类加载器组成的初始化加载器层次结构
+			①引导类加载器：用c++编写的，是JVM自带的类加载器，负责Java平台核心库，用来加载核心类库，该加载器无法直接获取
+			②扩展类加载器：负责jre/lib/ext目录下的jar包或java.ext.dirs指定目录下的jar包装入工作室
+			③系统类加载器：负责java-classpath或者java.class.path所指的目录下的类与jar包装入工作，是常用的类加载器
+	3. 获取类加载器的方法：
+		A. 获取系统类加载器
+			ClassLoader loader1 = ClassLoader.getSystemClassLoader()
+		B. 获取扩展类加载器
+			ClassLoader loader2 = loader.getParent()
+		C. 引导类加载器无法直接获取
+		D. 自定义类的加载器,由系统加载器加载的
+			Class clazz = 自定义类.class;
+			ClassLoader loader = clazz.getClassloader();
+		E. 核心类库的类加载器，由引导类加载器加载，无法获取	
+			String className = "java.lang.Object";
+			Class clazz = Class.forName(className);
+			ClassLoader loader = clazz.getClassLoader();
+	4. 通过类加载器加载文件（掌握）
+		A. 方法一：加载包下的文件
+			ClassLoader loader = this.getClass().getClassLoader();
+			InputStraeam is = loader.getResourceStream("com\\li\\loader\\jdbc.properties")
+		B. 方式二：加载当前工程下的文件
+			FileInputStream is = new FileInputStream(new File("jdbc.properties"));
+			
+		
+		Properties pro = new Properties();
+		pro.load(is)
+		pro.getProperty("user");
+		pro.getProperty(password)
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		

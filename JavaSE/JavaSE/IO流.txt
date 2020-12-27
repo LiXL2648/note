@@ -1,0 +1,307 @@
+一、java.io.File类：文件和目录路径名的抽象表示形式，与平台无关
+	1. 凡是与输入、输出相关的类、接口等都定义在java.io包下
+	2. File是一个类，可以通过构造方法创建文件的对象，此对象对应一个文件（.txt .avi .doc .ppt .mp3 .jpg）或者文件目录
+	3. 创建File文件类对象是时需要引入一个String类型的路径。路径分为绝对路径和相对路径
+		A. 绝对路径，包括盘符在内的完整文件路径
+		B. 相对路径，在当前文件项目路径下的文件路径
+	4. File类对象与平台无关，由于java是跨平台的
+	5. File能新建、删除、重命名文件和目录，但File不能访问文件内容本身。如果需要访问文件内容本身，则需要使用输入/输出流
+	6. File对象可以作为参数传递给流的构造方法
+	7. 对File操作相关的方法：
+		访问文件名：
+			getName():获取文件的文件名
+			getPath():获取文件的路径带文件名
+			getAbouluteFile():获取绝对文件名
+			getAboulutePath():获取文件的绝对路径带文件名
+			getParent():上一层文件目录
+			ranameTo(File newName):重命名，如：file1.renameTo(file2):file1重命名为file2
+				要求：file1一定存在，file2一定不存在；file必须保持一致
+		文件检测：
+			exists():判断文件是否存在
+			canWrite():判断文件是否可写
+			canRead():判断文件是否可读
+			isFile():判断文件是否文件
+			isDirectory():判断文件是否文件目录
+		获取常规文件信息
+			lastModified():判断文件的最后修改时间
+			length():判断文件的长度
+		文件操作相关：
+			createNewFile():创建文件
+			delete():删除文件
+		目录操作相关：
+			mkDir():创建文件目录，只有在上层目录存在的情况下才能创建成果
+			mlDirs():创建文件目录，若上层目录不存在，则一并创建
+			list():读取文件目录下的文件名，返回的是一个String的字符串数组
+			listFiles():读取文件目录下的文件，返回的是File文件数组
+二、javaIO原理：
+	A. IO流用来处理设备之间的数据传输
+	B. java程序中，对于数据的输入/输出操作以“流（stream）”的方式进行。
+	C. java.io包下提供了各种“流”类和接口，用来获取不同种类的数据，并通过标准的方法输入或者输出数据
+	1. 输入input：读取外部数据（磁盘、光盘等储存设备的数据）到程序（内存）中
+	2. 输出output：将程序（内存）数据输出到磁盘、光盘等储存设备中
+三、流的分类
+	1. 按照操作数据单位不同分为：字节流（8比特）音频文件、字符流（16比特）文本文档
+	2. 按照数据流的流向不同分为：输入流：文件到程序、输出流：程序到文件
+	3. 按照流的角色的不同分为：节点流：自己作用在程序跟文件之间，处理流：处理已有的节点流
+	抽象基类	字节流		字符流
+	输入流		InputStream	Reader
+	输出流		OutputSream Writer
+	A. Java的IO流共涉及40多个类，实际上非常规则，都是从4个抽象基类派生的
+	B. 由这四个类派生出来的子类名称都是以其父类名作为子类的后缀名
+四、节点流（文件流：4个最基本的具体类）：访问文件
+	1. FileInputStream(字节流)    BufferInputStream(字节处理流)
+	2. FileOutputStream(字节流)   BufferOutputStream(字节处理流)
+	3. FileReader(字符流)         BufferedReader(字符处理流)
+	4. FileWriter(字符流)         BufferedWriter(字符处理流)
+五、处理流（缓冲流、转换流、对象流、打印流）：处理节点流的都是处理流			
+
+六、节点流			
+FileInputStream：存在于硬盘中的文件，读取其内容到程序中,要求文件一定存在
+	1. 创建File类的对象File file = new File("Hello.txt");
+	2. 创建FileInputStream类的对象FileInputStream fis = new FileInputStream(file);
+	3. 调用FileInputStream的方法，实现file文件的读取
+	4. 实现方式1：int b = fis.read();while(b != -1){syso((char)b);b  =fis.read()}
+	   实现方式2：int[] b = new int[5];int len;while((len = fis.read(b)) != -1){syso(b)}
+	5. 关闭相应的流:if(fis != null){fis.close()};防止文件为空，进而出现空指针异常
+	   打印字节：syso((char)b)、for(int i=0;i<len;i++){syso((char)b[i])}、syso(new String(b,0,len))
+					注：数组b的长度必须使用len,而不能是b.length，否则数组b中原先的数据无法被覆盖，进而打印出错
+	6. read():读取文件的一个字节，当执行到文件的结尾时，返回-1.		
+	使用try-catch处理异常，而不采用throws将异常抛给调用者。
+			原因是，流是一种非常稀有的资源，用完必须关闭流，以免造成资源浪费
+					若程序运行时出现FileNotFoundException异常，为保证流能正常关闭，
+					因此将该语句放在finally中，故使用try-catch更加合理。
+
+FileOutputStream：
+	1. 创建File类的对象表明要写入的位置File file = new File("Hello.txt");
+	2. 创建FileOutputStream类的对象,将File的对象作为形参传递给FileOutputStream的构造器中FileOutputStream fis = new FileOutputStream(file);
+	3. 调用FileOutputStream的方法，实现file文件的写入writer.(new String("").getByte())
+	4. 关闭输出流if(fis != null){fis.close()};
+	   注：输出文件可以不存在，若没创建文件，程序自动创建该文件，若存在，会将原有的文件覆盖
+//使用FileInputStream和FileOutputStream对非文本进行复制粘贴（不建议处理文本文件，效率低）	
+FileReader：输入流对应的文件src一定要存在，否则报错。
+FileWriter：而输出流对应得文件dest可以不存在，执行过程中会自定创建。
+//使用	FileReader和FileWriter只能实现文本的复制，对于非文本文件（音频文件，视频文件，图片，二进制文件），只能使用字节流
+FileReader：输入流对应的文件src一定要存在，否则报错。
+FileWriter：而输出流对应得文件dest可以不存在，执行过程中会自定创建。
+七、处理流之一：缓冲流：程序开发首选，对文件的读写效率更高
+使用BufferInputStream和BufferOutputStream对非文本进行复制粘贴（不建议处理文本文件）	
+BufferInputStream：
+BufferOutputStream：			
+	1. 提供读入和写出文件
+	   File file1 = new File("1.avi");
+	   File file2 = new File("2.avi");
+	2. 创建FileInputStream和FileOutputStream的对象并将File的对象作为参数传递到的其构造方法中
+	   FileInputStream fis = new FileInputStream(file1);
+	   FileOutputStream fos = new FileOutputStream(file2);
+	3. 创建BufferInputStream和BufferOutputStream的对象并将FileInputStream和FileOutputStream的对象作为参数传递到其构造方法中
+	   BufferInputStream bis = new BufferInputStream(fis);
+	   BufferOutputStream bos = new BufferOutputStream(fos);
+	4. 进行读取，写入操作
+	   byte[] b = new byte[24];int len;while((len = bis.read()) != -1){bos.writer(b,0,len);bos.fush();}
+	5. 关闭对于的流,需要对相应的流进行判断在对其进行关闭
+	   bos.close();bis.close();
+//使用BufferReaderStream和BufferWriterStream对文本进行复制粘贴（不能处理非文本文件）				
+BufferedReader:			
+BufferedWriter:			
+	读写文件新方法：String str;while((str = brs.readLine()) != null){bws.writer(str + "\n");//bws.newLine();}		
+	注：1. 字节流的写出方法有自动换行，而处理流的写出方法需要手动换行。
+		2. 字节流的读入操作是通过字节或者字符数组读取，而处理流则是读取一行数据
+		3. 字节流的写出操作是将字符或者字节数组并指明指引，而处理流的写出操作是直接将将一行数据写入文件。
+		4. word文档不是纯文本文档，是经过封装而成的，由于Word文档可以插入图片，因此处理时，只能采用字节流和字节处理流
+八、处理流之二：转换流
+	1. 转换流提供了字节流和字符流之间的转换
+	2. java API提供了两个转换流：
+		InputStreamReader（解码：将字符数组转换成字符串）和OutputStreamWriter（编码：字符串转换成字节数组）
+	3. 字节流中的数据都是字符时，转成字符流操作更高效
+	4. 文件存储数据是以字节进行储存的，而程序是以字符进行存储的，
+InputStreamReader：	
+	1. 用于将字节流中读取到的字节指定字符集解码成字符，需要和InputStream“套接”。
+	2. 构造方法
+		public InputStreamReader(InputStream in)
+		public InputStreamReader(InputStream in,String charsetName)
+			如：Reader isr = new InputStreamReader(system.in, "ISO5334_1");
+OutputStreamWriter:
+	1. 用于将字符流中读取到的字符指定字符集编码为字节，需要和OutPutStream“套接”
+实例：
+	//1. 创建文件
+		File file1 = new File("note1.txt");//读入文件
+		File file2 = new File("note4.txt");//写出文件
+		//2. 创建字节流
+		FileInputStream fis = new FileInputStream(file1);//从文本以字节方式读入程序
+		FileOutputStream fos = new FileOutputStream(file2);//从程序中以字符方式写出文件
+		//3. 创建转换流
+		InputStreamReader isr = new InputStreamReader(fis, "GBK");//将字节流转换为字符流
+		OutputStreamWriter osw = new OutputStreamWriter(fos, "GBK");//将字符流转换为字节流
+		//4. 创建处理流
+		BufferedReader br = new BufferedReader(isr);
+		BufferedWriter bw = new BufferedWriter(osw);
+		String str;
+		while ((str = br.readLine()) != null) {
+			System.out.print(str + "\n");
+			bw.write(str + "\n");
+			bw.flush();
+		}
+		bw.close;
+		br.close;
+九、处理流之三：System.in（标准输入流（键盘录入））
+	InputStream is = System.in;：标准输入流Stream.in返回的是一个输入字节流对象
+	InputStreamReader isr = new InputStreamReader(is);//通过转化流将字节流转化为字符流，并创建缓冲流的对象
+	BufferedReader br = new BufferedReader(isr);//创建字符流的缓冲字符流对象
+	String str = br.readLine();	//获取输入对象
+	br.close();//关闭流
+十、处理流之四：打印流。标准输出流（控制台输出）
+	1. 在整个IO包中，打印流是输出信息最方便的类
+	2. PrintStream(字节打印流)和PrintWriter（字符打印流）
+		A. 提供了一系列重载的print和println方法，用于多种数据类型的输出
+		B. PrintStream和PrintWriter的输出不会抛出异常
+		C. PrintStream和PrintWriter有自动flush功能
+		D. System.out返回的是PrintStream的实例
+PrintStream：打印字节流
+	实例：
+		FileOutputStream fos = null;
+		try {
+			fos = new FileOutputStream(new File("print"));
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
+		//创建打印输出流，设置为自动刷新模式（写入换行符或者字节"\n"时，都会刷新输出缓冲区）
+		PrintStream ps =new PrintStream(fos, true);
+		if(ps != null){//把标准输出流（控制台输出）改成文件输出格式
+			System.setOut(ps);
+		}//当将此改吗注释掉，则在控制台输出
+		for(int i = 0; i < 255; i++){
+			System.out.print((char) i);
+			if(i % 50 == 0){//50个数据换行一次
+				System.out.println();
+			}
+		}
+处理流之五：数据流
+	1. 为了方便地操作java语言的基本数据类型，可以使用数据流
+	2. 数据流有两大类：（用于读取和写出基本数据类型的数据）
+		A. DataInputStream 和 DataOutPutStream
+		B. 分别“套接”在InputStream和OutPutStream节点流上
+	3. DataInputStream（输入型的数据流）中的方法
+		A. boolean readBoolean()	B. byte readByte()		C. char readChar()
+		D. short readShort()		E. int readInt()		F. long readLong()		
+		G. float feadFloat()		H. double readDouble()	I. String readUTF()
+		J. void readFully(byte[] b)
+	4. DataOutputStream（输出型的数据流）中的方法
+		将上述的方法中read改为相应的weite即可
+处理流之六：对象流
+	1. ObjectInputStream和ObjectOutPutStream
+		用于存储和读取对象的处理流，它的强大之处就是可以把java对象写入数据源之中，也能把对象从数据源之中还愿回来
+	2. 序列化（Serialize）：用ObjectInputStream类将一个java对象写入IO流中
+	3. 反序列化（Deserialize）：用ObjectOutputStream类从IO流中恢复该java对象
+		ObjectInputStream和ObjectOutPutStream不能序列化static和transient修饰的成员变量
+对象的序列化
+	1. 对象序列化机制允许把内存中java对象转换成平台无关的二进制流，从而允许把这种二进制流持久地保存在磁盘上，
+		或通过网络将这种二进制流传输到另一个网络节点。当其它程序获取了这种二进制流，就可以恢复成原来的java对象
+	2. 序列化的好处在于可将任何实现了Serializable接口的对象转化为字节数据，使其在保存和传输时可被还愿
+	3.序列化是BM（Remote Method Invoke-远程方法调用）过程的参数和返回值都必须实现的机制，而BMI是javaEE的基础。
+		序列化机制是JavaEES平台的基础
+	4. 如果需要让某个对象支持序列化机制，则必须让其类是可序列化的，为了让某个类是可序列化的，该类必须实现如下两个接口之一
+		Serializable和Externliable
+	5. 凡是实现Serializable接口的类都有一个表示序列化版本标识符的静态变量
+		A. private static final long serialVersionUID
+		B. serialVersionUID用来表明类的不同版本间的兼容性
+		C. 如果没有显示定义这个静态变量，它的值是java运行时环境变量根据类的内部细节自动生成。
+			若类的源代码作了修改，serialVersionUID可能发生变化。故建议，显示声明
+	6. 显示定义serialVersionUID的用途
+		A. 希望类的不同版本对序列化兼容，故因此需确保类的不同版本具有相同的serialVersionUID
+		B. 不希望类的不同版本对序列化兼容，因此需确保类的不同版本具有不同的serialVersionUID 
+ObjectOutPutStream:对象的序列化过程
+	1. 将内存中的对象通过ObjectOutPutStream转换为二进制流，存储在硬盘文件中
+ObjectInputStream：对象的反序列化过程
+	1. 将硬盘中的文件通过ObjectInputStream转换为相应的对象
+	要求：
+		1. 自定义类实现可；序列化，实现Serializable接口
+		2. 自定义类的引用数据类型属性可序列化，同样需要实现Serializable接口
+		3. 提供一个版本号：private static final long serialVersionUID
+		4. ObjectInputStream和ObjectOutPutStream不能序列化static或者transient修饰的成员变量
+处理流之七：RandomAccessFile类：
+	1. RandomAccessFile类支持“随机访问”的方式，程序可以直接跳到文件袋额任意地方来读写文件
+		支持只访问文件的部分内容
+		可以向已存在的文件后追加内容
+	2. RandomAccessFile类对象包含一个记录指针，用以标识当前写出的位置。RandomAccessFile类对象可以自由移动记录指针：
+		long getFilePoint():获取文件记录指针的当前位置
+		void seek(long pos):将文件记录指针定位到pos位置
+	3. 构造方法：
+		public RandomAccessFile(File file, String mode);
+		public RandomAccessFile(String name, String mode);
+	4. 创建RandomAccessFile类实例需要指定一个mode参数，该参数指定RandomAccessFile的访问方式
+		r:以只读方式打开
+		rw:打开以便读取和写入
+		rwd:打开以便读取和写入；同步文件内容的更新
+		rws:打开以便读取和写入；同步内容和元数据的更新
+
+
+// 流的形式读取文件
+private static void print(HttpServletResponse response,
+		HttpServletRequest request, String fileUrl, String defaultUrl) {
+	BufferedInputStream bis = null;
+	InputStream in = null;
+	OutputStream out = null;
+	byte[] b = null;
+	int len;
+	try {
+		File file = new File(fileUrl);
+		if (file.exists()) {
+			in = new FileInputStream(fileUrl);
+		} else {
+			ServletContext servletContext = request.getServletContext();
+			in = servletContext.getResourceAsStream(defaultUrl);
+		}
+		bis = new BufferedInputStream(in);
+		out = response.getOutputStream();
+		b = new byte[1024];
+		while ((len = bis.read(b)) != -1) {
+			out.write(b, 0, len);
+			out.flush();
+		}
+	} catch (Exception e) {
+		e.printStackTrace();
+	} finally {
+		if (out != null) {
+			try {
+				out.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		if (bis != null) {
+			try {
+				bis.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		if (in != null) {
+			try {
+				in.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+}
+
+
+补充：字符编码
+	1. 编码的由来：
+		计算机只能识别二进制，早期由来是电信号。为了方便应用计算机，由它可以识别各个国家的文字。
+			就将各个国家的文字用数字来表示，并一一对应，形成一张表。这就是编码
+	2. 常见的编码表：
+		ASCLL：美国标准信息交换码。用一个字节的7位可以表示
+		ISO8859-1：拉丁码表。欧洲码表。用一个字节的8位表表示
+	3. GB2312：中国的中文编码表
+	4. GBK：中国的中文编码表升级，融合了更多中文文字符号
+	5. Unicode：国际标准码，融合了多种文字。所有的文字都用两个字节来表示，java语言使用的就是Unicode
+	6. UTF-8：最多使用三个字节来表示一个字符
+			
+			
+			
+			
+			
+			
+			
+		

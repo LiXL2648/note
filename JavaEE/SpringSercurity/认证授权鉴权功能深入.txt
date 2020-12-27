@@ -86,17 +86,17 @@
 				CREATE TABLE `sys_menu` (
 				  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '菜单/权限表主键ID',
 				  `menu_pid` int(11) DEFAULT NULL COMMENT '父节点ID',
-				  `menu_pids` int(11) DEFAULT NULL COMMENT '所有父节点ID',
-				  `is_leaf` tinyint(1) NOT NULL COMMENT '是否是叶节点，0：否；1：是',
+				  `menu_pids` VARCHAR(32) DEFAULT NULL COMMENT '所有父节点ID',
+				  `is_leaf` tinyint(4) NOT NULL COMMENT '是否是叶节点，0：否；1：是',
 				  `menu_name` varchar(32) NOT NULL COMMENT '菜单/权限名称',
 				  `url` varchar(64) DEFAULT NULL COMMENT '路由地址',
 				  `icon` varchar(32) DEFAULT NULL COMMENT '菜单字体图标',
 				  `icon_color` varchar(16) DEFAULT NULL COMMENT '菜单字体图标颜色',
-				  `sort` tinyint(1) NOT NULL COMMENT '相对于父节点的排序',
-				  `level` tinyint(1) NOT NULL COMMENT '对应的层级',
-				  `status` tinyint(1) NOT NULL COMMENT '是否可用，0：否；1：是',
+				  `sort` tinyint(4) NOT NULL COMMENT '相对于父节点的排序',
+				  `level` tinyint(4) NOT NULL COMMENT '对应的层级',
+				  `status` tinyint(4) NOT NULL COMMENT '是否可用，0：否；1：是',
 				  PRIMARY KEY (`id`)
-				) ENGINE=InnoDB AUTO_INCREMENT=24 DEFAULT CHARSET=utf8mb4;
+				) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 		④ 角色管理
 			A. 需求分析
 				① 角色本身的管理需要注意的点非常少，就是简单的增删改查。重点在于角色分配该如何做。
@@ -111,11 +111,11 @@
 				  `role_name` varchar(32) NOT NULL COMMENT '角色名称(中文)',
 				  `role_code` varchar(32) NOT NULL COMMENT '角色名称(英文)',
 				  `role_desc` varchar(100) DEFAULT NULL COMMENT '角色描述',
-				  `sort` tinyint(1) NOT NULL COMMENT '角色顺序',
-				  `status` tinyint(1) NOT NULL COMMENT '是否可用，0：否；1：是',
+				  `sort` tinyint(4) NOT NULL COMMENT '角色顺序',
+				  `status` tinyint(4) NOT NULL COMMENT '是否可用，0：否；1：是',
 				  `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '角色的创建日期',
 				  PRIMARY KEY (`id`)
-				) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4;
+				) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 			C. 角色菜单权限关联表的CreateSQL
 				CREATE TABLE `role_menu` (
 				  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '角色权限表主键ID',
