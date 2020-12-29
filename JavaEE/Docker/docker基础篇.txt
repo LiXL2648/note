@@ -255,13 +255,281 @@
 		① 有镜像才能创建容器，这是根本前提（下载一个 CentOS 镜像演示）：docker pull centos
 		② 新建并启动容器：docker run [options] IMAGE [COMMAND][ARG...]
 			A. OPTIONS说明：有些是一个减号，有些是两个减号
-			B. --name="容器的名字"：为容器指定一个名称
-			
-	4. 小总结
-
-
-
-
+			B. --name="容器的名字"：为容器指定一个名称，如果没有指定，docker 会随机生成一个容器名字
+			C. -d：后台运行容器，并返回容器 ID，也即启动守护式容器
+			D. -i：以交互式运行容器，通常与 -t 同时使用
+			E. -t：为容器重新分配一个伪输入终端，通常与 -i 同时使用
+			F. -P：随机端口映射
+			G. -p：指定端口映射，有以下四种格式
+				a. ip:hostPort:containerPort
+				b. ip::containerPort
+				c. hostPort:containerPort
+				d. containerPort
+			H. 举例：
+				a. docker run -it 300e315adb2f [/bin/bash]：
+					(1) centos 的镜像 ID 为 300e315adb2f
+					(2) 以 centos 的镜像为模板，生成了一个容器 ea9894831578，并以 /bin/bash 的方式登陆进入到了该产生的容器内部的 centos 根目录下
+					(3) 使用 ls 查看当前 centos 容器内部的当前路径的所有文件夹
+					(4) 使用 ps -ef 查看 centos 容器内部的进程
+		③ 列出当前所有正在运行的容器：docker ps [options]
+			A. -a：列出当前所有正在运行的容器 + 历史上运行过的容器
+			B. -l：显示最近创建的容器
+			C. -n num：显示最近 num 个创建的容器
+			D. -q：静默模式，只显示容器编号
+			E. --no-trunc：不截断输出
+		④ 退出容器，两种退出方式
+			A. exit：容器停止推出
+			B. ctrl+P+Q：容器不停止退出
+		⑤ 启动容器：docker start 容器 ID 或者容器名
+		⑥ 重启容器：docker restart 容器 ID 或者容器名
+		⑦ 停止容器：docker stop 容器 ID 或者容器名
+		⑧ 强制停止容器：docker kill 容器 ID 或者容器名
+		⑨ 删除已停止的容器：docker rm 容器 ID 或者容器名
+			A. -f：强制删除，docker rm -f centos1219
+			B. 一次性删除多个容器：
+				a. docker rm -f ${docker ps -a -q}
+				b. docker ps -a -q | xargs docker rm
+		⑩ 重点：
+			A. 启动守护式容器：docker run -d --name centos1219 centos
+				a. 使用镜像 centos:latest 以后台模式启动一个容器：
+				b. 问题：然后使用 docker ps -a 进行查看，会发现容器已经退出，很重要的要说明的一点：Docker容器后台运行，就必须有一个前台进程
+				容器运行命令如果不是那些一直挂起的命令（比如运行 top，tail），就是会自动退出的
+				c. 这个是 docker 的机制问题，比如 web 容器，以 nginx 为例，正常情况下，我们配置启动服务只需要响应service即可。例如 service
+				nginx start，但是这样做，nginx 为后台进程模式运行，就导致 docker 前台没有运行的应用，这样的容器后台启动后，就会立即自杀，因为
+				它觉得没事可做了。所以最佳的解决方案就是，将要运行的程序以前台进程的形式启动	
+			B. 查看容器日志：docker logs -f -t --tail 容器 ID 或者容器名
+				a. -t：加入时间戳
+				b. -f：跟随最新的日志打印
+				c. --tail num：显示最后 num 条
+				d. 举例：
+					(1) 运行：docker run -d --name centos1219 centos /bin/sh -c "while true; do echo hello LiXL;sleep 2; done"，以后台的形式循环打印消息
+					(2) 查看日志：docker logs centos1219 
+					(3) 查看最新3条日志并不停追加：docker logs -t -f --tail 3 centos1219
+			C. 查看容器内部运行的进程：docker top 容器 ID 或者容器名
+			D. 查看容器内容细节：docker inspect 容器 ID 或者容器名
+			E. 进入正在运行的容器并以命令行交互
+				a. docker exec -it 容器 ID 或者容器名 bashShell，bashShell 有以下选项
+					(1) /bin/bash：进入容器
+					(2) ls -l /：在宿主机查看容器内部根路径的文件目录
+					(3) ……
+				b. 重新进入 docker attach 容器 ID 或者容器名
+				c. 上述两种方式的区别
+					(1) attach：直接进入容器启动命令，不会启动新的进程
+					(2) exec：是在容器中打开新的终端，并且可以启动新的进程
+					(3) exec 功能比 attach 强大，exec 可以进入容器内部，也可以在宿主机直接得到容器的结果，而 attach 需要先进入容器内部
+			F. 从容器中拷贝文件到主机：
+				a. docker cp 容器 ID 或者容器名:容器内部路径 宿主机目的路径
+				b. 举例：docker cp centos1220:/tmp/hello.txt /tmp
+	4. 总结：
+		attach      Attach to a running container：当前 shell 下 attach 连接指定运行镜像
+		build       Build an image from a Dockerfile：通过 Dockerfile 定制镜像
+		commit      Create a new image from a container's changes：提交当前容器为新的镜像
+		cp          Copy files/folders between a container and the local filesystem：从容器中拷贝指定文件或者目录到宿主机中
+		create      Create a new container：创建一个新的容器，同 run，但不启动容器
+		diff        Inspect changes on a container's filesystem：查看docker 容器变化
+		events      Get real time events from the server：从docker 服务获取容器实时事件
+		exec        Run a command in a running container：在已存在的容器上运行命令
+		export      Export a container's filesystem as a tar archive：导出容器的内容流作为一个tar归档文件[对应import]
+		history     Show the history of an image：展示一个镜像形成历史
+		images      List images：列出系统当前的进行
+		import      Import the contents from a tarball to create a filesystem image：从 tar 包中的内容创建一个新的文件系统映像[对应export]
+		info        Display system-wide information：显示系统相关信息
+		inspect     Return low-level information on Docker objects：查看容器详细信息
+		kill        Kill one or more running containers：杀死知道 docker 容器
+		load        Load an image from a tar archive or STDIN：从 tar 包中加载一个镜像[对应 save]
+		login       Log in to a Docker registry：注册或者登陆一个docker 源服务器
+		logout      Log out from a Docker registry：从当前 docker registry 退出
+		logs        Fetch the logs of a container：输出当前日志信息
+		pause       Pause all processes within one or more containers：暂停容器
+		port        List port mappings or a specific mapping for the container 查看映射端口对应的容器内部的源端口
+		ps          List containers：列出容器列表
+		pull        Pull an image or a repository from a registry：从 docker 镜像源服务器拉取指定镜像或者库镜像
+		push        Push an image or a repository to a registry：推送指定镜像或者库镜像至 docker 源服务器
+		rename      Rename a container：重新命名一个 docker 容器
+		restart     Restart one or more containers：重新启动 docker 容器
+		rm          Remove one or more containers：移除一个或者多个容器
+		rmi         Remove one or more images：移除一个或者多个镜像[无容器使用该镜像才可以删除，否则需要删除相关容器才可以继续或者-f强制删除]
+		run         Run a command in a new container：创建一个新的容易并运行一个命令
+		save        Save one or more images to a tar archive (streamed to STDOUT by default)：保存一个镜像为一个 tar 包[对应load]
+		search      Search the Docker Hub for images：在docker hub 中搜索镜像
+		start       Start one or more stopped containers：启动容器
+		stats       Display a live stream of container(s) resource usage statistics：查看容器的启动状态
+		stop        Stop one or more running containers：停止容器
+		tag         Create a tag TARGET_IMAGE that refers to SOURCE_IMAGE：给源中镜像打标签
+		top         Display the running processes of a container：查看容器中运行的进程信息
+		unpause     Unpause all processes within one or more containers：取消暂停容器
+		update      Update configuration of one or more containers：更新一个或者多个容器
+		version     Show the Docker version information：查看 docker 版本号
+		wait        Block until one or more containers stop, then print their exit codes：截取容器停止时的退出状态值
+四、Docker 镜像
+	1. Docker 镜像是什么：
+		① 镜像是一种轻量级、可执行的独立软件包，用来打包软件运行环境和基于运行环境开发的软件，它包含运行某个软件所需要的所有内容，包括代码、
+		运行时、库、环境变量和配置文件。
+		③ UnionFS（联合文件系统）
+			A. UnionFS（联合文件系统）：是一种分层、轻量级并且高性能的文件系统，它支持对文件系统的修改作为一次提交来一层层的叠加，同时可以将
+			不同目录挂载到同一个虚拟文件系统下（unite serveral directories into a single virtual filesystem）。Union 文件系统是 Docker 镜像的
+			基础。镜像可以通过分层来进行继承，基于基础镜像（没有父镜像），可以制作各种具体的应用镜像。
+			B. 特性：一次同时加载多个文件系统，但从外面看起来，只能看到一个文件系统，联合加载会把各层文件系统叠加起来，这样最终的文件系统会包括
+			所有底层的文件和目录
+		② Docker 镜像加载原理
+			A. docekr 的镜像实际上由一层一层的文件系统组成，这种层级的文件系统 UnionFS
+			B. bootfs（boot file system）主要包含 bootloader 和 kernel（内核），bootloader 主要是引导加载 kernel，Linux 刚启动时会加载 bootfs 文
+			件系统，在 Docker 镜像的最底层是 bootfs，这一层与我们典型的 Linux 和 Unix系统是一样的，包含 boot 加载器和内核。当 boot 加载完成之后整
+			个内核就都在内存中了，此时内存的使用权已由 bootfs转交给内核，而系统也会卸载 bootfs
+			C. rootfs（root file system），在 bootfs 之上。包含的就是典型 Linux 系统中的 /dev，/proc，/bin，/etc 等标准目录和文件。rootfs 就是各种
+			不同操作系统发行版，比如 Ubuntu，Centos等等
+			D. 平时我们安装的虚拟机的 CentOS 都是好几个G，为什么 docker 这里才 200m？对于一个精简的 OS，rootfs 可以很小，只需要包括最基本的命令、
+			工具和程序库就可以了，因为最底层直接用 HOST 的 kernel，自己只需要提供 rootfs 就行了。由此可见对于不同的 linux 发行版，bootfs 基本是一样
+			的，rootfs 会有差别，因此不同的发行版可以用公共的 bootfs。
+		④ 分层的镜像：以 pull 为例，在下载过程中可以看到 docker 的镜像好像是一层一层地在下载
+		⑤ 为什么 Docker 镜像要采用这种分层结构
+			A. 最大的一个好处就是共享资源
+			B. 比如：有好多个系统都从相同的 base 镜像构建而来，那么宿主机只需要在磁盘上保存一份 base 镜像，同时内存中也只需要加载一份 base 镜像，就
+			可以为所有容器服务了。而且镜像的每一层都可以被共享
+	2. 特点
+		① Docker 镜像都是只读的
+		② 当容器启动时，一个新的可写层被加载到镜像的顶部。这一层通常被称为“容器层”，“容器层”之下的都叫“镜像层”
+	3. Docker 镜像 commit 操作补充
+		① docker commit 提交容器副本使之成为一个新的镜像
+		② docker commit -m="提交的描述信息" -a="作者" 容器 ID 或者容器名 要创建的目标镜像名:[标签名]
+		③ 案例演示：
+			A. 从 docker hub 上下载 tomcat 镜像到本地并成功运行
+				a. docker run -it -p 8080:8080 tomcat
+				b. -p 主机端口:docker 容器端口
+				c. -P：随机分配端口
+				d. -i：交互
+				e. -t：终端
+			B. Docker 运行 Tomcat，访问 localhost:8080 报 404
+				a. 原因：容器内webapps文件夹为空，导致访问404
+				b. 修改：
+					(1) 进入容器内部：docker exec -it tomcat1220 /bin/bash
+					(2) 备份原来的 webapps 文件：mv webapps webapps.backup
+					(3) 将 webapps.dist 改为 webapps：mv webapps.dist webapps
+			C. 也即当前的 tomcat 运行实例是一个可以访问首页容器，以它为模板 commit 一个没有 doc 的 tomcat 新镜像 LiXL/tomcat
+				docker commit -a="LiXL" -m="tomcat with index" tomcat1220 lixl/tomcat:1.0
+			D. 启动新的镜像和原来的对比
+				a. 启动新的镜像容器：docker run -it --name mytomcat1220 -p 8089:8080 lixl/tomcat:1.0
+				b. 原拉取的 tomcat镜像，启动容器，访问首页 404
+				c. 新提交的 tomcat镜像，启动容器，访问首页 成功
+		④ 以后台的方式创建一个容器并启动：docker run -d -it --name mytomcat1221 -p 8087:8080 lixl/tomcat:1.0
+五、Docker容器数据卷
+	1. 是什么
+		① Docker 的理念
+			A. 将运用与运行的环境打包成容器运行，运行可以伴随着容器，但是我们对数据的要求希望是持久化
+			B. 容器之间希望有可能数据共享
+		② Docker 容器产生的数据，如果不通过 docker commit 生成新的镜像，使得数据作为镜像的一部分保存下来，那么删除容器之后，数据
+		自然也就没有了
+		③ 为了能保存数据在 docker 中我们使用卷
+		④ 一句话：有点类似我们 Redis 里面的 rdb 和 aof 文件
+	2. 能干什么
+		① 容器的持久化
+		② 容器间继承 + 数据共享
+		③ 卷就是目录或文件，存在于一个或者多个容器，由 docker 挂载到容器，但不属于联合文件系统，因此能够绕过 Union File System 提供
+		一些用于持续存储或共享数据的特性
+		④ 卷的设计目的就是数据的持久化，完全独立于容器的生存周期，因此 Docker 不会在容器删除时删除其挂载的数据卷
+		⑤ 特点：
+			A. 数据卷可在容器之间共享或者重用数据
+			B. 卷中的更改可以直接生效
+			C. 数据卷中的更改不会包含在镜像的更新中
+			D. 数据卷的生命周期一直持续到没有容器使用它为止
+	3. 数据卷
+		① 直接命令添加
+			A. 命令：docker run -it -v /宿主机绝对路径目录:/容器内目录 镜像名或者镜像 ID
+				a. 举例：docker run -it --name centos1223 -v /usr/local/mydata:/usr/local/myData centos
+				b. 出现Permission denied：
+					(1) 原因是CentOS7中的安全模块selinux把权限禁掉了：
+					(2) 在运行容器的时候，给容器加特权，也就是加上   --privileged=true 参数
+						docker run -it --name centos1227 -v /usr/local/mydata:/usr/local/myData:ro --privileged=true centos
+			B. 查看数据卷是否挂载成功：docker inspect 容器名或者 ID
+				a. 举例：docker inspect centos1223
+				b. 若出现 "Binds": ["/usr/local/mydata:/usr/local/mydata"] 则证明挂载成功
+			C. 容器和宿主机之间数据共享
+				a. 在宿主机上的 /usr/local/mydata 目录上新建 hello.txt 文件，在容器的 /usr/local/myData 目录中能看到相同的文件 hello.txt
+				b. 在容器的 /usr/local/myData 目录上修改 hello.txt，并新建 hello1.txt，在宿主机的 /usr/local/mydata 目录上能看到修改内容的
+				hello.txt 和新建的 hello1.txt
+			D. 容器停止退出后，主机修改数据是否同步
+				a. 容器停止退出：exit
+				b. 主机修改 hello.txt
+				c. 容器重启进行：docker start centos1223 docker exec it centos1223 /bin/bash
+				d。 容器查看主机修改过的 hello.txt，内容同步
+			E. 命令（带权限）：docker run -it -v 宿主机绝对路径目录:/容器内目录:ro 镜像名或者镜像 ID
+				a. 举例：
+					(1) 创建容器：docker run -it --name centos1227 -v /usr/local/mydata:/usr/local/myData:ro --privileged=true centos
+					(2) 在 /usr/local/myData 中新建 hello3.txt 或者修改 hello.txt 文件
+					(3) 出现：Read-only file system的 提示信息
+				b. 查看容器 docker inspect centos1227 
+					"Binds": [
+						"/usr/local/mydata:/usr/local/myData:ro"
+					],
+		② DockerFile添加：
+			A. /usr/local/mydata 目录下新建 mydocker 文件夹并进入
+				cd /usr/local/mydata/
+				mkdir mydocker
+				cd mydocker/
+			B. 可在 Dockerfile 中使用 VOLUME 指令来给镜像容器添加一个或多个数据卷
+				a. VOLUME["/usr/local/myData1", "/usr/local/myData2", "/usr/local/myData3"]
+				b. 说明：
+					(1) 出于可移植性和分享的考虑，用 “-v 主机目录:容器目录” 这种方法不能够直接在 Dockerfile 中实现
+					(2) 由于宿主机目录是依赖于特定宿主机的，并不能保证在所有宿主机上都存在这样的特定目录
+			C. File 构建
+				a. 新建Dockerfile：vim Dockerfile
+					# volume test
+					FROM centos
+					VOLUME ["/usr/local/myData/myCentosDir1", "/usr/local/myData/myCentosDir2"]
+					CMD echo "finish,......success1"
+					CMD /bin/bash
+				b. 相当于：docker run -it -v /usr/local/mydata/myCentosDir1:/usr/local/myData/myCentosDir1, 
+				/usr/local/mydata/myCentosDir2:/usr/local/myData/myCentosDir2 centos
+			D. build 后生成镜像，获得一个新镜像：docker build -f /usr/local/mydata/mydocker/Dockerfile -t lixl/centos .
+			E. run 容器：docker run -it --name mycentos1227 lixl/centos
+			F. 通过上述步骤，容器内的卷目录地址已经知道，对应的主机目录地址在哪？
+				a. 在容器 mycentos1227 的 myCentosDir1 目录中新建 hello1.txt
+				b. 使用 docker inspect mycentos1227 查看
+					"Mounts": [
+						{
+							"Type": "volume",
+							"Name": "f70c32a8140d01040c4d85476482ac10657122fa3d7c1c6bb3e225e5f1c90b6a",
+							"Source": "/var/lib/docker/volumes/f70c32a8140d01040c4d85476482ac10657122fa3d7c1c6bb3e225e5f1c90b6a/_data",
+							"Destination": "/usr/local/myData/myCentosDir2",
+							"Driver": "local",
+							"Mode": "",
+							"RW": true,
+							"Propagation": ""
+						},
+						{
+							"Type": "volume",
+							"Name": "d84d74c59ebd916790840cdb0dcefc33c87d20e801e6ba4174046c7f331cca17",
+							"Source": "/var/lib/docker/volumes/d84d74c59ebd916790840cdb0dcefc33c87d20e801e6ba4174046c7f331cca17/_data",
+							"Destination": "/usr/local/myData/myCentosDir1",
+							"Driver": "local",
+							"Mode": "",
+							"RW": true,
+							"Propagation": ""
+						}
+					]
+				c. 如果没有指定宿主机的目录，Dockerfile 会默认在主机上生成一个目录与容器的目录相对应
+				d. 容器 mycentos1227 的 myCentosDir1 目录对应的宿主机目录中可以查看到相同的文件，并且在宿主机中修改hello1.txt，会同步到容器中
+			G. 主机对应的默认地址：/var/lib/docker/volumes/
+	4. 数据卷容器
+		① 是什么：命名的容器挂载数据卷，其他容器通过挂载这个（父容器）实现数据共享，挂载数据卷的容器，称之为数据卷容器
+		② 总体介绍
+			A. 以上一步新建的镜像 lixl/centos 为模板并运行容器 mycentos01/mycentos02/mycentos03/
+			B. 容器已经具有容器卷 /usr/local/myData/myCentosDir1，/usr/local/myData/myCentosDir2
+		③ 容器间传递共享（--volumes-from）
+			A. 先启动一个父容器 mycentos01，在 /usr/local/myData/myCentosDir2 新增内容
+				a. docker run -it --name mycentos01 lixl/centos
+				b. cd /usr/local/myData/myCentosDir2
+				c. touch mycentos01_add.txt
+			B. mycentos02/mycentos03/ 继承自 mycentos01
+				a. --volumes-from
+				b. 命令：
+					(1) docker run -it --name mycentos02 --volumes-from mycentos01 lixl/centos
+					(2) mycentos02/mycentos03 分别在 /usr/local/myData/myCentosDir2 新增内容
+						(a) cd /usr/local/myData/myCentosDir2/
+						(b) ls mycentos01_add.txt
+						(c) touch mycentos02_add.txt
+					(3) mycentos02/mycentos03 的 /usr/local/myData/myCentosDir2 目录中存在 mycentos01 新建的 mycentos01_add.txt 文件，而 mycentos01 的
+						/usr/local/myData/myCentosDir2 目录中存在 mycentos02/mycentos03 新建的 mycentos02_add.txt 和 mycentos03_add.txt
 
 
 
