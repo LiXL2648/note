@@ -1,0 +1,73 @@
+﻿str = Pattern.compile("<").matcher(str).replaceAll("&lt");
+str = Pattern.compile(">").matcher(str).replaceAll("&gt");
+将文件中的标签转化为字符输出
+
+InputStream is = pageContext.getServletContext().getResourceAsStream(src);
+获取输入流，src代表的是当前项目下的某个文件，不需要全路径。
+
+EL表达式中的JSP范围隐含变量的作用只能用于获取范围内的属性，即相当于getAttribute()，而不能使用该范围的其他功能
+而pageContext的作用是可以获取JSP范围的隐含对象，因此可以通过pageContext获取JSP范围的隐含变量，从而获取JSP范围隐含变量的其他属性
+
+获取当前web应用的根路径的方法是request.getContextPath()
+
+对于表单的get和post请求的中文乱码问题
+由于表单采用的字符编码默认是欧洲编码，因此需要对表单进行编码的设置
+对于get请求的解决方法是：一般采用第二种方法
+	a. 方法一：采用重新编码的方式，即：
+					<%
+						String val = request.getParameter("username");
+						String username = new String(val.getBytes("iso-8859-1"), "UTF-8");
+						out.print(username);
+					%>
+	b. 方法二：可以通过修改Tomcat的server.xml文件的方式，参照http://localhost:8080/docs/config/index.html文档的useBodyEncodingForURI属性
+	为Connector节点添加URIEncoding="UTF-8"属性即可，该设置的位置为D:\Program Files\apache-tomcat-6.0.9\conf\server.xml以及eclipse下的server\Tomcat v6.0 Server at localhost-config\server.xml，缺一不可。
+	<Connector port="8080" protocol="HTTP/1.1" maxThreads="150" connectionTimeout="20000" redirectPort="8443" URIEncoding="UTF-8"/>
+对于post请求：只要在获取请求信息之前，调用request的setCharacterEncoding("UTF-8")即可解决获取中文参数乱码问题
+一般方法是，通过创建字符编码拦截器进行解析
+
+使用JDBC连接数据库需要加入MySQL驱动
+	mysql-connector-java-8.0.13.jar
+
+
+使用C3P0数据源需要使用两个jar包：
+	c3p0-0.9.5.2.jar
+	mchange-commons-java-0.2.11.jar
+	
+在JSP中使用标签创建日期时间对象：
+<%-- <jsp:useBean id="date" type="java.io.Serializable" beanName="java.util.Date" scope="request"></jsp:useBean>--%>
+<jsp:useBean id="date" class="java.util.Date" scope="request"></jsp:useBean>
+	
+
+概述：使用maven构建web项目时，经常会遇见这个问题，问题原因报错讲述的很清晰明了，就是web模块需要使用java1.7及以后的版本，目前的版本不符合。因而只需要修改java版本到1.7及以上即可。
+
+        解决方法：
+        1. 在eclipse 构建 web中关于java版本有三处需要修改统一。
+            （1）在 Java Build Path的libraries中修改
+            （2）在Java Compiler 中修改
+            （3）在Project Facet中修改
+        2. 大部分按上上述修改就应该可以了，但总是有意外，还是报错。因为使用了 maven构建项目，因而最好在pom.xml文件中的build标签中加入以下代码：
+	<build>
+	    <plugins>
+		    <plugin>
+		    <groupId>org.apache.maven.plugins</groupId>
+		    <artifactId>maven-compiler-plugin</artifactId>
+		    <version>3.1</version>
+		    <configuration>
+			    <source>1.8</source>
+			    <target>1.8</target>
+		    </configuration>
+		    </plugin>
+	    </plugins>
+    	</build>
+
+Eclipse默认的快速复制一行的快捷键为：
+
+1）Ctrl + Alt + Up（向上方向键）：在本行上方插入一行，内容与本行相同
+
+2）Ctrl + Alt + Down（向下方向键）：在本行下方插入一行，内容与本行相同
+
+但英特尔核心显卡的驱动已经注册了这个快捷键，导致热键冲突。
+
+1、在Eclipse菜单中选 Window->Preference->General->Key
+2、右侧头部的“type filter text”编辑框中分别输入Copy Lines以及Duplicate Lines，并在底部的Binding编辑框将原有组合键删除，并保持光标停留在此编辑框中，再按下自定义的组合键。
+3、重启Eclipse 

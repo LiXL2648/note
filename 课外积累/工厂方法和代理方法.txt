@@ -1,0 +1,78 @@
+//设计模式之代理方法：
+        //定义一个接口，再定义两个类去实现这个接口，
+        //一个定义为被代理类，一个定义为代理类
+        //被代理类实现的是接口的功能
+        //代理类是用于代替被代理类实现接口的功能
+        
+public class TestProxy {
+	public static void main(String[] args) {
+		Object o = new ProxyObject();
+		o.action();
+	}
+}
+interface Object{
+	void action();
+}
+//代理类
+class ProxyObject implements Object{
+	ObjectImplc obji = new ObjectImplc();
+
+	@Override
+	public void action() {
+		System.out.println("我是代理类");
+		obji.action();
+	}
+}
+//被代理类
+class ObjectImplc implements Object{
+	public void action() {
+		System.out.println("我是被代理类");
+	}
+}
+//设计模式之工厂方法：
+         //首先定义一个工作接口
+         //让老师类与学生类根据具体的情况去实现这个工作的功能
+         //接着定义一个工厂接口
+         //定义一个学生工厂跟老师工厂
+         //这两个工厂的方法存放的是学生类与老师类的对象，并返回
+public class TestFactory {
+	public static void main(String[] args) {
+		Factory studentFactory = new StudentFactory();
+		studentFactory.factory().dowork();
+	}
+}
+interface Factory{
+	public abstract Work factory();
+}
+class StudentFactory implements Factory{
+
+	@Override
+	public Work factory() {
+		return new StudentWork();
+	}
+}
+class TeacherFactory implements Factory{
+
+	@Override
+	public Work factory() {
+		return new TeacherWork();
+	}
+}
+interface Work{
+	public abstract void dowork();
+}
+
+class StudentWork implements Work{
+
+	@Override
+	public void dowork() {
+		System.out.println("学生做作业");
+	}
+}
+class TeacherWork implements Work{
+
+	@Override
+	public void dowork() {
+		System.out.println("老师改作业");
+	}
+}
