@@ -779,27 +779,146 @@
 				目录，而宿主机中并没有 tomcat 主页的内容，因此会出现404，将 宿主机 /usr/local/apache-tomcat-9.0.41/webapps 下的目录拷贝到 /usr/local/mydata/mytomcat/webapps
 				重新启动容器，再访问 http://192.168.230.48:8088/ 进入tomcat主页
 				b. 结合前述的容器卷将测试的web服务发布在 /usr/local/mydata/mytomcat/webapps 中，重新启动容器，在浏览器中访问该 web 服务
+					(1) 在 /usr/local/mydata/mytomcat/webapps 新建 test 文件夹
+					(2) 在 test 文件夹中新建 test.html 文件，并定义一个 h1 标签，保存退出
+					(3) 重启 tomcat docker restart mytomcat01，浏览器访问 http://192.168.230.48:8088/test/test.html，正确显示 test.html 页面
 				c. 获取容器 jdk 版本：docker exec -it mytomcat01 java -version
 				d. 使用 docker 命令查看进入容器的落脚目录 docker exec -it mytomcat01 ls -l，该目录与 Dockerfile中设置的 WORKDIR 一致
-			5. 小总结
+	5. 小总结
+														-------------------------------------------------------------
+														|															↓ push
+		------------------------------------------------|--------------------------------------------		-------------------
+		|												|											|		|				  |
+		|							--------------------|--------------------						|		| Docker registry |
+		|							|    tar |-----↓	↓					|						|		| 				  |
+		|							|	     |	 --------------				|						|		-------------------
+		|	--------------   build	|  	     --- |		 	  |				|						|				| pull
+		|	| Dockerfile | ---------|----------> |   images	  |	<-----------|-----------------------|----------------
+		|	--------------			| 	     |-> |			  | ---			|						|
+		|							|	     |	 --------------	  |			|						|
+		|						    | commit |					  | run		|						|
+		|							|	     |	 --------------	  |			|						|
+		|							|	     |	 |			  | <--			|						|
+		|							|	     --- | Containers | 			|						|
+		|							|		     |			  | --- stop	|						|
+		|							|		     --------------	  | start	|						|
+		|							|				    ↑---------| restart |						|
+		|							|										|						|
+		|							|		Local Docker instance			|						|
+		|							-----------------------------------------						|
+		|																							|
+		|										  My Computer										|
+		---------------------------------------------------------------------------------------------
+七、Docker 常用安装
+	1. 总体步骤
+		① 搜索镜像
+		② 拉取镜像
+		③ 查看镜像
+		④ 启动镜像
+		⑤ 停止容器
+		⑥ 移除容器
+	2. 安装 tomcat
+		① docker hub 上面查找 tomcat 镜像
+		② docker hub 上拉取 tomcat 镜像到本地
+		③ docker images 查看是否有拉取到的 tomcat
+		④ 使用 tomcat 镜像创建容器（也叫运行镜像）
+	3. 安装 mysql
+		① docker hub 上面查找 mysql 镜像
+			docker search mysql
+		② docker hub 上（阿里云加速器）拉取 mysql 镜像到本地标签为5.7.30
+			docker pull mysql:5.7.30
+		③ 使用 mysql5.7.30镜像创建容器（也叫运行镜像）
+			A. 使用 myql 镜像
+				a. docker 命令：	
+					docker run -p 3306:3306 --name mysql \
+					-v /usr/local/mydata/mysql/log:/var/log/mysql \
+					-v /usr/local/mydata/mysql/data:/var/lib/mysql \
+					-v /usr/local/mydata/mysql/conf:/etc/mysql \
+					-e MYSQL_ROOT_PASSWORD=2648 -d mysql:5.7.30
+				b. 命令说明：
+					(1) -p 3306:3306：将主机的 3306 端口映射到 docker 容器的 3306 端口
+					(2) --name mysql：运行服务的名字
+					(3) -v /usr/local/mydata/mysql/log:/var/log/mysql：将主机的 /usr/local/mydata/mysql/log 目录挂载到容器的 /var/log/mysql
+					(4) -v /usr/local/mydata/mysql/data:/var/lib/mysql：将主机的  /usr/local/mydata/mysql/data 目录挂载到容器的 /var/lib/mysql
+					(5) -v /usr/local/mydata/mysql/conf:/etc/mysql：将主机的 /usr/local/mydata/mysql/conf 目录挂载到容器的 /etc/mysql
+					(6) -e MYSQL_ROOT_PASSWORD=2648：初始化 root 用户密码
+					(7) -d mysql:5.7.30：后台程序运行 mysql:5.7.30
+				c. 进入MySQL容器
+					docker exec -it mysql /bin/bash
+				d. 退出容器
+					exit;
+				e. 在/usr/local/mydata/mysql/conf/my.cnf中配置MySQL
+					vim /usr/local/mydata/mysql/conf/my.cnf
+				f. 在my.cnf中输入以下配置内容
+					[client]
+					default-character-set=utf8
 
+					[mysql]
+					default-character-set=utf8
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+					[mysqld]
+					init_connect='SET collation_connection=utf8_unicode_ci'
+					init_connect='SET NAMES utf8'
+					character-set-server=utf8
+					collation-server=utf8_unicode_ci
+					skip-character-set-client-handshake
+					skip-name-resolve
+					
+					default-time_zone='+8:00'
+					sql_mode=STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
+				g. 保存退出并重新启动MySQL容器
+				h. 设置MySQL容器在docker重启时自启动：docker update mysql --restart=always
+				i. MySQL在虚拟主机中得安装位置为：/etc/mysql， /usr/local/mysql， /usr/local/mysql/bin/mysql
+			B. 外部 Win 10也来连接运行在 docker 上的 mysql 服务
+			C. 数据备份小测试
+				docker exec mysql sh -c 'exec mysqldump --all-databases -uroot -p"2648"' > /usr/local/mydata/all-databases.sql
+	4. 安装 redis
+		① docker hub 上（阿里云加速器）拉取 redis 镜像到本地标签为 latest
+			docker pull redis
+		② 使用 redis 镜像创建容器（也叫运行镜像）
+			A. 使用镜像
+				a. 创建redis 启动的配置文件
+					mkdir -p /mydata/redis/conf
+					touch /mydata/redis/conf/redis.conf
+				b. 命令
+					docker run -p 6379:6379 --name redis \
+					-v /usr/local/mydata/redis/data:/data \
+					-v /usr/local/mydata/redis/conf:/etc/redis \
+					-d redis redis-server /etc/redis/redis.conf
+				c. 使用redis-cli连接redis
+					docker exec -it redis redis-cli
+				d. 设置redis容器在docker重启时自启动
+					docker update redis --restart=always
+				e. 设置redis的持久化，在/usr/local/mydata/redis/conf/redis.conf中添加配置：appendonly yes（必须在启动容器后才能在配置文件中添加配置）
+八、本地镜像发布到阿里云
+	1. 本地镜像发布到阿里云流程
+	2. 镜像的生成方法
+		① 前面的 Dockerfile
+		② 从容器创建一个新的镜像：docker commit [OPTIONS] 容器 name /ID [REPOSITORY[:TAG]]
+	3. 将本地镜像推送到阿里云
+		① 本地镜像素材原型：
+			REPOSITORY    TAG       IMAGE ID       CREATED        SIZE
+			lixl/tomcat   9.0       905d3ed10ae3   20 hours ago   636MB
+		② 阿里云开发者平台：https://cr.console.aliyun.com/cn-qingdao/instances/repositories
+		③ 创建仓库镜像
+			A. 选择地域
+			B. 选择命名空间，首先需要创建一个命名空间
+			C. 输入仓库名称
+			D. 仓库类型，选择公开/私有
+			E. 输入摘要信息和描述信息
+			F. 下一步之后，选择本地仓库
+			G. 创建镜像库  
+		④ 将镜像推送到registry
+			A. 登录阿里云Docker Registry，首次登录需要密码
+				docker login --username=lixl2648 registry.cn-guangzhou.aliyuncs.com
+			B. 设置本地镜像在镜像仓库中的版本号
+				docker tag [ImageId/镜像名[:镜像版本号]] registry.cn-guangzhou.aliyuncs.com/lixl2648/mytomcat:[镜像版本号]
+			C. 将本地镜像推送到镜像仓库，仓库镜像版本号需要和上一步保持一致
+				docker push registry.cn-guangzhou.aliyuncs.com/lixl2648/mytomcat:[镜像版本号]
+		⑤ 公有云可以查询得到
+		⑥ 查看详情
+	4. 将阿里云上的镜像下载到本地，需要加上版本号，因此镜像仓库中可能存在多个版本的镜像
+		docker pull registry.cn-guangzhou.aliyuncs.com/lixl2648/mytomcat:9.0
 
 
 
