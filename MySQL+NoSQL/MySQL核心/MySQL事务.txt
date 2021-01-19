@@ -84,6 +84,7 @@
 	8. 查看视图
 		①语法一：desc 视图名;
 		②语法二：show create view 视图名;
+		③语法三：select 字段名 from 视图名;
 	9. 视图具备以下特点不能更新
 		①包含以下关键字的sql语句：分组函数、distinct、group by、having、union或者union all
 		②常量视图
@@ -494,12 +495,44 @@
 				END REPEAT;
 			END $
 			CALL my_repeat1(20)$
-	
-
-
-
-
-
-
+八. 用户管理与授权
+	1. 创建用户
+		① 语法：CREATE USER 'username'@'host' IDENTIFIED BY 'password';
+		② 参数说明：
+			A. username：将创建的用户名
+			B. host：指定该用户在哪个主机上可以登陆，此处的"localhost"，是指该用户只能在本地登录，不能在另外一台机器上远程登录；如果想远程登录的话，
+			将"localhost"改为"%"，表示在任何一台电脑上都可以登录；也可以指定某台机器的IP，表示只有那台机器可以远程登录;
+			C. password：该用户的登陆密码,密码可以为空,如果为空则该用户可以不需要密码登陆服务器。
+		③ 举例：CREATE USER 'admin'@'%' IDENTIFIED BY '123456';
+	2. 授权
+		① 语法：GRANT privileges ON databasename.tablename TO 'username'@'host'
+		② 参数说明：
+			A. privileges：用户的操作权限,如SELECT , INSERT , UPDATE 等，如果要授予所的权限则使用ALL;
+			B. databasename：数据库名
+			C. tablename：表名
+			D. 如果要授予该用户对所有数据库和表的相应操作权限则可用*表示, 如*.*
+		③ 举例：GRANT all privileges ON test.* TO 'admin'@'%'
+	3. 创建用户同时授权
+		① 语法：GRANT privileges ON databasename.tablename TO 'username'@'host' IDENTIFIED BY 'password';
+		② 举例：GRANT all privileges ON test.* TO 'admin'@'%' IDENTIFIED BY '123456';
+		③ 执行完成后，必须执行flush privileges; 
+	4. 设置与更改用户密码
+		① 语法：SET PASSWORD FOR 'username'@'host' = PASSWORD('newpassword');
+		② 举例：SET PASSWORD FOR 'admin'@'%' = PASSWORD('2648');
+	5. 撤销用户权限
+		① 语法：REVOKE privilege ON databasename.tablename FROM 'username'@'host';
+		② 说明：privilege, databasename, tablename 同授权部分.
+		③ 举例：REVOKE all privilege ON test.* FROM 'admin'@'%';
+		④ 假如你在给用户'admin'@'%'授权的时候是这样的(或类似的)：GRANT SELECT ON test.user TO 'admin'@'%'，则在使用REVOKE SELECT ON *.* FROM 'admin'@'%';
+		命令并不能撤销该用户对test数据库中的user表的SELECT 操作。相反，如果授权使用的是GRANT SELECT ON *.* TO 'admin'@'%';则REVOKE SELECT ON test.user FROM 'admin'@'%';
+		命令也不能撤销该用户对test数据库中user表的Select 权限。
+		⑤ 具体信息可以用命令SHOW GRANTS FOR 'username'@'host'; 查看。
+	6. 删除用户
+		① 语法：DROP USER 'username'@'host';
+		② 举例：DROP USER 'admin'@'%';
+	7. 查看用户的授权
+		① 语法：SHOW GRANTS FOR 'username'@'host'
+		② 举例：SHOW GRANTS FOR 'admin'@'%'
+	8. GRANT USAGE：mysql usage权限就是空权限，默认create user的权限，只能连库，啥也不能干
 
 		
