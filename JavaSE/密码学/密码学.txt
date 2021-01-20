@@ -381,7 +381,7 @@
 				|																			|-----------------------------------|	|
 				|																			| P | 15 | f | 31 | v | 47 | / | 63 |	|
 				|																			-------------------------------------	|
-				----------------------------------------------------------------------------------------------------------------------
+				---------------------------------------------------------------------------------------------------------------------
 		③ Base64 构成原则
 			A. 小写26个字母：a-z
 			B. 大写26个字母：A-Z
@@ -691,133 +691,241 @@
 			}
 		}
 	3. 使用私钥进行加密
-		import com.sun.org.apache.xerces.internal.impl.dv.util.Base64;
-
-		import javax.crypto.Cipher;
-		import java.security.*;
-
-		public class RsaDemo {
-
-			public static void main(String[] args) throws Exception {
-				// 加密明文
-				String text = "余彩欣";
-
-				//  算法
-				String algorithm = "RSA";
-				// 返回一个 KeyPairGenerator 对象，该对象为指定的算法生成公钥/私钥对
-				KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance(algorithm);
-				// 生成密钥对
-				KeyPair keyPair = keyPairGenerator.generateKeyPair();
-				// 生成公钥
-				PublicKey publicKey = keyPair.getPublic();
-				// 生成私钥
-				PrivateKey privateKey = keyPair.getPrivate();
-				// 获取公钥字节数组
-				byte[] publicKeyEncoded = publicKey.getEncoded();
-				// 获取私钥字节数组
-				byte[] privateKeyEncoded = privateKey.getEncoded();
-				// 使用Base64对公钥/私钥的Base64进行编码
-				System.out.println(Base64.encode(publicKeyEncoded));
-				System.out.println(Base64.encode(privateKeyEncoded));
-
-				// 创建Cipher对象进行加密，使用 RSA 算法
-				Cipher cipher = Cipher.getInstance(algorithm);
-				// 对Cipher对象进行初始化，第一个参数：加密模式，第二个参数：使用公钥或者私钥加密
-				cipher.init(Cipher.ENCRYPT_MODE, privateKey);
-				// 使用私钥进行加密
-				byte[] bytes = cipher.doFinal(text.getBytes());
-				// 使用 Base64 进行编码
-				System.out.println(Base64.encode(bytes));
-			}
+		/**
+		 * 使用私钥进行加密
+		 * @param text 明文
+		 * @param algorithm RSA算法
+		 * @param key 私钥
+		 * @return
+		 * @throws Exception
+		 */
+		public static String priKeyEncrypt(String text, String algorithm, Key key) throws Exception {
+			// 私钥加密
+			// 创建Cipher对象进行加密，使用 RSA 算法
+			Cipher cipher = Cipher.getInstance(algorithm);
+			// 对Cipher对象进行初始化，第一个参数：加密模式，第二个参数：使用私钥加密
+			cipher.init(Cipher.ENCRYPT_MODE, key);
+			// 使用私钥进行加密
+			byte[] encrypt = cipher.doFinal(text.getBytes());
+			// 使用 Base64 进行编码
+			return Base64.encode(encrypt);
+    }
+	4. 私钥加密私钥解密：由于私钥加密，需要用公钥解密，因此会报Decryption error异常
+	5. 私钥加密公钥解密
+		/**
+		 * 使用公钥进行解密
+		 * @param text 密文
+		 * @param algorithm RSA算法
+		 * @param key 公钥
+		 * @return
+		 * @throws Exception
+		 */
+		public static String pubKeyDecrypt(String text, String algorithm, Key key) throws Exception {
+			// 公钥解密
+			// 创建Cipher对象进行解密密，使用 RSA 算法
+			Cipher cipher = Cipher.getInstance(algorithm);
+			// 对Cipher对象进行初始化，第一个参数：解密模式，第二个参数：使用公钥解密
+			cipher.init(Cipher.DECRYPT_MODE, key);
+			// 使用Base64进行解码
+			byte[] decode = Base64.decode(text);
+			// 使用公钥进行解密
+			byte[] decryptByte = cipher.doFinal(decode);
+			return new String(decryptByte);
 		}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+	6. 保存公钥和私钥
+		/**
+		 * 把公钥和私钥保存到文件中
+		 * @param algorithm RSA算法
+		 * @param pubKeyPath 保存公钥的路径
+		 * @param priKeyPath 保存私钥的路径
+		 */
+		public static void generateKeyToFile(String algorithm, String pubKeyPath, String priKeyPath) throws Exception {
+			// 返回一个 KeyPairGenerator 对象，该对象为指定的算法生成公钥/私钥对
+			KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance(algorithm);
+			// 生成密钥对
+			KeyPair keyPair = keyPairGenerator.generateKeyPair();
+			// 生成公钥
+			PublicKey publicKey = keyPair.getPublic();
+			// 生成私钥
+			PrivateKey privateKey = keyPair.getPrivate();
+			// 获取公钥字节数组
+			byte[] publicKeyEncoded = publicKey.getEncoded();
+			// 获取私钥字节数组
+			byte[] privateKeyEncoded = privateKey.getEncoded();
+			// 使用Base64对公钥/私钥的Base64进行编码
+			String pubkeyEncode = Base64.encode(publicKeyEncoded);
+			String pribkeyEncode = Base64.encode(privateKeyEncoded);
+			// 把公钥和私钥保存到文件中
+			FileUtils.writeStringToFile(new File(pubKeyPath), pubkeyEncode, Charset.forName("UTF-8"));
+			FileUtils.writeStringToFile(new File(priKeyPath), pribkeyEncode, Charset.forName("UTF-8"));
+		}
+	7. 读取私钥
+		/**
+		 * 从私钥文件中获取私钥对象
+		 * @param path 私钥文件路径
+		 * @param algorithm RSA算法
+		 * @return
+		 * @throws Exception
+		 */
+		public static Key getPriKey(String path, String algorithm) throws Exception {
+			// 从私钥文件中读取私钥字符串
+			String privateKeyStr = FileUtils.readFileToString(new File(path), Charset.forName("UTF-8"));
+			// 创建key功查
+			KeyFactory keyFactory = KeyFactory.getInstance(algorithm);
+			// 使用Base64对私钥字符串进行解码
+			byte[] decode = Base64.decode(privateKeyStr);
+			// 创建私钥key的规则
+			PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(decode);
+			// 返回私钥对象
+			return keyFactory.generatePrivate(keySpec);
+		}
+	8. 读取公钥
+		/**
+		 * 从公钥文件中获取公钥对象
+		 * @param path 公钥文件路径
+		 * @param algorithm RSA算法
+		 * @return
+		 * @throws Exception
+		 */
+		public static Key getPubKey (String path, String algorithm) throws Exception {
+			// 从公钥文件中读取公钥字符串
+			String publicKeyStr = FileUtils.readFileToString(new File(path), Charset.forName("UTF-8"));
+			// 创建key功查
+			KeyFactory keyFactory = KeyFactory.getInstance(algorithm);
+			// 使用Base64对公钥字符串进行解码
+			byte[] decode = Base64.decode(publicKeyStr);
+			// 创建公钥key的规则
+			X509EncodedKeySpec keySpec = new X509EncodedKeySpec(decode);
+			// 返回公钥对象
+			return keyFactory.generatePublic(keySpec);
+		}
+十二、数字签名
+	1. 数字签名（又称公钥数字签名）是只有信息的发送者才能产生的别人无法伪造的一段数字串，这段数字串同时也是对信息的发送者发送信息真实姓的一个有效证明。
+	它是一种类似写在纸上的普通物理签名，但是使用了公钥加密领域的技术来实现的，用于鉴别数字信息的方法，一套数字签名通常定义两种互补的运行，一个用于签名，
+	另一个用于验证。数字签名是非对称密钥加密技术与数字摘要技术的应用。
+	2. 简单认识
+		① 相信我们都写过信，在写信的时候落款处总要留下自己的名字，用来表示写信的人是谁，我们签的这个字就是生活中的签名：
+		② 而数字签名呢？其实也是同样的道理，他们含义是：在网络中传输数据的时候，给数据添加一个数字签名，表示是谁发的数据，而且还能证明数据没有被篡改。
+	3. 基本原理：
+		① 为了理解得更清楚，通过案例一步一步讲解。张三有俩好哥们A、B，由于工作原因，张三和A、B写邮件的时候为了安全都需要加密。于是张三想到了数字签名：
+			A. 加密采用非对称加密，张三有三把钥匙，两把公钥送给朋友，一把留给自己
+			B. A 或者 B 写邮件给张三：A 先用公钥对邮件加密，然后张三收到邮件之后使用私钥解密
+			C. 张三写邮件给 A 或者 B
+				a. 张三写完邮件，先用 hash 函数生成邮件的摘要，附着在文中上面，这就完成了数字签名，然后张三再使用私钥加密，就可以把邮件发送出去
+				b. A 获取 B 收到邮件之后，先把数字签名取下来，然后使用自己的公钥解密即可。这时候取下来的数字签名中的摘要若要和张三的一致，那就认为是张三
+				发来的，再对信件本身使用 Hash 函数，将得到的结果，与上一步得到的摘要进行对比，如果两者一致，就证明这封信未被修改过
+		② 上面的流程使用一张图来演示一下
+			A. 首先把公钥送给 A 和 B
+			B. A 或者 B 给张三发邮件
+				-------------------------------------------------------------
+				|	-------		  --------	 公钥加密	 ------------		|
+				|	| A/B | ----> | 邮件 | ------------> | 加密邮件 |		|
+				|	-------		  --------				 ------------		|
+				|											   |			|
+				|											   | 网络传输	|
+				|											   ↓			|
+				|	--------	  --------	 私钥解密	 ------------		|
+				|	| 张三 | <--- | 邮件 | <------------ | 加密邮件 |		|
+				|	--------	  --------				 ------------		|
+				-------------------------------------------------------------
+			C. 最后一个比较麻烦，张三给 A 或者 B 发邮件
+				---------------------------------------------------------------------------------------------------------------------
+				|	--------	   --------		  ------------------   			对摘要私钥加密 ====> 数字签名	  	  ------------	|
+				|	| 张三 | ----> | 邮件 | ----> | 摘要 Hash 函数 | -----------------------------------------------> | 加密邮件 |	|
+				|	--------	   --------		  ------------------					附着在邮件下方				  ------------	|
+				|																										   |		|
+				|																										   |		|
+				|																										   ↓		|
+				|	--------	   --------		  ------------------------------------			取下数字签名		  ------------	|
+				|	| A/B  | <---- | 邮件 | <---- | 摘要 Hash 计算 摘要对比 未被修改 | -------------------------------| 加密邮件 |	|
+				|	--------	   --------		  ------------------------------------	对信息签名公钥解密====> 摘要  ------------	|
+				---------------------------------------------------------------------------------------------------------------------
+	4. 数字证书
+		① 上面提到我们对签名进行验证时，需要使用到公钥，如果公钥是伪造的，那我们无法验证数字签名了，也就根本不可能从数字签名确定对方的合法性，这时候就需
+		要数字证书。我们可能都有考各种证书的经历，比如说普通话证书，四六级证书等等，但是归根结底，到任何场合我们都能拿出我们的证书来证明自己的确考了四六
+		级、普通话，这里的证书也是同样的道理
+		② 比如说毕业证，任何公司都会承认，为什么会承认？因为那是国家发的，大家都信任国家，也就是说只要是国家的认证机构，我们都信任它是合法的。
+		③ 那么这个证书是如何生成的？下图所示：认证机构把公钥 A、数字签名 A，打包成证书返回给服务器
+			---------------------------------------------------------------------
+			|	----------------	   ----------------		  --------------	|
+			|	| 服务器公钥 A | ----> | 认证机构加密 | ----> | 数字签名 A |	|
+			|	----------------	   ----------------		  --------------	|
+			|			↑				（自己的私钥）				|			|
+			|			|											|			|
+			|			|				   --------					|			|
+			|			| <--------------- | 证书 |	<---------------↓			|
+			|							   --------								|
+			---------------------------------------------------------------------
+	5. 网页加密
+		① 我们看到一个应用“数字证书”的实例：https协议。这个协议主要用于网页加密
+		② 首先，客户端向服务器发出加密请求
+		③ 服务器用自己的私钥加密网页后，连同本身的数字证书，一起发送给客户端
+		④ 客户端（浏览器）的“证书管理器”，有“受信任的根证书颁发机构”列表。客户端会根据这张列表，查看解开数字证书公钥是否在列表之内
+		⑤ 如果数字证书记载的网址，与正在浏览的网址不一致，就说明这张证书可能被冒用了，浏览器会发出警告
+		⑥ 如果这张数字证书不是由受信任的机构颁发的，浏览器会发出另一种警告
+		⑦ 如果数字证书是可靠的，客户端就可以使用证书中的服务器公钥，对信息进行加密，然后与服务器交换加密信息。
+	6. 生成和校验数字签名
+		① 生成数字签名
+		/**
+		 * 获取数字签名
+		 * @param text 原文
+		 * @param algorithm 算法
+		 * @param priKey 私钥
+		 * @return
+		 */
+		public static String getSignature(String text, String algorithm, PrivateKey priKey) throws Exception {
+			// 获取签名对象
+			Signature signature = Signature.getInstance(algorithm);
+			// 初始化签名对象
+			signature.initSign(priKey);
+			// 传入原文
+			signature.update(text.getBytes());
+			// 开始签名
+			byte[] bytes = signature.sign();
+			// 使用Base64进行编码
+			return Base64.encode(bytes);
+		}
+		② 校验数字签名
+			/**
+			 * 校验数字签名
+			 * @param text 明文
+			 * @param signatureData 数字签名密文
+			 * @param algorithm 算法
+			 * @param pubKey 公钥
+			 * @return
+			 */
+			public static boolean verifySignature(String text, String signatureData, String algorithm, PublicKey pubKey) throws Exception {
+				// 获取签名对象
+				Signature signature = Signature.getInstance(algorithm);
+				// 初始化签名对象
+				signature.initVerify(pubKey);
+				// 传入原文
+				signature.update(text.getBytes());
+				// 使用Base64对签名密文进行解码
+				byte[] bytes = Base64.decode(signatureData);
+				// 对数字签名进行校验
+				return signature.verify(bytes);
+			}
+		③ 测试：
+			import com.li.encryptdecrypt.rsa.RsaDemo;
+			import com.sun.org.apache.xerces.internal.impl.dv.util.Base64;
+
+			import java.security.*;
+
+			public class SignatureDemo {
+
+				public static void main(String[] args) throws Exception {
+					// 获取私钥
+					PrivateKey priKey = RsaDemo.getPriKey("pri.key", "RSA");
+					// 获取公钥
+					PublicKey pubKey = RsaDemo.getPubKey("pub.key", "RSA");
+
+					String text = "柯亚丹";
+					//  算法
+					String algorithm = "sha256withrsa";
+					String signatureData = getSignature(text, algorithm, priKey);
+					System.out.println(signatureData);
+					boolean b = verifySignature(text, signatureData, algorithm, pubKey);
+					System.out.println(b);
+				}
+			}

@@ -534,5 +534,5 @@
 		① 语法：SHOW GRANTS FOR 'username'@'host'
 		② 举例：SHOW GRANTS FOR 'admin'@'%'
 	8. GRANT USAGE：mysql usage权限就是空权限，默认create user的权限，只能连库，啥也不能干
-
+	9. 刷新权限：flush privileges
 		
