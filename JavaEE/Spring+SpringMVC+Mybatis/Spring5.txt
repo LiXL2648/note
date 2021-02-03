@@ -1,0 +1,716 @@
+一、Spring框架的新功能
+	1. 整个框架的代码基于 java8
+		① 通过使用泛型等特性提高可读性
+		② 对 java8 提高直接的代码支撑
+		③ 运行时兼容 JDK1.9
+		④ JavaEE 7 API 需要 Spring 相关的模块支持
+		⑤ 运行时兼容 javaEE 8 API 
+		⑥ 取消包，类和方法
+			A. 包：beans.factory.access
+			B. 包：dbc.support.nativejdbc
+			C. 从 Spring-aspects 模块移除了包 mock.staicmock，不在提供 AnnotationDrivenStaticEntityMockingControl支持
+		⑦ 许多不建议使用的类和方法在代码库中删除
+	2. 核心特性（JDK1.8的增强）
+		① 访问 Resource 时提高 getFile 和 isFile 防御式抽象
+		② 有效的方法参数访问基于 Java8 反射增强
+		③ 在 Spring 核心接口中增加了声明default方法的支持，一贯使用 JDK1.7 Charset 和 StandardCharset的增强
+		④ 兼容 JDK9
+		⑤ Spring 5.0 框架自带了通用的日志封装
+		⑥ 持续实例化 via 构造函数（修改了异常处理）
+		⑦ spring-jcl 替代了通用的日志，仍然支持可重写
+		⑧ 自动检测 log4j2、slf4j、jul（java.util.Logging）而不是其他支持
+		⑨ 基于 NIO 的 readableChannel也提供了这个新特性
+	3. 核心容器
+		① 支持候选组件索引（也可以支持环境变量扫描）
+		② 支持 @Nullable 注解
+		③ 函数式风格 GenericApplicationContext/AnnotationConfigApplicationContext
+		③ 基本支持 bean API 注册
+		④ 在接口层面使用CGLB动态代理的时候，提供事务、缓存、异步注解检测
+		⑤ XML 配置作用域流式
+		⑥ Spring Web MVC
+		⑦ 全部的 Servlet3.1 签名支持在 Spring-provide Filter实现
+		⑧ 在 SpringMVC Controller 方法里支持 Servlet4.0 PushBuilder 参数
+		⑨ 多个不可变对象的数据绑定（Kotlin、Lombak、@ConstructorPorties）
+		⑩ 支持 jackson2.9
+		Ⅰ  支持 JSON 绑定 API
+		Ⅱ 支持 protobuf3
+		Ⅲ 支持 Reactor3.1 Flux 和 Mono
+	4. SpringWebFlux
+		① 新的 spring-webflux模块，一个基于 reactive 的 spring-webmvc，完全的异步非阻塞，旨在使用 entent-loop 执行模型和传统的线程池模型
+		② reactive 说明在 spring-core 比如编码和解码
+		③ spring-core 相关的基础设施，比如： Encode 和 Decode 可以用来编码和解码数据流；DataBuffer 可以使用 Java ByteBuffer 或者 Netty ByteBuf；
+		ReactiveAdapterRegistry 可以对相关的库提供传输层支持
+		④ 在 spring-web 包里包含 HttpMessageReade 和 HttpMessageWrite
+	5. 测试方面的改进
+		① Spring TestContext 框架中完成了对JUnit5 Juptier 编程和扩展模
+		② SpringExtension：是 Junit 多个可扩展 API 的一个实现，提供了对现存 Spring TestContext Framework 的支持，使用@ExtendWith(SpringExtension.class)
+		注解引用
+		③ @ SpringJunitConfig：一个复合注解
+		④ @ExtendWith(SpringExtension.class) 来源于 Junit Jupiter
+		⑤ ContextConfiguration 来源于 Spring TestContext框架
+		⑥ DisabledIf 如果提供的该属性值为true的表达式占位符，信号：注解的测试类或者测试方法被禁用
+		⑦ 在Spring TestContext框架中支持并行测试
+		⑧ 通过SpringRunner在Spring TestContext 框架中支持TestNG，Junit5，新的执行之前和之后测试回调。
+		⑨ 在testexecutionlistener API 和 testcontextmanager 新 beforetestexecution() 和 aftertestexecution() 回调，MockHttpServletRequest新增了 
+		getContentAsByteArray() 和 getContentAsString 方法来访问请求体
+		⑩ 如果字符编码被设置为 mock 请求，在print() 和 log() 方法可以打印 Spring MVC test 和 redirectedUrl() 和 forwardedUrl() 方法支持带变量表达式
+		URL模板
+		Ⅰ XMLUnit 升级到了 2.3 版本。
+二、整合日志框架
+	1. 导入依赖
+		<properties>
+			<spring.version>5.3.3</spring.version>
+			<log4j2.version>2.13.3</log4j2.version>
+		</properties>
+
+		<dependencies>
+
+			<!-- Spring 核心包 -->
+			<dependency>
+				<groupId>org.springframework</groupId>
+				<artifactId>spring-context</artifactId>
+				<version>${spring.version}</version>
+			</dependency>
+			
+			<!-- Spring 依赖的日志工具 -->
+			<dependency>
+				<groupId>commons-logging</groupId>
+				<artifactId>commons-logging</artifactId>
+				<version>1.2</version>
+			</dependency>
+
+			<!-- 日志框架 -->
+			<dependency>
+				<groupId>org.apache.logging.log4j</groupId>
+				<artifactId>log4j-slf4j-impl</artifactId>
+				<version>${log4j2.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>org.slf4j</groupId>
+						<artifactId>slf4j-api</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+			<dependency>
+				<groupId>org.slf4j</groupId>
+				<artifactId>slf4j-api</artifactId>
+				<version>1.7.30</version>
+			</dependency>
+		</dependencies>
+	2. 在src的resources目录下配置log4j2.xml文件
+		<?xml version="1.0" encoding="UTF-8"?>
+		<!--日志级别以及优先级排序: OFF > FATAL > ERROR > WARN > INFO > DEBUG > TRACE > ALL -->
+		<!--Configuration后面的status用于设置log4j2自身内部的信息输出，可以不设置，当设置成trace时，可以看到log4j2内部各种详细输出-->
+		<configuration status="INFO">
+			<!--先定义所有的appender-->
+			<appenders>
+				<!--输出日志信息到控制台-->
+				<console name="Console" target="SYSTEM_OUT">
+					<!--控制日志输出的格式-->
+					<PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
+				</console>
+			</appenders>
+			<!--然后定义logger，只有定义了logger并引入的appender，appender才会生效-->
+			<!--root：用于指定项目的根日志，如果没有单独指定Logger，则会使用root作为默认的日志输出-->
+			<loggers>
+				<root level="info">
+					<appender-ref ref="Console"/>
+				</root>
+			</loggers>
+		</configuration>
+	3. 测试代码
+	
+		import com.li.bean.Employee;
+		import org.junit.jupiter.api.Test;
+		import org.slf4j.Logger;
+		import org.slf4j.LoggerFactory;
+		import org.springframework.context.ApplicationContext;
+		import org.springframework.context.support.ClassPathXmlApplicationContext;
+
+		public class Spring5Test {
+
+			private static final Logger log = LoggerFactory.getLogger(Spring5Test.class);
+
+			@Test
+			public void test() {
+				ApplicationContext ac = new ClassPathXmlApplicationContext("applicationContext.xml");
+				Employee employee = ac.getBean("employee", Employee.class);
+				System.out.println(employee);
+				log.info(employee.toString());
+			}
+		}
+	4. 控制台输出：2021-01-21 17:16:35.583 [main] INFO  com.li.Spring5Test - Employee(id=26, empName=Ke, phone=1122)
+三、Spring5 框架核心容器支持 @Nullable 注解 和 函数式风格 GenericApplicationContext
+	1. @Nullable 注解可以使用在方法、属性、参数上，表示方法返回、属性值、参数可以为空
+		① 举例：
+			A. 用在方法上
+				@Nullable
+				String getId();
+			B. 用在参数上
+				@Nullable ApplicationContext parent
+			C. 用在属性上
+				@Nullable
+				private String name;
+	2. 函数式风格创建对象，交给 spring 进行管理
+		① 举例：
+			@Test
+			public void testGenericApplicationContext() {
+				// 创建 GenericApplicationContext 对象
+				GenericApplicationContext context = new GenericApplicationContext();
+				// 调用 context 的方法对象注册
+				context.refresh();
+				context.registerBean(Department.class, () -> new Department(1, "Java"));
+				Department department = context.getBean(Department.class);
+				log.info(department.toString());
+			}
+		② 举例2
+			@Test
+			public void testGenericApplicationContext1() {
+				// 创建 GenericApplicationContext 对象
+				GenericApplicationContext context = new GenericApplicationContext();
+				// 调用 context 的方法对象注册
+				context.refresh();
+				context.registerBean("department", Department.class, () -> new Department(1, "Java"));
+				Department department = (Department) context.getBean("department");
+				log.info(department.toString());
+			}
+四、Spring 支持整合 JUnit5
+	1. Spring 整合 JUnit4
+		① 引入相关依赖
+			<!-- Spring 整合单元测试类 -->
+			<dependency>
+				<groupId>org.springframework</groupId>
+				<artifactId>spring-test</artifactId>
+				<version>${spring.version}</version>
+			</dependency>
+		② 创建测试类，使用注解方式完成
+			import com.li.bean.Employee;
+			import org.junit.Test;
+			import org.junit.runner.RunWith;
+			import org.springframework.beans.factory.annotation.Autowired;
+			import org.springframework.test.context.ContextConfiguration;
+			import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+
+			@RunWith(SpringJUnit4ClassRunner.class)
+			@ContextConfiguration("classpath:applicationContext.xml")
+			public class Spring5JUnit4Test {
+
+				@Autowired
+				private Employee employee;
+
+				@Test
+				public void test() {
+					System.out.println(employee);
+				}
+			}
+	2. Spring 整合 JUnit5
+		① 引入相关依赖
+			<!-- Spring 整合单元测试类 -->
+			<dependency>
+				<groupId>org.springframework</groupId>
+				<artifactId>spring-test</artifactId>
+				<version>${spring.version}</version>
+			</dependency>
+		② 创建测试类，使用注解方式完成
+			import com.li.bean.Employee;
+			import org.junit.jupiter.api.Test;
+			import org.junit.jupiter.api.extension.ExtendWith;
+			import org.springframework.test.context.ContextConfiguration;
+			import org.springframework.test.context.junit.jupiter.SpringExtension;
+
+			import javax.annotation.Resource;
+
+			@ExtendWith(SpringExtension.class)
+			@ContextConfiguration("classpath:applicationContext.xml")
+			public class Spring5JUnit5Test {
+
+				@Resource
+				private Employee employee;
+
+				@Test
+				public void test() {
+					System.out.println(employee);
+				}
+			}
+		③ 使用复合注解 SpringJunitConfig 简化
+			import com.li.bean.Employee;
+			import org.junit.jupiter.api.Test;
+			import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
+
+			import javax.annotation.Resource;
+
+			@SpringJUnitConfig(locations = { "classpath:applicationContext.xml" })
+			public class Spring5JUnit5Test {
+
+				@Resource
+				private Employee employee;
+
+				@Test
+				public void test() {
+					System.out.println(employee);
+				}
+			}
+五、Spring5 新功能 SpringWebflux
+	1. SpringWebflux 介绍
+		① 是 Spring5 添加的新模块，用于 web 开发的，功能与 SpringMVC 类似，Webflux 是当前一种流程响应式编程的框架
+		② 使用传统 web 框架，比如 SpringMVC，这些基于 Selevt 容器，Webflux 是一种异步非阻塞的框架，异步非阻塞的框架在 Servlet3.1 以后才支持，
+		核心是基于 Reactor 的相关 API 实现
+		③ 什么是异步非阻塞
+			A. 异步和同步：针对调用者，调用者发送请求，如果等着对方回应之后才去做其他的事情就是同步，如果发送请求之后不等待对方回应而去做其他
+			事情就是异步。
+			B. 非阻塞和阻塞：针对被调用者，被调用者接收到请求之后，做完请求任务之后才给出反馈就是阻塞，接收到请求后马上给出反馈然后再去做其他
+			事情就是非阻塞。
+			C. 上面都是针对对象不一样
+		④ Webflux 特点：
+			A. 非阻塞式：在有限资源下，提高系统吞吐量和伸缩性，以 Reactor 为基础实现响应式编程
+			B. 函数式编程：Spring5 框架基于 Java8，Webflux 使用 Java8 函数式编程方式实现路由请求
+		⑤ 比较 SpringMVC
+			A. 两个框架都可以使用注解方式，都能运行在 Tomcat 等容器中
+			B. SpringMVC 采用命令式编程，Webflux 采用异步响应式编程
+	2. 响应式编程
+		① 什么是响应式编程
+			响应式编程是一种面向数据流和变化传播的编程范式，这意味着可以在编程语言中很方便地表达静态或者动态地数据流，而相关的计算模型会自动
+			将变化的值通过数据流进行传播。电子表格程序就是响应式编程的一个例子，单元格可以包含字面值或者类似“=B1+C1”的公式，而包含公式的单元格
+			的值会依据其他单元格值的变化而变化
+		② Java8及其之前的版本
+			import java.util.Observable;
+
+			public class ObserverDemo extends Observable {
+
+				public static void main(String[] args) {
+					ObserverDemo observer = new ObserverDemo();
+
+					// 添加观察者
+					observer.addObserver((o, arg) -> {
+						System.out.println("发送了变化");
+					});
+
+					observer.addObserver((o, arg) -> {
+						System.out.println("手动被观察者通知，准备改变");
+					});
+
+					observer.setChanged(); // 监控数据变化
+					observer.notifyObservers(); // 通知观察者
+				}
+			}
+	3. Reactor 实现响应式编程
+		① 在响应式编程操作中，Reactor 是满足 Reactive 规范的框架
+		② Reactor 有两个核心类，Mono 和 Flux，这两个类实现了接口 Publisher，提供丰富的函数式编程操作符。Flux 对象实现发布者，返回 N 个元素；Mono 实现
+		翻发布者，返回 0 或者 1 个元素
+		③ Mono 和 Flux 都是数据流的发布者，使用 Mono 和 Flux 都可以发出三种数据信号：元素值，错误信号，完成信号，错误信号和完成信号都代表终止信号，终
+		止用于告诉订阅者数据流结束了，错误信号终止数据流同时把错误信息传递给订阅者
+		④ 代码演示 Mono 和 Flux
+			A. 引入依赖
+				<dependency>
+					<groupId>io.projectreactor</groupId>
+					<artifactId>reactor-core</artifactId>
+					<version>3.1.5.RELEASE</version>
+				</dependency>
+			B. 相关方法：
+				import java.util.Arrays;
+				import java.util.List;
+				import java.util.stream.Stream;
+
+				public class ReactorDemo {
+
+					public static void main(String[] args) {
+
+						// just 方法直接声明
+						Flux.just(1, 2, 3, 4);
+						Mono.just(5);
+
+						// 使用数组
+						Integer[] array = {1, 2, 3, 4};
+						Flux.fromArray(array);
+
+						// 使用集合
+						List<Integer> list = Arrays.asList(array);
+						Flux.fromIterable(list);
+
+						// 使用 Stream 流
+						Stream<Integer> stream = list.stream();
+						Flux.fromStream(stream);
+					}
+				}
+		⑤ 三种信号相关特点
+			A. 错误信号和完成信号都是终止信号，不能共存的
+			B. 如果没有发送任何元素值，而是直接发送终止信号，则表示是空的数据流
+			C. 如果没有终止信号，则表示是无限数据流
+		⑥ 调用 just 或者其他方法只是声明数据流，数据流并没有发出，只有进行订阅之后才会触发数据流，不订阅什么都不会发生
+			Flux.just(1, 2, 3, 4).subscribe(System.out::println);
+			Mono.just(5).subscribe(System.out::println);
+		⑦ 操作符
+			A. 对数据流进行一道道操作，称为操作符，比如工厂流水线
+			B. map：元素映射为新元素
+			C. flatMap：元素映射为流
+	4. SpringWebflux 执行流程和核心API
+		① SpringWebflux 基于 Reactor，默认使用 Netty 容器，Netty是一个高性能的，基于异步事件驱动的 NIO 异步非阻塞的框架
+		② SpringWebflux 执行过程和 SpringMVC 相似，SpringWebflux 核心控制器 DispatchHandler 实现了 WebHandler 接口 
+			public Mono<Void> handle(ServerWebExchange exchange) { // 存放 HTTP 请求响应信息
+				return this.handlerMappings == null ? this.createNotFoundError() : Flux.fromIterable(this.handlerMappings).concatMap((mapping) -> {
+					return mapping.getHandler(exchange); // 根据请求地址获取对应 mapping
+				}).next().switchIfEmpty(this.createNotFoundError()).flatMap((handler) -> {
+					return this.invokeHandler(exchange, handler); // 调用具体的业务方法
+				}).flatMap((result) -> {
+					return this.handleResult(exchange, result); // 处理结果返回
+				});
+			}
+		③ SpringWebflux 的 DispatchHandler 负责请求的处理
+			A. HandlerMapping：请求查询到处理的方法
+			B. HandlerAdapyer: 真正负责请求处理
+			C. HandlerResultHandler：响应结果处理
+		④ SpringWebflux 实现函数式编程的两个接口：RouteFunction 和 HandlerFounction
+			A. RouteFunction：处理路由
+			B. HandlerFounction：处理函数
+	5. SpringWebflux （基于注解编程模型）
+		① SpringWebflux 实现方式有两种：注解编程模型和函数式编程模型
+		② 使用注解编程模型方式，和 SpringMVC 使用的相似，只需要把相关依赖配置到项目中，SpringBoot 自动配置相关运行容器，默认情况下使用 Netty 服务器
+		③ 创建 SpringBoot 模块工程Webflux，引入 Webflux 依赖
+			<dependency>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-starter-webflux</artifactId>
+			</dependency>
+		④ 配置启动的端口号
+			server:
+			  port: 8081
+		⑤ 创建相应的包和类
+			@Data
+			@ToString
+			public class Employee {
+
+				private Integer id;
+
+				private String empName;
+
+				private String phone;
+			}
+		⑥ 定义相应的接口进行操作
+			@Data
+			@ToString
+			public class Employee {
+
+				private Integer id;
+
+				private String empName;
+
+				private String phone;
+			}
+		⑦ 定义接口的实现
+			import com.li.webflux.entity.Employee;
+			import com.li.webflux.service.EmployeeService;
+			import org.springframework.stereotype.Service;
+			import reactor.core.publisher.Flux;
+			import reactor.core.publisher.Mono;
+
+			import java.util.HashMap;
+			import java.util.Map;
+
+			@Service
+			public class EmployeeServiceImpl implements EmployeeService {
+
+				private final Map<Integer, Employee> emps = new HashMap<>();
+
+				{
+					emps.put(1, new Employee(1, "LiXL", "1234456"));
+					emps.put(1, new Employee(1, "LiLX", "12344567"));
+					emps.put(1, new Employee(1, "YuCX", "123445678"));
+				}
+
+				@Override
+				public Mono<Employee> getEmpById(int id) {
+					return Mono.justOrEmpty(emps.get(id));
+				}
+
+				@Override
+				public Flux<Employee> getAllEmps() {
+					return Flux.fromIterable(emps.values());
+				}
+
+				@Override
+				public Mono<Void> saveEmp(Mono<Employee> empMono) {
+					return empMono.doOnNext(e -> {
+						int id = emps.size() + 1;
+						emps.put(id, e);
+					}).then(Mono.empty());
+				}
+			}
+		⑧ 定义控制层
+			import com.li.webflux.entity.Employee;
+			import com.li.webflux.service.EmployeeService;
+			import org.springframework.stereotype.Service;
+			import reactor.core.publisher.Flux;
+			import reactor.core.publisher.Mono;
+
+			import java.util.HashMap;
+			import java.util.Map;
+
+			@Service("employeeService")
+			public class EmployeeServiceImpl implements EmployeeService {
+
+				private final Map<Integer, Employee> emps = new HashMap<>();
+
+				{
+					emps.put(1, new Employee(1, "LiXL", "1234456"));
+					emps.put(2, new Employee(2, "LiLX", "12344567"));
+					emps.put(3, new Employee(3, "YuCX", "123445678"));
+				}
+
+				@Override
+				public Mono<Employee> getEmpById(int id) {
+					return Mono.justOrEmpty(emps.get(id));
+				}
+
+				@Override
+				public Flux<Employee> getAllEmps() {
+					return Flux.fromIterable(emps.values());
+				}
+
+				@Override
+				public Mono<Void> saveEmp(Mono<Employee> empMono) {
+					return empMono.doOnNext(e -> {
+						int id = emps.size() + 1;
+						e.setId(id);
+						emps.put(id, e);
+					}).then(Mono.empty());
+				}
+			}
+		⑨ 说明：
+			A. SpringMVC 方式实现，采用同步阻塞的方式，基于 SpringMVC + Servlet + Tomcat
+			B. SpringWebflux 方式实现，采用异步非阻塞的方式，基于 SpringWebflux + Reactor + Nettty
+	7. SpringWebflux（基于函数式编程模型）
+		① 在使用函数式编程模型操作的时候，需要自己初始化服务器
+		② 基于函数式编程模型，有两个核心的接口：RouteFunction 和 HandlerFounction
+			A. RouteFunction：实现路由功能，将请求转发给对应的Handler
+			B. HandlerFounction：处理请求生成响应的函数
+			C. 核心任务定义两个函数式接口的实现并且启动需要的服务器
+		③ SpringWebFlux 请求和响应不再是 ServletRequest 和 ServletResponse，而是 ServerRequest 和 ServerResponse
+		④ 创建 SpringBoot 模块工程 WebfluxFuncation
+		④ 创建 Handler 
+			import com.li.webfluxfunction.entity.Employee;
+			import com.li.webfluxfunction.service.EmployeeService;
+			import org.springframework.http.MediaType;
+			import org.springframework.web.reactive.function.server.ServerRequest;
+			import org.springframework.web.reactive.function.server.ServerResponse;
+			import reactor.core.publisher.Flux;
+			import reactor.core.publisher.Mono;
+
+			import static org.springframework.web.reactive.function.BodyInserters.fromObject;
+
+			public class EmployeeHandler {
+
+				private final EmployeeService employeeService;
+
+				public EmployeeHandler(EmployeeService employeeService) {
+					this.employeeService = employeeService;
+				}
+
+				public Mono<ServerResponse> getEmpById(ServerRequest request) {
+					// 获取Id
+					Integer id = Integer.valueOf(request.pathVariable("id"));
+					// 得到数据
+					Mono<Employee> empMono = employeeService.getEmpById(id);
+					// 使用Reactor操作符flatMap，把empMono进行转换
+					return empMono.flatMap(e -> {
+						return ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).body(fromObject(e))
+								.switchIfEmpty(ServerResponse.notFound().build());
+					});
+				}
+
+				public Mono<ServerResponse> getAllEmps(ServerRequest request) {
+					// 得到数据
+					Flux<Employee> emps = employeeService.getAllEmps();
+					// 使用Reactor操作符flatMap，把empMono进行转换
+					return ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).body(emps, Employee.class);
+				}
+
+				public Mono<ServerResponse> saveEmp(ServerRequest request) {
+					// 得到对象
+					Mono<Employee> empMono = request.bodyToMono(Employee.class);
+					return ServerResponse.ok().build(employeeService.saveEmp(empMono));
+				}
+			}
+		⑤ 初始化服务器，编写 Router，创建服务器完成适配，最终调用
+			
+			import com.li.webfluxfunction.handler.EmployeeHandler;
+			import com.li.webfluxfunction.service.EmployeeService;
+			import com.li.webfluxfunction.service.impl.EmployeeServiceImpl;
+			import org.springframework.http.MediaType;
+			import org.springframework.http.server.reactive.HttpHandler;
+			import org.springframework.http.server.reactive.ReactorHttpHandlerAdapter;
+			import org.springframework.web.reactive.function.server.RouterFunction;
+			import org.springframework.web.reactive.function.server.RouterFunctions;
+			import org.springframework.web.reactive.function.server.ServerResponse;
+			import reactor.netty.http.server.HttpServer;
+
+			import static org.springframework.web.reactive.function.server.RequestPredicates.*;
+			import static org.springframework.web.reactive.function.server.RouterFunctions.toHttpHandler;
+
+			public class Server {
+			
+				public static void main(String[] args) throws Exception {
+					Server server = new Server();
+					server.createReactorServer();
+					System.out.println("enter to exit");
+					System.in.read();
+				}
+
+				// 创建 Router 路由
+				public RouterFunction<ServerResponse> routingFunction() {
+
+					// 创建 handler 对象
+					EmployeeService employeeService = new EmployeeServiceImpl();
+					EmployeeHandler employeeHandler = new EmployeeHandler(employeeService);
+
+					// 设置路由
+					return RouterFunctions.route(
+									GET("/employee/{id}").and(accept(MediaType.APPLICATION_JSON)), employeeHandler::getEmpById)
+							.andRoute(
+									GET("/employee").and(accept(MediaType.APPLICATION_JSON)), employeeHandler::getAllEmps)
+							.andRoute(
+									POST("employee"), employeeHandler::saveEmp);
+				}
+
+				// 创建服务器完成适配
+				public void createReactorServer() {
+
+					// 路由和handler适配
+					RouterFunction<ServerResponse> router = routingFunction();
+					HttpHandler httpHandler = toHttpHandler(router);
+					ReactorHttpHandlerAdapter adapter = new ReactorHttpHandlerAdapter(httpHandler);
+
+					// 创建服务器
+					HttpServer.create().handle(adapter).port(8082).bindNow();
+				}
+			}
+		⑥ 使用WebClient调用
+			import com.li.webfluxfunction.entity.Employee;
+			import org.springframework.http.MediaType;
+			import org.springframework.web.reactive.function.client.WebClient;
+			import reactor.core.publisher.Flux;
+
+			public class Client {
+
+				public static void main(String[] args) {
+
+					// 调用服务器地址
+					WebClient webClient = WebClient.create("http://localhost:8082");
+
+					// 根据Id查询
+					String id = "1";
+					Employee employee = webClient.get().uri("/employee/{id}", id).accept(MediaType.APPLICATION_JSON)
+							.retrieve().bodyToMono(Employee.class).block();
+					System.out.println(employee);
+
+					Flux<Employee> employeeFlux = webClient.get().uri("/employee").accept(MediaType.APPLICATION_JSON)
+							.retrieve().bodyToFlux(Employee.class);
+					employeeFlux.map(Employee::getEmpName).buffer().doOnNext(System.out::println).blockFirst();
+				}
+			}
+六、课程总结
+	1. Spring 框架概述
+		① 轻量级开源 JavaEE 框架，为解决企业开发的复杂性，两大核心组成：IOC 和 AOP 
+		② Spring 5.0 以上的版本
+	2. IOC 容器
+		① 底层原理：工厂方法和反射
+		② IOC 接口：BeanFactory
+		③ IOC 操作 Besn 管理（基于 XML）
+		④ IOC 操作 Besn 管理（基于 注解）
+	3. AOP
+		① AOP 底层原理：动态代理，有接口则使用 JDK 动态代理，没有接口则使用 CGLIB 动态代理
+		② 术语：切入点、增强（通知）、切面
+		③ 基于 AspectJ 实现 AOP 操作
+	4. JdbcTemplate
+		① 实现数据库CRUD操作
+		② 实现数据库批量操作
+	5. 事务管理
+		① 事务的基本概念
+		② 重要概念（传播行为和隔离级别）
+		③ 基于注解方式实现声明式事务管理
+		④ 完全注解方式 实现声明式事务管理
+	6. Spring5 新功能
+		① 整合日志框架
+		② @Nullable注解
+		③ 函数式注册对象
+		④ 整合 JUnit5 单元测试框架
+		⑤ SpringWebflux 的使用
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
