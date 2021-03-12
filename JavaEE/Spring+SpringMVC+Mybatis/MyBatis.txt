@@ -1393,7 +1393,9 @@
 		⑥. 使用 SqlSessionTemplate 进行批量处理的注意事项
 			A. 使用 SqlSessionTemplate 创建的session 只有当调用 commit 时，才会执行数据库操作，而调用commit 之前只是对 sql 进行预编译
 			B. 当调用 commit 时，没有异常的 sql 会成功执行到数据库，无法回滚，而有异常的 sql 在此时才会抛出异常
-			C. 使用SqlSessionTemplate 进行批量处理时，最好与 @Transactional 一起使用。
+			C. 在执行批量更新操作时，如果中间进行其他操作，则会使事务提前提交到数据库中，因此需要避免批量更新操作时，进行其他操作
+			D. 使用SqlSessionTemplate 进行批量处理时，最好与 @Transactional 一起使用。
+		
 	6. 存储过程-游标处理
 		① MyBatis对存储过程的游标提供了一个JdbcType=CURSOR的支持，可以智能的把游标读取到的数据，映射到我们声明的结果集中
 		② 以Oracle中分页查询为实例

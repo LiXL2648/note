@@ -659,73 +659,581 @@
 						System.in.read();
 					}
 				}
-	5. 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+	5. SelectionKey
+		① SelectionKey，表示 Selector 和网络通道的注册关系, 共四种:
+			A. int OP_ACCEPT：有新的网络连接可以 accept，值为 16
+			B. int OP_CONNECT：代表连接已经建立，值为 8
+			C. int OP_READ：代表读操作，值为 1
+			D. int OP_WRITE：代表写操作，值为 4
+		② 源码中：
+			public static final int OP_READ = 1 << 0;
+			public static final int OP_WRITE = 1 << 2;
+			public static final int OP_CONNECT = 1 << 3;
+			public static final int OP_ACCEPT = 1 << 4;
+		③ SelectionKey相关方法
+			A. public abstract class SelectionKey
+			B. public abstract Selector selector()：得到与之关联的 Selector 对象
+			C. public abstract SelectableChannel channel()：得到与之关联的通道
+			D. public final Object attachment()：得到与之关联的共享数据
+			E. public abstract SelectionKey interestOps(int ops)：设置或改变监听事件
+			F. public final boolean isAcceptable()：是否可以 accept
+			G. public final boolean isReadable()：是否可以读
+			H. public final boolean isWritable()：是否可以写
+	6. ServerSocketChannel
+		① ServerSocketChannel 在服务器端监听新的客户端 Socket 连接
+		② 相关方法如下
+			A. public abstract class ServerSocketChannel extends AbstractSelectableChannel implements NetworkChannel
+			B. public static ServerSocketChannel open()：得到一个 ServerSocketChannel 通道
+			C. public final ServerSocketChannel bind(SocketAddress local)：设置服务器端端口号
+			D. public final SelectableChannel configureBlocking(boolean block)：设置阻塞或非阻塞模式，取值 false 表示采用非阻塞模式
+			E. public SocketChannel accept()：接受一个连接，返回代表这个连接的通道对象
+			F. public final SelectionKey register(Selector sel, int ops)：注册一个选择器并设置监听事件
+	7. SocketChannel
+		① SocketChannel，网络 IO 通道，具体负责进行读写操作。NIO 把缓冲区的数据写入通道，或者把通道里的数据读到缓冲区。
+		② 相关方法如下
+			A. public abstract class SocketChannel extends AbstractSelectableChannelimplements ByteChannel, ScatteringByteChannel, GatheringByteChannel, NetworkChannel
+			B. public static SocketChannel open()：得到一个 SocketChannel 通道
+			C. public final SelectableChannel configureBlocking(boolean block)：设置阻塞或非阻塞模式，取值 false 表示采用非阻塞模式
+			D. public boolean connect(SocketAddress remote)：连接服务器
+			E. public boolean finishConnect()：如果上面的方法连接失败，接下来就要通过该方法完成连接操作
+			F. public int write(ByteBuffer src)：往通道里写数据
+			G. public int read(ByteBuffer dst)：从通道里读数据
+			H. public final SelectionKey register(Selector sel, int ops, Object att)：注册一个选择器并设置监听事件，最后一个参数可以设置共享数据
+			I. public final void close()：关闭通道
+	8. NIO 网络编程应用实例-群聊系统，实例要求:
+		① 编写一个 NIO 群聊系统，实现服务器端和客户端之间的数据简单通讯（非阻塞）
+		② 实现多人群聊
+		③ 服务器端：可以监测用户上线，离线，并实现消息转发功能
+		④ 客户端：通过channel 可以无阻塞发送消息给其它所有用户，同时可以接受其它用户发送的消息(有服务器转发得到)
+		⑤ 目的：进一步理解NIO非阻塞网络编程机制
+		⑥ Server 端：
+			import java.io.IOException;
+			import java.net.InetSocketAddress;
+			import java.nio.ByteBuffer;
+			import java.nio.channels.*;
+			import java.util.Iterator;
+
+			public class ChatServer {
+
+				// 定义属性
+				private Selector selector;
+				private ServerSocketChannel listenerChannel;
+				private static final int PORT = 2648;
+
+				// 构造器，进行初始化操作
+				public ChatServer() {
+					init();
+				}
+
+				// 初始化方法
+				public void init() {
+
+					try {
+						// 得到选择器对象selector
+						selector = selector.open();
+						// 得到ServerSocketChannel对象listenerChannel
+						listenerChannel = ServerSocketChannel.open();
+						// 绑定端口
+						listenerChannel.socket().bind(new InetSocketAddress(PORT));
+						// 设置非阻塞
+						listenerChannel.configureBlocking(false);
+						// 注册listenerChannel到selector中，关心的事件为：OP_ACCEPT
+						listenerChannel.register(selector, SelectionKey.OP_ACCEPT);
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+
+				// 监听方法
+				public void listener() {
+
+					try {
+						// 循环等待客户端连接
+						while (true) {
+							// 等待2秒钟，没有事件发生，则继续循环监听
+							if (selector.select() == 0) {
+								System.out.println("服务器等待了2秒钟，无连接");
+								continue;
+							}
+
+							// 如果返回的有事件发生的通道个数大于0，获取SelectionKey（关注事件）集合，通过 SelectionKey反向获取channel
+							Iterator<SelectionKey> iterator = selector.selectedKeys().iterator();
+							while (iterator.hasNext()) {
+								// 获取SelectionKey
+								SelectionKey selectionKey = iterator.next();
+								// 根据key对应的通道发生的事件做相应处理
+								if (selectionKey.isAcceptable()) { // 对应的是OP_ACCEPT，即有客户端连接
+									// 获取连接的客户端
+									SocketChannel socketChannel = listenerChannel.accept();
+									// 设置socketChannel为非阻塞
+									socketChannel.configureBlocking(false);
+									// 将SocketChannel注册到Selector，关注的事件是OP_READ
+									socketChannel.register(selector, SelectionKey.OP_READ);
+									// 提示客户端上线
+									System.out.println(socketChannel.getRemoteAddress() + " 上线了");
+								}
+
+								if (selectionKey.isReadable()) { // 对应的是OP_READ，即有有数据可读
+									// 读取通道数据
+									read(selectionKey);
+								}
+
+								// 手动移除当前selectionKey，防止重复操作
+								iterator.remove();
+							}
+						}
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+
+				// 读取通道数据
+				private void read(SelectionKey selectionKey) {
+
+					SocketChannel socketChannel = null;
+					try {
+						// 通过 SelectionKey 反向获取 SocketChannel
+						socketChannel = (SocketChannel) selectionKey.channel();
+						// 创建buffer
+						ByteBuffer byteBuffer = ByteBuffer.allocate(1024);
+						// 读取socketChannel中的数据
+						int len = socketChannel.read(byteBuffer);
+						if (len > 0) {
+							String msg = new String(byteBuffer.array());
+							System.out.println("来自客户端 " + socketChannel.getRemoteAddress() + " 的消息：" + msg);
+							// 向其他客户端转发消息
+							write(msg, socketChannel);
+						}
+					} catch (IOException e) {
+						try {
+							System.out.println("客户端 " + socketChannel.getRemoteAddress() + "离线了");
+							// 取消注册
+							selectionKey.cancel();
+							socketChannel.close();
+						} catch (IOException ex) {
+							ex.printStackTrace();
+						}
+					}
+				}
+
+				// 向其他客户端转发消息
+				private void write(String msg, SocketChannel socketChannel) throws IOException {
+
+					// 服务器转发消息
+					System.out.println("服务器转发消息中……");
+					// 遍历所有注册到selector上的socketChannel
+					for (SelectionKey selectionKey : selector.keys()) {
+						SelectableChannel targetChannel = selectionKey.channel();
+						// 排除自己
+						if (targetChannel instanceof SocketChannel && targetChannel != socketChannel) {
+							// 转型
+							SocketChannel channel = (SocketChannel) targetChannel;
+							// 将消息存储在buffer中
+							ByteBuffer byteBuffer = ByteBuffer.wrap(msg.getBytes());
+							// 将buffer数据写入通道
+							channel.write(byteBuffer);
+						}
+					}
+				}
+
+				public static void main(String[] args) throws IOException {
+					ChatServer chatServer = new ChatServer();
+					chatServer.listener();
+				}
+			}
+		⑦ Client 端：
+			import java.io.IOException;
+			import java.net.InetSocketAddress;
+			import java.nio.ByteBuffer;
+			import java.nio.channels.SelectionKey;
+			import java.nio.channels.Selector;
+			import java.nio.channels.SocketChannel;
+			import java.util.Iterator;
+			import java.util.Scanner;
+
+			public class ChatClient {
+
+				// 定义属性
+				private Selector selector;
+				private SocketChannel socketChannel;
+				private String username;
+
+				private static final String HOST = "127.0.0.1";
+				private static final int PORT = 2648;
+
+				public ChatClient() {
+					init();
+				}
+
+				// 初始化Selector和SocketChannel
+				public void init() {
+					try {
+						// 获取选择器对象
+						selector = Selector.open();
+						// 连接服务器
+						socketChannel = SocketChannel.open(new InetSocketAddress(HOST, PORT));
+						// 设置非阻塞
+						socketChannel.configureBlocking(false);
+						// 将socketChannel注册到选择器上
+						socketChannel.register(selector, SelectionKey.OP_READ);
+						// 获取username
+						username = socketChannel.getLocalAddress().toString();
+						System.out.println(username + " is OK ……");
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+
+				// 向服务器发送消息
+				public void send(String msg) {
+					msg = username + "说：" + msg;
+					try {
+						socketChannel.write(ByteBuffer.wrap(msg.getBytes()));
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+
+				// 读取从服务器端恢复得消息
+				public void read() {
+					try {
+						int readChannels = selector.select();
+						if (readChannels > 0) { // 有刻意的通道
+							Iterator<SelectionKey> iterator = selector.selectedKeys().iterator();
+							while (iterator.hasNext()) {
+								SelectionKey selectionKey = iterator.next();
+								if (selectionKey.isReadable()) {
+									SocketChannel channel = (SocketChannel) selectionKey.channel();
+									ByteBuffer byteBuffer = ByteBuffer.allocate(1024);
+									channel.read(byteBuffer);
+									String msg = new String(byteBuffer.array());
+									System.out.println(msg);
+								}
+								iterator.remove();
+							}
+						}
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+
+				public static void main(String[] args) throws IOException {
+					// 启动客户端
+					ChatClient chatClient = new ChatClient();
+					// 启动一个线程，每隔3秒钟，从服务器读取数据
+					new Thread(() -> {
+						while (true) {
+							chatClient.read();
+							try {
+								Thread.sleep(3000);
+							} catch (InterruptedException e) {
+								e.printStackTrace();
+							}
+						}
+					}).start();
+
+					// 发送数据给服务器
+					Scanner scanner = new Scanner(System.in);
+					while (scanner.hasNextLine()) {
+						String msg = scanner.nextLine();
+						chatClient.send(msg);
+					}
+				}
+			}
+	9. NIO与零拷贝
+		① 零拷贝基本介绍
+			A. 零拷贝是网络编程的关键，很多性能优化都离不开。
+			B. 在 Java 程序中，常用的零拷贝有 mmap(内存映射) 和 sendFile。那么，他们在OS 里，到底是怎么样的一个的设计？我们分析 mmap 和 sendFile 这两个零拷贝
+			C. 另外我们看下NIO 中如何使用零拷贝
+		② 传统IO数据读写
+			A. Java 传统 IO 和 网络编程的一段代码
+				File file = new File("test.txt");
+				RandomAccessFile raf = new RandomAccessFile(file, "rw");
+				byte[] arr = new byte[(int) file.length()];
+				raf.read(arr);
+				Socket socket = new ServerSocket(8080).accept();
+				socket.getOutputStream().write(arr);
+			B. 传统IO：
+				a. DMA：direct memory access（直接内存拷贝，不使用CPU）
+				b. 传统IO示意图
+								|					|					|					|					|
+								|-------------------|					|-------------------|					|
+								|	user context	↓					|	user context	↓					|
+								|-------------------------------------------------------------------------------------------->
+								|					|	kernel context	↑					|	kernel context	↑
+					状态切换	|					|-------------------|					|-------------------|
+								|					|	syscall read	|					|	syscall write	|
+								|					|					|					|					|
+								|-------------------------------------------------------------------------------------------->
+								|					|		   CPU copy	| --------------	|					|
+								|	USER spoce		|		 |----------->|user buffer |--------|				|
+								|					|		 |			| --------------	|	| CPU copy		|
+								|----------------------------|----------------------------------↓---------------------------->
+								|	Kernel spoce	| -----------------	|					| ----------------- |
+					拷贝		|				 |--->| kernel buffer |	|					| | socket buffer |	|
+								|		DMA copy |	| -----------------	|					| --------|--------	|
+								|----------------|----------------------------------------------------↓ DMA copy ------------->
+								|				 |	| -----------------	|					| ------------------|
+								|				 -----|   Hard drive  | |					| | protocol engine||
+								|					| ----------------- |					| ------------------|
+								|-------------------------------------------------------------------------------------------->
+								|					|					|					|					|
+								0					1					2					3					4
+				c. 传统IO经过三次状态切换，四次拷贝，代价非常高
+			C. mmap 优化
+				a. mmap 通过内存映射，将文件映射到内核缓冲区，同时，用户空间可以共享内核空间的数据。这样，在进行网络传输时，就可以减少内核空间到用户控件的拷贝次数
+				b. mmap示意图
+								|					|					|					|					|
+								|-------------------|					|-------------------|					|
+								|	user context	↓					|	user context	↓					|
+								|-------------------------------------------------------------------------------------------->
+								|					|	kernel context	↑					|	kernel context	↑
+					状态切换	|					|-------------------|					|-------------------|
+								|					|	syscall read	|					|	syscall write	|
+								|					|					|					|					|
+								|-------------------------------------------------------------------------------------------->
+								|					|		   CPU copy	| --------------	|					|
+								|	USER spoce		|		 |----------->|user buffer |	|					|
+								|					|		 |			| --------------	|					|
+								|----------------------------|--------------------------------------------------------------->
+								|	Kernel spoce	| -----------------	|		CPU copy	| ----------------- |
+					拷贝		|				 |--->| kernel buffer |---------------------->| socket buffer | |
+								|		DMA copy |	| -----------------	|					| --------|--------	|
+								|----------------|----------------------------------------------------↓ DMA copy ------------->
+								|				 |	| -----------------	|					| ------------------|
+								|				 -----|   Hard drive  | |					| | protocol engine||
+								|					| ----------------- |					| ------------------|
+								|-------------------------------------------------------------------------------------------->
+								|					|					|					|					|
+								0					1					2					3					4
+				c. mmap 优化经过三次状态切换，三次拷贝，该优化方式不是真正意义上得零拷贝
+			D. sendFile 优化
+				a. Linux 2.1 版本 提供了sendFile 函数，其基本原理如下：数据根本不经过用户态，直接从内核缓冲区进入到 SocketBuffer，同时，由于和用
+				户态完全无关，就减少了一次上下文切换
+				b. sendFile 优化示意图
+								|					|					|					|
+								|-------------------|					|-------------------|
+								|	user context	↓					|	user context	↓
+								|------------------------------------------------------------------------>
+								|					|	kernel context	↑					|
+					状态切换	|					|-------------------|					|
+								|					|	syscall read	|					|
+								|					|					|					|
+								|------------------------------------------------------------------------>
+								|					|		   			| 					|
+								|	USER spoce		|		   CPU copy	|					|
+								|					|		 |--------------------|			|
+								|----------------------------↓--------------------↓---------------------->
+								|	Kernel spoce	| -----------------	| ----------------- |
+					拷贝		|				 |--->| kernel buffer | | | socket buffer | |
+								|		DMA copy |	| -----------------	| -----------------	|
+								|----------------|-------------------------------↓ DMA copy ------------->
+								|				 |	| -----------------	| ------------------|
+								|				 -----|   Hard drive  | | | protocol engine||
+								|					| ----------------- | ------------------|
+								|------------------------------------------------------------------------>
+								|					|					|					|
+								0					1					2					3
+				c. 提示：零拷贝从操作系统角度，是没有cpu 拷贝
+				d. Linux 在 2.4 版本中，做了一些修改，避免了从内核缓冲区拷贝到 Socketbuffer 的操作，直接拷贝到协议栈，从而再一次减少了数据拷贝。
+								|					|					|					|
+								|-------------------|					|-------------------|
+								|	user context	↓					|	user context	↓
+								|------------------------------------------------------------------------>
+								|					|	kernel context	↑					|
+					状态切换	|					|-------------------|					|
+								|					|	syscall read	|					|
+								|					|					|					|
+								|------------------------------------------------------------------------>
+								|					|		   			| 					|
+								|	USER spoce		|		 |-----------------------------------
+								|					|		 |	 |-------------|			|	|
+								|----------------------------|---↓-------------↓----------------|-------->
+								|	Kernel spoce	| -----------------	| ----------------- |	|
+					拷贝		|				 |--->| kernel buffer | | | socket buffer | |	| copy desc
+								|		DMA copy |	| -----------------	| -----------------	|	|
+								|----------------|-------------------------------↓ DMA copy ----|-------->
+								|				 |	| -----------------	| ------------------|	|
+								|				 -----|   Hard drive  | | | protocol engine|<---|
+								|					| ----------------- | ------------------|
+								|------------------------------------------------------------------------>
+								|					|					|					|
+								0					1					2					3
+				e. 这里其实有 一次cpu 拷贝kernel buffer -> socket buffer但是，拷贝的信息很少，比如lenght , offset , 消耗低，可以忽略
+		③ 零拷贝的再次理解
+			A. 我们说零拷贝，是从操作系统的角度来说的。因为内核缓冲区之间，没有数据是重复的（只有 kernel buffer 有一份数据）。
+			B. 零拷贝不仅仅带来更少的数据复制，还能带来其他的性能优势，例如更少的上下文切换，更少的 CPU 缓存伪共享以及无 CPU 校验和计算。
+		④ mmap 和 sendFile 的区别
+			A. mmap 适合小数据量读写，sendFile 适合大文件传输。
+			B. mmap 需要 4 次上下文切换，3 次数据拷贝；sendFile 需要 3 次上下文切换，最少 2 次数据拷贝。
+			C. sendFile 可以利用 DMA 方式，减少 CPU 拷贝，mmap 则不能（必须从内核拷贝 到 Socket 缓冲区）。
+		⑤ NIO 零拷贝案例，案例要求：
+			A. 使用传统的IO 方法传递一个大文件
+				a. OldIOServer
+					import java.io.DataInputStream;
+					import java.io.IOException;
+					import java.net.ServerSocket;
+					import java.net.Socket;
+
+					public class OldIOServer {
+
+						public static void main(String[] args) throws IOException {
+
+							ServerSocket serverSocket = new ServerSocket(2648);
+							while (true) {
+								Socket socket = serverSocket.accept();
+								DataInputStream dataInputStream = new DataInputStream(socket.getInputStream());
+
+								byte[] bytes = new byte[4096];
+								while (dataInputStream.read(bytes) != -1) {
+
+								}
+							}
+						}
+					}
+				b. OldIOClient
+					import java.io.DataOutputStream;
+					import java.io.FileInputStream;
+					import java.io.IOException;
+					import java.net.Socket;
+					import java.time.Duration;
+					import java.time.Instant;
+
+					public class OldIOClient {
+
+						public static void main(String[] args) throws IOException {
+
+							Socket socket = new Socket("localhost", 2648);
+							String fileName = "C:\\Users\\Li\\Music\\hello.flac";
+							FileInputStream inputStream = new FileInputStream(fileName);
+							DataOutputStream dataOutputStream = new DataOutputStream(socket.getOutputStream());
+
+							byte[] bytes = new byte[4096];
+							long total = 0;
+							long len;
+							Instant start = Instant.now();
+
+							while ((len = inputStream.read(bytes)) != -1) {
+								total += len;
+								dataOutputStream.write(bytes);
+							}
+
+							Instant end = Instant.now();
+							System.out.println("发送总字节：" + total + "，耗时：" + Duration.between(start, end).toMillis()); // 170
+							dataOutputStream.close();
+							inputStream.close();
+							socket.close();
+						}
+					}
+			B. 使用NIO 零拷贝方式传递(transferTo)一个大文件
+				a. NewIOServer
+					import java.io.IOException;
+					import java.net.InetSocketAddress;
+					import java.nio.ByteBuffer;
+					import java.nio.channels.ServerSocketChannel;
+					import java.nio.channels.SocketChannel;
+
+					public class NewIOServer {
+
+						public static void main(String[] args) throws IOException {
+
+							ServerSocketChannel serverSocketChannel = ServerSocketChannel.open();
+							serverSocketChannel.bind(new InetSocketAddress(730));
+							ByteBuffer byteBuffer = ByteBuffer.allocate(4096);
+
+							while (true) {
+								SocketChannel socketChannel = serverSocketChannel.accept();
+								while (socketChannel.read(byteBuffer) != -1) {
+									byteBuffer.rewind();
+								}
+							}
+						}
+					}
+				b. NewIOClient
+					import java.io.FileInputStream;
+					import java.io.IOException;
+					import java.net.InetSocketAddress;
+					import java.nio.channels.FileChannel;
+					import java.nio.channels.SocketChannel;
+					import java.time.Duration;
+					import java.time.Instant;
+
+					public class NewIOClient {
+
+						public static void main(String[] args) throws IOException {
+
+							SocketChannel socketChannel = SocketChannel.open();
+							socketChannel.connect(new InetSocketAddress("localhost", 730));
+							String filename = "C:\\Users\\Li\\Music\\hello.flac";
+
+							// 得到一个文件channel
+							FileChannel fileChannel = new FileInputStream(filename).getChannel();
+							Instant start = Instant.now();
+
+							// 在Linux下一次transferTo方法就可以完成传输
+							// 在windows下一次transferTo只能发送8m，如果超过8m，就需要分段传输文件，而且要记录传输的位置以及大小
+							// transferTo底层使用的就是零拷贝
+							long fileSize = fileChannel.size();
+							long count;
+							if (fileSize % (8 * 1024 * 1024) == 0) {
+								count = fileSize / (8 * 1024 * 1024);
+							} else {
+								count = fileSize / (8 * 1024 * 1024) + 1;
+							}
+
+							long total = 0;
+
+							if (count == 1) {
+								total = fileChannel.transferTo(0, fileSize, socketChannel);
+							}
+							else {
+								long position = 0;
+								for (int i = 0; i < count; i++) {
+									long size;
+									if (i + 1 == count) {
+										size = fileSize - i * 8 * 1024 * 1024;
+									} else {
+										size = 8 * 1024 * 1024;
+									}
+									total += fileChannel.transferTo(position, size, socketChannel);
+									position = i * 8 * 1024 * 1024;
+								}
+							}
+							Instant end = Instant.now();
+							System.out.println("发送总字节：" + total + "，耗时：" + Duration.between(start, end).toMillis()); // 24
+
+							fileChannel.close();
+							socketChannel.close();
+						}
+					}
+
+			C. 看看两种传递方式耗时时间分别是多少
+				a. 使用传统的IO 方法传递一个大文件（31.8 MB，33,420,672 字节），花费170ms
+				b. 使用NIO 零拷贝方式传递(transferTo)一个大文件（31.8 MB，33,420,672 字节），花费24ms
+七、Java AIO 
+	1. 基本介绍
+		① JDK 7 引入了 Asynchronous I/O，即 AIO。在进行 I/O 编程中，常用到两种模式：Reactor和 Proactor。Java 的 NIO 就是 Reactor，当有事件触发时，
+		服务器端得到通知，进行相应的处理
+		② AIO 即 NIO2.0，叫做异步不阻塞的 IO。AIO 引入异步通道的概念，采用了Proactor 模式，简化了程序编写，有效的请求才启动线程，它的特点是先由操作系
+		统完成后才通知服务端程序启动线程去处理，一般适用于连接数较多且连接时间较长的应用
+		③ 目前 AIO 还没有广泛应用，Netty 也是基于NIO, 而不是AIO， 因此我们就不详解AIO了，有兴趣的同学可以参考 <<Java新一代网络编程模型AIO原理及Linux系统
+		AIO介绍>> http://www.52im.net/thread-306-1-1.html
+	2. BIO、NIO、AIO对比表
+		---------------------------------------------------------------
+		| 		   | BIO	    | NIO					 | AIO 		  |
+		|-------------------------------------------------------------|
+		| IO模型   | 同步阻塞 	| 同步非阻塞（多路复用） | 异步非阻塞 |
+		|-------------------------------------------------------------|
+		| 编程难度 | 简单		| 复杂					 | 复杂		  |
+		|-------------------------------------------------------------|
+		| 可靠性   | 差			| 好					 | 好		  |
+		|-------------------------------------------------------------|
+		| 吞吐量   | 低			| 高					 | 高		  |
+	---------------------------------------------------------------
+	3. 举例说明
+		① 同步阻塞：到理发店理发，就一直等理发师，直到轮到自己理发。
+		② 同步非阻塞：到理发店理发，发现前面有其它人理发，给理发师说下，先干其他事情，一会过来看是否轮到自己.
+		③ 异步非阻塞：给理发师打电话，让理发师上门服务，自己干其它事情，理发师自己来家给你理发
 
 
 
