@@ -436,10 +436,15 @@
 		⑥ 四次make，结果Hint: It's a good idea to run 'make test' ;)，编译成功
 		⑦ 编译成功之后，进入src目录，执行：make install PREFIX=/usr/local/redis，结果Hint: It's a good idea to run 'make test' ;)，安装成功
 		⑧ 进入/usr/local/redis，该目录存在一个bin文件存放这可执行文件，在/usr/local/redis中新建一个conf目录用于存放redis的配置文件，并将/usr/local/redis-6.0.6中的redis.conf复制到
-		/usr/local/redis/conf中
+		/usr/local/redis/conf中，并备份一份
+			mkdir conf
+			cp /usr/local/redis-6.0.6/redis.conf /usr/local/redis/conf
+			cp redis.conf redis_bk.conf
 	3. 修改 redis.conf
 		① 将配置项 daemonize no 修改为 yes，让服务在后台启动
 		② 将配置项 appendonly no 修改为 yes，实现数据的持久化
+		③ 注释bind 127.0.0.1,解除本机绑定(否则不能远程连接)
+		④ protected-mode yes 修改为 protected-mode no
 	4. 启动redis 服务
 		① 以后台的方式启动redis
 			./redis-server /usr/local/redis/conf/redis.conf
@@ -457,7 +462,7 @@
 			export PATH=$PATH:$REDIS_HOME/bin
 		③ 保存退出后重载/etc/profile文件
 			source /etc/profile
-	6. 设置redis开机自启
+	6. 设置redis开机自启（失败）
 		① 新建redis.service服务文件
 			touch  /etc/systemd/system/redis.service
 			vim /etc/systemd/system/redis.service
@@ -485,6 +490,28 @@
 		⑥ 启动redis
 			systemctl start redis
 			systemctl stop redis
+	7. 设置开机自启
+		① 复制启动文件
+			cp /usr/local/redis-6.0.6/utils/redis_init_script /etc/init.d/redisd
+		② 编辑启动脚本
+			A. 打开脚本
+				vim /etc/init.d/redisd
+			B. 添加
+				# chkconfig: 2345 10 90
+				# description: Start and Stop redisd
+			C. 修改
+				EXEC=/usr/local/redis/bin/redis-server
+				CLIEXEC=/usr/local/redis/bin/redis-cli
+				PIDFILE=/var/run/redis_${REDISPORT}.pid
+				CONF="/usr/local/redis/conf/redis.conf"
+		③ 分配权限
+			chmod +x /etc/init.d/redisd
+		④ 增加系统服务
+			chkconfig --add redisd
+			chkconfig --list redisd
+		⑤ 启动/关闭服务
+			service redisd start
+			service redisd stop
 六、Windows设置Nginx开机自启
 	1. 下载windows版nginx （http://nginx.org/download/nginx-1.10.0.zip）
 	2. 将Nginx设置为Windows服务
@@ -572,32 +599,208 @@
 		④ 禁止gitlab开机自启动：sudo systemctl disable gitlab-runsvdir.service
 		⑤ 开启gitlab开机自启动：sudo systemctl enable gitlab-runsvdir.service
 		⑥ 查看gitlab的状态：sudo gitlab-ctl status
+八、离线安装MySQL 5.7
+	1. 下载地址：https://downloads.mysql.com/archives/community/
+	2. 安装
+		① 创建用户
+			A. 添加mysql用户组：groupadd mysql
+			B. 添加mysql用户：useradd -g mysql mysql -d /home/mysql
+			C. 修改mysql用户的登陆密码：passwd mysql
+		② 解压缩 mysql-5.7.30-linux-glibc2.12-x86_64.tar.gz到/usr/local/，并改名为mysql
+			tar -zxvf mysql-5.7.30-linux-glibc2.12-x86_64.tar.gz
+			mv mysql-5.7.30-linux-glibc2.5-x86_64 mysql
+		③ 并赋予用户读写权限
+			chown -R mysql:mysql mysql/
+	3. 创建配置文件
+		① vim /etc/my.cnf
+			[client]
+			port = 3306
+			socket = /tmp/mysql.sock
 
+			[mysqld]
+			character_set_server=utf8
+			init_connect='SET NAMES utf8'
+			basedir=/usr/local/mysql
+			datadir=/usr/local/mysql/data
+			socket=/tmp/mysql.sock
+			log-error=/var/log/mysqld.log
+			pid-file=/var/run/mysqld/mysqld.pid
+			#不区分大小写
+			lower_case_table_names = 1
 
+			sql_mode=STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
 
+			max_connections=5000
 
+			default-time_zone = '+8:00'
+	4. 初始化文件
+		① 初始化log文件，防止没有权限。
+			cd /var/log/
+			vim mysqld.log
+			：wq
 
+			chmod 777 mysqld.log
+			chown mysql:mysql mysqld.log
+		② 初始化pid文件，防止没有权限
+			#手动编辑一下日志文件，什么也不用写，直接保存退出
+			cd /var/run/
+			mkdir mysqld
+			cd mysqld
+			vi mysqld.pid
+			：wq
+			# 给权限
+			cd ..
+			chmod 777 mysqld
+			chown -R mysql:mysql /mysqld
+		③ 初始化数据库
+			# 初始化数据库，并指定启动mysql的用户，否则就会在启动MySQL时出现权限不足的问题
+			/usr/local/mysql/bin/mysqld --initialize --user=mysql --basedir=/usr/local/mysql --datadir=/usr/local/mysql/data --lc_messages_dir=/usr/local/mysql/share --lc_messages=en_US
+			初始化完成后，在my.cnf中配置的datadir目录（/var/log/mysqld.log）下生成一个error.log文件，里面记录了root用户的随机密码。
+			cat /var/log/mysqld.log
+			执行后记录最后一点：root@localhost: xxxxx 。 这里的xxxxx就是初始密码。
+	5. 启动数据库
+		① 源目录启动：/usr/local/mysql/support-files/mysql.server start
+		② 并设置开机自启动服务：
+			# 复制启动脚本到资源目录
+			cp /usr/local/mysql/support-files/mysql.server /etc/rc.d/init.d/mysqld
 
+			# 增加mysqld服务控制脚本执行权限
+			chmod +x /etc/rc.d/init.d/mysqld
 
+			# 将mysqld服务加入到系统服务
+			chkconfig --add mysqld
 
+			# 检查mysqld服务是否已经生效
+			chkconfig --list mysqld
 
+			# 切换至mysql用户，启动mysql，或者稍后下一步再启动。
+			service mysqld start 
+		③ 从此就可以使用service mysqld命令启动/停止服务：service mysqld start/stop/restart
+	6. 配置环境变量
+		为了更好的操作mysql，配置环境变量。
+		# 切换至mysql用户
+		su mysql
 
+		vi .bash_profile
+		# 修改配置文件，增加export PATH=$PATH:/usr/local/mysql/bin
 
+		# 立即生效
+		source .bash_profile
+	7. 登陆，修改密码
+		必须修改初始的随机密码：
+		# 系统默认会查找/usr/bin下的命令;建立一个链接文件。
+		ln -s /usr/local/mysql/bin/mysql /usr/bin
 
+		# 登陆mysql的root用户
+		mysql -uroot -p
+		# 输入2.4生成的 随机密码
 
+		# 修改root用户密码为123456
+		set password for root@localhost=password("123456");
+九、离线升级gcc g++
+	1. 下载地址：https://ftp.gnu.org/gnu/gcc/
+	2. 下载gcc依赖包
+		① 用压缩工具打开下载好的 gcc-9.10.tar.gz ，进入 contrib 目录查看 download_prerequisites文件
+		② 找到所需要下载的依赖配置
+			A. gmp='gmp-6.1.0.tar.bz2'
+			B. mpfr='mpfr-3.1.4.tar.bz2'
+			C. mpc='mpc-1.0.3.tar.gz'
+			D. isl='isl-0.18.tar.bz2'
+		③ 下载依赖：
+			A. gmp：https://ftp.gnu.org/pub/gnu/gmp/gmp-6.1.0.tar.bz2
+			B. mpfr：http://mirror.hust.edu.cn/gnu/mpfr/mpfr-3.1.4.tar.bz2
+			C. mpc：https://ftp.gnu.org/gnu/mpc/mpc-1.0.3.tar.gz
+			D. isl：http://www.mirrorservice.org/sites/sourceware.org/pub/gcc/infrastructure/isl-0.18.tar.bz2
+	3. 升级gcc
+		① 上传 gcc-9.10.tar.gz 到服务器，解压 gcc-9.10.tar.gz 到 /usr/local 目录下
+			tar -zvxf gcc-9.10.tar.gz --directory=/usr/local/
+		② 进入 gcc-9.10 安装目录
+			cd gcc-9.10
+		③ 上传依赖包到 /usr/local/gcc-9.10 目录下，并解压
+			A. tar -xf gmp-6.1.0.tar.bz2
+			B. tar -xf mpfr-3.1.4.tar.bz2
+			C. tar -xf mpc-1.0.3.tar.gz
+			D. tar -xf isl-0.18.tar.bz2
+		④ 建立软链接 
+			ln -sf gmp-6.1.0 gmp
+			ln -sf mpfr-3.1.4 mpfr 
+			ln -sf mpc-1.0.3 mpc
+			ln -sf isl-0.18 isl
+		⑤ 升级
+			# 创建build目录
+			mkdir build && cd build
 
+			# 配置
+			../configure -enable-checking=release -enable-languages=c,c++ -disable-multilib
 
-
-
-
-
-
-
-
-
-
-
-
+			# 执行安装（大约两小时）
+			make && make install
+	4. 解决升级后还是原先版本的问题
+		① 升级后使用 gcc -v 查看版本，发现仍然是原先版本
+		② 使用 find / -name gcc 全局搜 gcc
+			A. /usr/local/lib/gcc：对应新版本gcc
+			B. /usr/bin/gcc：对应旧版本gcc
+		③ 解决方法
+			mv /usr/bin/gcc /usr/bin/gcc4.8
+			ln -s /usr/local/bin/gcc /usr/bin/gcc
+十、MinIO的安装与基础用法
+	1. MInIO在linux服务器上安装
+		① 下载及准备工作
+			A. 下载地址：https://min.io/download#/linux
+				cd /root/minio  //自定义一个minio软件操作目录
+				wget https://dl.min.io/server/minio/release/linux-amd64/minio
+				chmod +x minio
+			B. 创建minio文件存储目录及日志目录
+				mkdir -p /root/data/minio;
+				mkdir -p /root/logs/minio;
+		② 启动MinIO，将下面的内容保存为/root/minio/run.sh,与minio下载文件放在同一个目录下面。并为其赋予执行权限chmod u+x run.sh
+			#!/bin/bash
+			export MINIO_ACCESS_KEY=fight
+			export MINIO_SECRET_KEY=fight2021
+			# nohup启动服务 指定文件存放路径 /root/data 还有设置日志文件路径 /root/minio/log
+			nohup ./minio server /root/data/minio > /root/logs/minio/minio.log 2>&1 &
+		③ 访问 http://192.168.161.3:9000/ 进行登录。
+	2. 设置minio开机自启
+		① 设置minio开机自启
+			vi /etc/rc.local
+		② 添加自启脚本位置
+			/root/minio/run.sh
+	3. MinIO系统的基本用法
+		① 创建 bucket
+			A. 登录之后在浏览器上面，点击右下角“红色的加号”创建 bucket 来存储对象。我们要了解什么是bucket，说白了就是上传的对象文件的分类
+			B. 你可以按这个图片或者其他资源文件属于哪个系统创建一个bucket，比如说我创建一个boot-launch的bucket给boot-launch应用使用
+			C. 你也可以按照资源的类型去创建bucket，比如：image，video，audio分别放在不同的bucket中存放
+		② 上传资源，bucket 创建好之后，我们就可以向这个bucket里面上传资源文件对象了
+		③ 资源分享，MinIO 默认的策略是分享地址的有效时间最多是7天，点击Copy link可以获得资源的访问链接
+		④ 永久资源分享
+			A. MinIO 默认的策略是分享地址的有效时间最多是7天，要突破这种限制，可以在 bucket 中进行策略设置。
+			B. 点击对应的 bucket ，edit policy添加策略*.*，Read Only
+			C. 如此就放开了访问，并且没有时间限制，同时只需要按http://${MINIO_HOST}:${MINIO_PORT}/${bucketName}/${fileName}的格式可直接访问资源（不需要进行分享操作）。
+	4. 在 html 文件中引用静态资源
+		① 通过上面的设置与运行，MinIO 作为静态资源服务器已经完成，可以写个 html 来引用 MinIO 中的静态资源
+		② 格式：<img src="http://${MINIO_HOST}:${MINIO_PORT}/image/test.jpg" alt="图片">
+		③ 实例：<img src="http://192.168.161.3:9000/boot-launch/java9-streamapi.png" alt="图片">
+十一、部署SpringBoot项目时，在后台持续运行
+	1. 使用nohup命令，让SpringBoot项目不挂断地在Linux后台运行
+		① 语法：nohup Command [ Arg … ][ & ]
+		② 示例：nohup java -jar xxx.jar &
+		③ 执行上述命令，nohup会把执行结果中的日志默认输出到当前文件夹下面的nohup.out文件中。
+		④ 可以手动指定日志输出到哪个文件中：nohup java -jar xxx.jar > nohup.log  2>&1 & 
+	2. 具体示例
+		① 创建目录/usr/local/fight-manage-system，将SpringBoot的jar包上传到该目录
+		② 在 /usr/local/fight-manage-system 目录中创建 startup.sh 文件，并输入以下内容，并保存退出
+			vi startup.sh
+			
+			#! /bin/bash
+			nohup java -jar /usr/local/fight-manage-system/fight-manage-system-1.0-SNAPSHOT.jar --spring.profiles.active=prod
+			> /usr/local/fighr-manage-system/log/fighr-manage-system.log 2>&1 &
+			
+			:wq!
+		③ 将startup.sh设为可执行文件：chmod +x startup.sh
+		④ 启动后在/usr/local/fight-manage-system目录中新增log文件夹，并生成日志文件fighr-manage-system.log
+	3. 关闭 SpringBoot项目后台程序
+		ps -ef | grep java
+		kill -9 PID
 
 
 

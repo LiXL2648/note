@@ -1,0 +1,258 @@
+一、Docker 安装
+	1. 介绍：
+		① elasticsearch：存储和检索数据
+		② kibana：可视化检索数据
+	2. 下载镜像文件
+		① docker pull elasticsearch:7.8.0
+		② docker pull kibana:7.8.0
+	3. 创建实例
+		① Elasticsearch
+			A. 创建 Elasticsearch 挂载目录
+				mkdir -p /usr/local/mydata/elasticsearch/config
+				mkdir -p /usr/local/mydata/elasticsearch/data
+			B. 创建 Elasticsearch 的配置文件，并写入配置
+				echo "http.host: 0.0.0.0">> config/elasticsearch.yml
+			C. 创建容器
+				docker run --name elasticsearch -p 9200:9200 -p 9300:9300 \
+				-e "discovery.type=single-node" \
+				-e ES_JAVA_OPTS="-Xms64m -Xmx512m" \
+				-v /usr/local/mydata/elasticsearch/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml \
+				-v /usr/local/mydata/elasticsearch/data:/usr/share/elasticsearch/data \
+				-v /usr/local/mydata/elasticsearch/plugins:/usr/share/elasticsearch/plugins \
+				-d elasticsearch:7.8.0
+			D. 修改 Elasticsearch 挂载目录的权限
+				chmod -R 777 /usr/local/mydata/elasticsearch/
+			E. 访问：http://10.10.0.26:9200/，查看 Elasticsearch 是否启动成功
+			F. 注意：-e ES_JAVA_OPTS="-Xms64m -Xmx512m" ，设置ES的初始内存和最大内存，否则导致过大启动不了ES
+		② Kibana
+			A. 创建容器
+				docker run --name kibana -e ELASTICSEARCH_HOSTS=http://10.10.0.26:9200 -p 5601:5601 -d kibana:7.8.0
+			B. 注意：http://10.10.0.26:9200 为虚拟机地址
+二、Elasticsearch基本操作
+	1. HTTP操作
+		① 索引操作
+			A. 创建索引
+				a. 对比关系型数据库，创建索引就等同于创建数据库
+				b. 在 Postman中，向ES服务器发PUT请求 ：http://10.10.0.26:9200/shopping
+				c. 请求后，服务器返回响应
+					{
+						"acknowledged": true, # acknowledged：响应结果 true：操作成功
+						"shards_acknowledged": true, # shards_acknowledged：分片结果 true：分片操作成功
+						"index": "shopping" # index：索引名称
+					}
+				d. 注意：创建索引库的分片数默认1片，在7.0.0之前的Elasticsearch版本中，默认5片
+				e. 如果重复添加索引，会返回错误信息
+			B. 查看单个索引
+				a. 在 Postman中，向ES服务器发GET请求 ：http://10.10.0.26:9200/shopping
+				b. 查看索引向ES服务器发送的请求路径和创建索引是一致的，但是HTTP方法不一致
+			C. 查看所有索引
+				a. 在 Postman中，向ES服务器发GET请求 ：http://10.10.0.26:9200/_cat/indices?v
+				b. 这里请求路径中的_cat表示查看的意思，indices表示索引，所以整体含义就是查看当前ES服务器中的所有索引，就好像MySQL中的show tables的感觉
+			D. 删除索引
+				a. 在 Postman中，向ES服务器发DELETE请求 ：http://127.0.0.1:9200/shopping
+				b. 重新访问索引时，服务器返回响应：索引不存在
+		② 文档操作
+			A. 创建文档
+				a. 在 Postman中，向ES服务器发POST请求 ：http://127.0.0.1:9200/shopping/_doc，请求体内容为：
+					{
+						"title":"小米手机",
+						"category":"小米",
+						"images":"http://www.gulixueyuan.com/xm.jpg",
+						"price":3999.00
+					}
+				b. 此处发送请求的方式必须为POST并且需要发送请求体，不能是PUT，否则会发生错误
+				c. 上面的数据创建后，由于没有指定数据唯一性标识（ID），默认情况下，ES服务器会随机生成一个。
+				d. 如果想要自定义唯一性标识，需要在创建时指定：http://127.0.0.1:9200/shopping/_doc/1
+				e. 此处需要注意：如果增加数据时明确数据主键，那么请求方式也可以为PUT，并且_doc可以换成_create
+			B. 查看文档
+				a. 查看文档时，需要指明文档的唯一性标识，类似于MySQL中数据的主键查询。在 Postman中，向ES服务器发GET请求 ：http://127.0.0.1:9200/shopping/_doc/1
+				b. 如果指定一个不存在的标识，则返回的结果 found 属性为 false
+				c. 查看所有文档，在 Postman中，向ES服务器发GET请求 ：http://127.0.0.1:9200/shopping/_search
+			C. 修改文档（全量修改）
+				a. 和新增文档一样，输入相同的URL地址请求，如果请求体变化，会将原有的数据内容覆盖
+				b. 在 Postman中，向ES服务器发 put 请求 ：http://127.0.0.1:9200/shopping/_doc/1，请求体内容为:
+					{
+						"title":"小米手机",
+						"category":"小米",
+						"images":"http://www.gulixueyuan.com/xm.jpg",
+						"price":4999.00
+					}
+			D. 修改字段（局部修改）
+				a. 修改数据时，也可以只修改某一给条数据的局部信息
+				b. 在 Postman中，向ES服务器发POST请求 ：http://127.0.0.1:9200/shopping/_update/1请求体内容为：
+					{
+						"doc": {
+							"title":"红米手机"
+						}
+					}
+			E. 删除文档
+				a. 删除一个文档不会立即从磁盘上移除，它只是被标记成已删除（逻辑删除）。
+				b. 在 Postman中，向ES服务器发DELETE请求 ：http://127.0.0.1:9200/shopping/_doc/1
+				c. 如果删除一个并不存在的文档，则result属性会显示not_found
+			F. 条件删除
+				a. 一般删除数据都是根据文档的唯一性标识进行删除，实际操作时，也可以根据条件对多条数据进行删除
+				b. 向ES服务器发POST请求 ：http://127.0.0.1:9200/shopping/_delete_by_query，请求体内容为：
+					{
+						"query": {
+							"match": {
+								"title": "小米手机"
+							}
+						}
+					}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
