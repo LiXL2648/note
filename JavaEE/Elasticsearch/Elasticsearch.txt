@@ -99,73 +99,571 @@
 							}
 						}
 					}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+		③ 高级查询
+			A. 查询所有文档
+				a. 在 Postman中，向ES服务器发GET请求 ：http://127.0.0.1:9200/shopping/_search
+				b. 请求体
+					{
+					  "query": {
+						"match_all": {}
+					  }
+					}
+				c. 参数说明
+					(1) query：这里的query代表一个查询对象，里面可以有不同的查询属性
+					(2) match_all：查询类型，例如：match_all(代表查询所有)， match，term ， range 等等
+					(3) {查询条件}：查询条件会根据类型的不同，写法也有差异
+			B. 匹配查询
+				a. 在请求地址中协助请求参数进行条件查询：http://10.10.0.26:9200/shopping/_search?q=category:小米（一般不建议）
+				b. 使用请求体携带请求参数的方式，match匹配类型查询，会把查询条件进行分词，然后进行查询，多个词条之间是or的关系
+				c. 在 Postman中，向ES服务器发GET请求 ：http://127.0.0.1:9200/shopping/_search
+				d. 请求体：
+					{
+						"query": {
+							"match": {
+								"category":"小米"
+							}
+						}
+					}
+			C. 组合查询
+				a. bool：把各种其它查询通过`must`（必须 ）、`must_not`（必须不）、`should`（应该）的方式进行组合
+				b. 在 Postman中，向ES服务器发GET请求 ：http://127.0.0.1:9200/shopping/_search
+				c. 请求体：
+					{
+						"query": {
+							"bool": {
+								"must": [
+									{
+										"match": {
+											"category": "华为"
+										}
+									},
+									{
+										"match": {
+											"price": 5999
+										}
+									}
+								]
+							}
+						}
+					}
+			D. 分页查询
+				a. from：当前页的起始索引，默认从0开始。 from = (pageNum - 1) * size
+				b. size：每页显示多少条
+				c. 在 Postman中，向ES服务器发GET请求 ：http://127.0.0.1:9200/shopping/_search
+				d. 请求体：
+					{
+						"query": {
+							"match_all": {}
+						},
+						"from": 0,
+						"size": 5
+					}
+			E. 过滤字段
+				a. 在 Postman中，向ES服务器发GET请求 ：http://127.0.0.1:9200/shopping/_search
+				b. 请求体：
+					{
+						"query": {
+							"match_all": {}
+						},
+						"from": 0,
+						"size": 5,
+						"_source": ["title", "price"]
+					}
+				c. 也可以通过:	
+					(1) includes：来指定想要显示的字段 
+					(2) excludes：来指定不想要显示的字段
+					(3) 举例：
+						{
+							"_source": {
+								"includes": ["name","nickname"]
+							},  
+							"query": {
+								"match_all": {}
+							},
+							"from": 0,
+							"size": 5
+						}
+			F. 单字段排序
+				a. sort 可以让我们按照不同的字段进行排序，并且通过order指定排序的方式。desc降序，asc升序。
+				b. 在 Postman中，向ES服务器发GET请求 ：http://127.0.0.1:9200/shopping/_search
+				c. 请求体
+					{
+						"_source": {
+							"includes": ["title", "price"]
+						},  
+						"query": {
+							"match_all": {}
+						},
+						"from": 0,
+						"size": 5,
+						"sort": {
+							"price": {
+								"order": "desc"
+							}
+						}
+					}
+			H. 组合查询
+				a. bool 把各种其它查询通过`must`（必须 ）、`must_not`（必须不）、`should`（应该）的方式进行组合
+				b. 在 Postman中，向ES服务器发GET请求 ：http://127.0.0.1:9200/shopping/_search
+				c. 请求体
+					{
+						"query": {
+							"bool": {
+								"must": [
+									{
+										"match": {
+											"category": "华为"
+										}
+									},
+									{
+										"match": {
+											"price": "5999"
+										}
+									}
+								]
+							}
+						}
+					}
+			I. 范围查询
+				a. range 查询找出那些落在指定区间内的数字或者时间。
+				b. range查询允许以下字符
+					+----------------------+
+					| 操作符	说明	   |
+					+----------------------+
+					| gt		大于>	   |
+					+----------------------+
+					| gte		大于等于>= |
+					+----------------------+
+					| lt		小于<	   |
+					+----------------------+
+					| lte		小于等于<= |
+					+----------------------+
+				c. 请求体
+					{
+						"query": {
+							"bool": {
+								"should": [
+									{
+										"match": {
+											"category": "华为"
+										}
+									},
+									{
+										"match": {
+											"category": "小米"
+										}
+									}
+								],
+								"filter": {
+									"range": {
+										"price": {
+											"gte": 3999
+										}
+									}
+								}
+							}
+						}
+					}
+			J. 模糊查询
+				a. 返回包含与搜索字词相似的字词的文档。
+				b. 编辑距离是将一个术语转换为另一个术语所需的一个字符更改的次数。这些更改可以包括：
+					(1) 更改字符（box → fox）
+					(2) 删除字符（black → lack）
+					(3) 插入字符（sic → sick）
+					(4) 转置两个相邻字符（act → cat）
+				c. 为了找到相似的术语，fuzzy查询会在指定的编辑距离内创建一组搜索词的所有可能的变体或扩展。然后查询返回每个扩展的完全匹配。
+				d. 通过fuzziness修改编辑距离。一般使用默认值AUTO，根据术语的长度生成编辑距离。
+				e. 在 Postman中，向ES服务器发GET请求 ：http://127.0.0.1:9200/shopping/_search
+				f. 请求体
+					{
+						"query": {
+							"fuzzy": {
+								"title": {
+									"value": "红米手机"
+								}
+							}
+						}
+					}
+					或
+					{
+						"query": {
+							"fuzzy": {
+								"title": {
+								"value": "zhangsan",
+								"fuzziness": 2
+								}
+							}
+						}
+					}
+			K. 精确匹配
+				a. match 是属于全文检索匹配，对查询字段文字数据进行分词，对分词后的数据保存到倒排索引中，即使使用查询字段的一部分数据也能查询到该数据，
+				es 同样会将查询的内容进行分词，并在倒排索引中进行匹配。
+				b. match_phrase 可对某个字段进行精确查询
+				c. 在 Postman中，向ES服务器发GET请求 ：http://127.0.0.1:9200/shopping/_search
+				d. 请求体
+					{
+						"query": {
+							"match_phrase": {
+								"category": "小华"
+							}
+						}
+					}
+			L. 高亮查询
+				a. Elasticsearch可以对查询内容中的关键字部分，进行标签和样式(高亮)的设置。
+				b. 在使用match查询的同时，加上一个highlight属性：
+					(1) pre_tags：前置标签
+					(2) post_tags：后置标签
+					(3) fields：需要高亮的字段
+					(4) title：这里声明title字段需要高亮，后面可以为这个字段设置特有配置，也可以空
+				c. 在 Postman中，向ES服务器发GET请求 ：http://127.0.0.1:9200/shopping/_search
+				d. 请求体
+					{
+						"query": {
+							"match": {
+								"category": "小华"
+							}
+						},
+						"highlight": {
+							"fields": {
+								"category": {}
+							}
+						}
+					}
+			M. 聚合查询
+				a. 聚合允许使用者对es文档进行统计分析，类似与关系型数据库中的group by，当然还有很多其他的聚合，例如取最大值、平均值等等。
+				b. 在 Postman中，向ES服务器发GET请求 ：http://127.0.0.1:9200/shopping/_search
+				c. 对某个非文本字段进行统计分析
+					{
+						"aggs": { // 聚合操作
+							"price_terms": { // 名称，随意起
+								"terms": { //分组
+									"field": "price" // 分组字段
+								}
+							}
+						},
+						"size": 0
+					}
+				d. 对某个字段取最大值max
+					{
+						"aggs": { 
+							"price_max": {
+								"max": {
+									"field": "price"
+								}
+							}
+						},
+						"size": 0
+					}
+				e. 对某个字段取最小值min
+					{
+						"aggs": {
+							"price_min": {
+								"min": {
+									"field": "price"
+								}
+							}
+						},
+						"size": 0
+					}
+				f. 对某个字段求和sum
+					{
+						"aggs": {
+							"price_sum": {
+								"sum": {
+									"field": "price"
+								}
+							}
+						},
+						"size": 0
+					}
+				g. 对某个字段取平均值avg
+					{
+						"aggs": {
+							"price_avg": {
+								"avg": {
+									"field": "price"
+								}
+							}
+						},
+						"size": 0
+					}
+				h. State聚合，对某个字段一次性返回count，max，min，avg和sum五个指标
+					{
+						"aggs": {
+							"price_stats": {
+								"stats": {
+									"field": "price"
+								}
+							}
+						},
+						"size": 0
+					}
+		④ 映射操作
+			A. 映射
+				a. 有了索引库，等于有了数据库中的database。
+				b. 接下来就需要建索引库(index)中的映射了，类似于数据库(database)中的表结构(table)。
+				c. 创建数据库表需要设置字段名称，类型，长度，约束等；索引库也一样，需要知道这个类型下有哪些字段，每个字段有哪些约束信息，这就叫做映射(mapping)。
+			B. 创建映射
+				a. 在 Postman中，向ES服务器发PUT请求 ：http://127.0.0.1:9200/student/_mapping
+				b. 请求体内容为：
+					{
+						"properties": {
+							"name": {
+								"type": "text",
+								"index": true
+							},
+							"sex": {
+								"type": "keyword",
+								"index": true
+							},
+							"age": {
+								"type": "long",
+								"index": false
+							}
+						}
+					}
+				c. 映射数据说明：	
+					(1) 字段名：任意填写，下面指定许多属性，例如：title、subtitle、images、price
+					(2) type：类型，Elasticsearch中支持的数据类型非常丰富，说几个关键的：
+						(A) String类型，又分两种：
+							(a) text：可分词
+							(b) keyword：不可分词，数据会作为完整字段进行匹配
+						(B) Numerical：数值类型，分两类
+							(a) 基本数据类型：long、integer、short、byte、double、float、half_float
+							(b) 浮点数的高精度类型：scaled_float
+						(C) Date：日期类型
+						(D) Array：数组类型
+						(E) Object：对象
+					(3) index：是否索引，默认为true，也就是说你不进行任何配置，所有字段都会被索引。
+						true：字段会被索引，则可以用来进行搜索
+						false：字段不会被索引，不能用来搜索
+					(4) store：是否将数据进行独立存储，默认为false
+						原始的文本会存储在_source里面，默认情况下其他提取出来的字段都不是独立存储的，是从_source里面提取出来的。当然你也可以独立的存储某个字段，
+						只要设置"store": true即可，获取独立存储的字段要比从_source中解析快得多，但是也会占用更多的空间，所以要根据实际业务需求来设置。
+					(5) analyzer：分词器，这里的ik_max_word即使用ik分词器
+			C. 查看映射
+				a. 在 Postman中，向ES服务器发GET请求 ：http://127.0.0.1:9200/student/_mapping
+			D. 索引映射关联
+				a. 在 Postman中，向ES服务器发PUT请求 ：http://127.0.0.1:9200/student
+				b. 请求体内容为：
+					{
+						"settings": {},
+						"mappings": {
+							"properties": {
+								"name": {
+									"type": "text",
+									"index": true
+								},
+								"sex": {
+									"type": "keyword",
+									"index": true
+								},
+								"age": {
+									"type": "long",
+									"index": false
+								}
+							}
+						}
+					}
+	2. Java API操作
+		① 创建Maven项目，修改pom文件，增加Maven依赖关系
+			<dependencies>
+				<dependency>
+					<groupId>org.elasticsearch</groupId>
+					<artifactId>elasticsearch</artifactId>
+					<version>7.8.0</version>
+				</dependency>
+				<!-- elasticsearch的客户端 -->
+				<dependency>
+					<groupId>org.elasticsearch.client</groupId>
+					<artifactId>elasticsearch-rest-high-level-client</artifactId>
+					<version>7.8.0</version>
+				</dependency>
+				<!-- elasticsearch依赖2.x的log4j -->
+				<dependency>
+					<groupId>org.apache.logging.log4j</groupId>
+					<artifactId>log4j-api</artifactId>
+					<version>2.8.2</version>
+				</dependency>
+				<dependency>
+					<groupId>org.apache.logging.log4j</groupId>
+					<artifactId>log4j-core</artifactId>
+					<version>2.8.2</version>
+				</dependency>
+				<dependency>
+					<groupId>com.fasterxml.jackson.core</groupId>
+					<artifactId>jackson-databind</artifactId>
+					<version>2.9.9</version>
+				</dependency>
+				<!-- junit单元测试 -->
+				<dependency>
+					<groupId>junit</groupId>
+					<artifactId>junit</artifactId>
+					<version>4.12</version>
+				</dependency>
+			</dependencies>
+		② 客户端对象
+			RestHighLevelClient esClient = new RestHighLevelClient(RestClient.builder(new HttpHost(HOSTNAME, PORT)));
+			esClient.close();
+		③ 索引操作
+			A. 创建索引
+				RestHighLevelClient esClient = EsClientUtil.getInstance().getEsClient();
+				CreateIndexRequest indexRequest = new CreateIndexRequest("student");
+				CreateIndexResponse indexResponse = esClient.indices().create(indexRequest, RequestOptions.DEFAULT);
+				System.out.println(indexResponse.isAcknowledged());
+				esClient.close();
+			B. 查看索引
+				RestHighLevelClient esClient = EsClientUtil.getInstance().getEsClient();
+				GetIndexRequest indexRequest = new GetIndexRequest("student");
+				GetIndexResponse indexResponse = esClient.indices().get(indexRequest, RequestOptions.DEFAULT);
+				System.out.println(indexResponse.getAliases());
+				System.out.println(indexResponse.getSettings());
+				System.out.println(indexResponse.getMappings());
+				esClient.close();
+			C. 删除索引
+				RestHighLevelClient esClient = EsClientUtil.getInstance().getEsClient();
+				DeleteIndexRequest indexRequest = new DeleteIndexRequest("student");
+				AcknowledgedResponse response = esClient.indices().delete(indexRequest, RequestOptions.DEFAULT);
+				System.out.println(response.isAcknowledged());
+				esClient.close();
+		④ 文档操作
+			A. 新增文档
+				RestHighLevelClient esClient = EsClientUtil.getInstance().getEsClient();
+				IndexRequest indexRequest = new IndexRequest();
+				indexRequest.index("shopping").id("11");
+				Shopping shopping = new Shopping("Apple 8", "Apple", "http://www.gulixueyuan.com/apple12.jpg",
+						new BigDecimal("5299.00"));
+				ObjectMapper objectMapper = new ObjectMapper();
+				String shoppingJson = objectMapper.writeValueAsString(shopping);
+				indexRequest.source(shoppingJson, XContentType.JSON);
+				IndexResponse indexResponse = esClient.index(indexRequest, RequestOptions.DEFAULT);
+				System.out.println(indexResponse.getResult());
+
+				esClient.close();
+			B. 修改文档
+				RestHighLevelClient esClient = EsClientUtil.getInstance().getEsClient();
+				UpdateRequest updateRequest = new UpdateRequest();
+				updateRequest.index("shopping").id("10");
+				// updateRequest.doc(XContentType.JSON, "price", new BigDecimal("6199.00"));
+				updateRequest.doc(XContentType.JSON, "title", "iPhone 11");
+				UpdateResponse updateResponse = esClient.update(updateRequest, RequestOptions.DEFAULT);
+				System.out.println(updateResponse.getResult());
+				esClient.close();
+			C. 查询文档
+				RestHighLevelClient esClient = EsClientUtil.getInstance().getEsClient();
+				GetRequest getRequest = new GetRequest();
+				getRequest.index("shopping").id("7");
+				GetResponse getResponse = esClient.get(getRequest, RequestOptions.DEFAULT);
+				System.out.println(getResponse.getSourceAsString());
+				esClient.close();
+			D. 删除文档
+				RestHighLevelClient esClient = EsClientUtil.getInstance().getEsClient();
+				DeleteRequest deleteRequest = new DeleteRequest();
+				deleteRequest.index("shopping").id("7");
+				DeleteResponse deleteResponse = esClient.delete(deleteRequest, RequestOptions.DEFAULT);
+				System.out.println(deleteResponse.getResult());
+				esClient.close();
+			E. 批量操作
+				RestHighLevelClient esClient = EsClientUtil.getInstance().getEsClient();
+				BulkRequest bulkRequest = new BulkRequest();
+				ObjectMapper objectMapper = new ObjectMapper();
+				bulkRequest.add(new IndexRequest().index("shopping").id("7").source(objectMapper.writeValueAsString(
+						new Shopping("iPhone 12", "Apple", "https://item.jd.com/100020961240.html", new BigDecimal("6299.00"))), XContentType.JSON));
+				bulkRequest.add(new IndexRequest().index("shopping").id("8").source(objectMapper.writeValueAsString(
+						new Shopping("iPhone 11 Prod Max", "Apple", "https://item.jd.com/100020961240.html", new BigDecimal("7299.00"))), XContentType.JSON));
+				bulkRequest.add(new IndexRequest().index("shopping").id("9").source(objectMapper.writeValueAsString(
+						new Shopping("iPhone X", "Apple", "https://item.jd.com/100020961240.html", new BigDecimal("8499.00"))), XContentType.JSON));
+				BulkResponse bulkResponse = esClient.bulk(bulkRequest, RequestOptions.DEFAULT);
+				System.out.println(bulkResponse.hasFailures());
+				esClient.close();
+		⑤ 高级查询
+			A. 全量查询
+				RestHighLevelClient esClient = EsClientUtil.getInstance().getEsClient();
+				SearchRequest searchRequest = new SearchRequest();
+				searchRequest.indices("shopping");
+				SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder().query(QueryBuilders.matchAllQuery());
+				searchRequest.source(searchSourceBuilder);
+				SearchResponse searchResponse = esClient.search(searchRequest, RequestOptions.DEFAULT);
+				searchResponse.getHits().forEach(h -> System.out.println(h.getSourceAsString()));
+				System.out.println();
+				esClient.close();
+			B. 全文检索+分页查询+排序+过滤字段
+				RestHighLevelClient esClient = EsClientUtil.getInstance().getEsClient();
+				
+				SearchRequest searchRequest = new SearchRequest();
+				searchRequest.indices("shopping");
+				SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+				// 全文检索
+				searchSourceBuilder.query(QueryBuilders.matchQuery("category", "Apple"));
+				// 分页查询
+				searchSourceBuilder.from(0);
+				searchSourceBuilder.size(2);
+				// 排序
+				searchSourceBuilder.sort("price", SortOrder.ASC);
+				// 过滤字段
+				String[] includes = {};
+				String[] excludes = {"category"};
+				searchSourceBuilder.fetchSource(includes, excludes);
+
+				searchRequest.source(searchSourceBuilder);
+				SearchResponse searchResponse = esClient.search(searchRequest, RequestOptions.DEFAULT);
+				searchResponse.getHits().forEach(s -> System.out.println(s.getSourceAsString()));
+				esClient.close();
+			C. 组合查询+范围查询
+				RestHighLevelClient esClient = EsClientUtil.getInstance().getEsClient();
+
+				SearchRequest searchRequest = new SearchRequest();
+				SearchSourceBuilder builder = new SearchSourceBuilder();
+				// 组合查询
+				MatchQueryBuilder matchQueryBuilder = QueryBuilders.matchQuery("category", "华为");
+				MatchQueryBuilder matchQueryBuilder1 = QueryBuilders.matchQuery("category", "Apple");
+				BoolQueryBuilder boolQueryBuilder = QueryBuilders.boolQuery().should(matchQueryBuilder).should(matchQueryBuilder1);
+				builder.query(boolQueryBuilder);
+
+				// 范围查询
+				RangeQueryBuilder rangeQueryBuilder = QueryBuilders.rangeQuery("price").gte(5999.0d).lte(8499.0d);
+				builder.query(rangeQueryBuilder);
+
+				searchRequest.source(builder);
+				SearchResponse searchResponse = esClient.search(searchRequest, RequestOptions.DEFAULT);
+				searchResponse.getHits().forEach(s -> System.out.println(s.getSourceAsString()));
+				esClient.close();
+			D. 模糊查询+高亮查询
+				RestHighLevelClient esClient = EsClientUtil.getInstance().getEsClient();
+				SearchRequest searchRequest = new SearchRequest();
+				SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+
+				// 模糊查询
+				FuzzyQueryBuilder fuzzyQueryBuilder = QueryBuilders.fuzzyQuery("title", "iPhone ").fuzziness(Fuzziness.TWO);
+				searchSourceBuilder.query(fuzzyQueryBuilder);
+
+				// 高亮查询
+				HighlightBuilder highlightBuilder = new HighlightBuilder().field("title");
+				searchSourceBuilder.highlighter(highlightBuilder);
+
+				searchRequest.source(searchSourceBuilder);
+				SearchResponse searchResponse = esClient.search(searchRequest, RequestOptions.DEFAULT);
+				searchResponse.getHits().forEach(s -> System.out.println(s.getHighlightFields()));
+			E. 分组查询+分组查询，求最大值
+				RestHighLevelClient esClient = EsClientUtil.getInstance().getEsClient();
+				SearchRequest searchRequest = new SearchRequest();
+				SearchSourceBuilder builder = new SearchSourceBuilder();
+				// 分组查询
+				TermsAggregationBuilder termsAggregationBuilder = AggregationBuilders.terms("terms_price").field("price");
+				builder.aggregation(termsAggregationBuilder);
+
+				// 分组查询，求最大值
+				MaxAggregationBuilder maxAggregationBuilder = AggregationBuilders.max("max_price").field("price");
+				builder.aggregation(maxAggregationBuilder);
+
+				searchRequest.source(builder);
+				SearchResponse searchResponse = esClient.search(searchRequest, RequestOptions.DEFAULT);
+				ParsedDoubleTerms termsCategoryAggregation = searchResponse.getAggregations().get("terms_price");
+				System.out.println(termsCategoryAggregation.getBuckets());
+
+				ParsedMax maxPriceAggregation = searchResponse.getAggregations().get("max_price");
+				System.out.println(maxPriceAggregation.getValue());
+				esClient.close();
 
 
 
