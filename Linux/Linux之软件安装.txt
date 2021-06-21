@@ -169,6 +169,58 @@
 		export TOMCAT_HOME=/usr/local/tomcat
 		export PATH=$PATH:$TOMCAT_HOME/bin
 		保存退出，并重启
+		⑧ 设置开机自启之supervisor
+			A. 安装supervisor
+				a. sudo yum install -y supervisor
+				b. 如果提示没有可用软件包就执行 sudo yum -y install epel-release
+			B. 创建sock
+				touch /tmp/supervisor.sock
+				chmod 777 /tmp/supervisor.sock
+			C. 开机启动
+				systemctl enable supervisord
+			D. 生成配置文件
+				mkdir -p /etc/supervisor/
+				echo_supervisord_conf > /etc/supervisord.conf
+			E. 修改配置文件
+				vim /etc/supervisord.conf
+				shift + g 将光标定位到最后一行
+			F. 删掉前边的注释（分号）。然后更改如下
+				[include]
+				files = /etc/supervisor/*.conf
+			G. 运行
+				systemctl start supervisord
+			H. 在/etc/supervisor中新建tomcat.conf文件
+[program:tomcat]
+directory=/opt/apache-tomcat-8.0.50
+command=/opt/apache-tomcat-8.0.50/bin/catalina.sh run
+environment=JAVA_HOME="/usr/lib/jvm/jdk1.8.0_161",JAVA_BIN="/usr/lib/jvm/jdk1.8.0_161/bin"
+user=root
+autostart=true
+autorestart=true
+stdout_logfile=/var/log/supervisor/%(program_name)s.log
+stderr_logfile=/var/log/supervisor/%(program_name)s.log
+			I. 重启supervisor
+				a. systemctl restart supervisord
+				b. 如果重启失败，journalctl -xe，查看失败原因，/var/log/supervisor/tomcat.log does not exists
+					mkdir /var/log/supervisor
+					touch /var/log/supervisor/tomcat.log
+					chmod 777 /var/log/supervisor
+				c. 重启supervisor
+			J. 重启tomcat命令
+				supervisorctl -c /etc/supervisord.conf restart tomcat
+			K. 重启测试
+				reboot
+			L. 二次测试
+				重启后执行supervisorctl status
+			M. 浏览器测试正常,至此，tomcat自启动配置成功。其实，systemd和init.d两种方法理论上也是可以成功的，但是启动成功，然而，浏览器访问一直转圈。。
+		⑨ 设置Tomcat不需要依赖系统JDK环节变量
+			A. 编辑 setclasspath.sh
+				vi /usr/local/tomcat/apache-tomcat-8.5.65/bin/setclasspath.sh
+			B. 添加变量
+export JAVA_HOME=/usr/local/java/jdk1.8.0_261
+export JRE_HOME=$JAVA_HOME/jre
+export PATH=$PATH:$JAVA_HOME/bin
+export CLASSPATH=.:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar
 	4. 安装eclipse：
 		① 解压eclipse到 /opt/ tar -zxvf eclipse-jee-mars-2-linux-gtk-x86_64.tar.gz
 		② 进入 eclipse/ 目录，打开eclipse：./eclipse
@@ -613,30 +665,30 @@
 			chown -R mysql:mysql mysql/
 	3. 创建配置文件
 		① vim /etc/my.cnf
-			[client]
-			port = 3306
-			socket = /tmp/mysql.sock
+[client]
+port = 3306
+socket = /tmp/mysql.sock
 
-			[mysqld]
-			character_set_server=utf8
-			init_connect='SET NAMES utf8'
-			basedir=/usr/local/mysql
-			datadir=/usr/local/mysql/data
-			socket=/tmp/mysql.sock
-			log-error=/var/log/mysqld.log
-			pid-file=/var/run/mysqld/mysqld.pid
-			#不区分大小写
-			lower_case_table_names = 1
+[mysqld]
+character_set_server=utf8
+init_connect='SET NAMES utf8'
+basedir=/usr/local/mysql
+datadir=/usr/local/mysql/data
+socket=/tmp/mysql.sock
+log-error=/var/log/mysqld.log
+pid-file=/var/run/mysqld/mysqld.pid
+#不区分大小写
+lower_case_table_names = 1
 
-			sql_mode=STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
+sql_mode=STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
 
-			max_connections=5000
+max_connections=5000
 
-			default-time_zone = '+8:00'
+default-time_zone = '+8:00'
 	4. 初始化文件
 		① 初始化log文件，防止没有权限。
 			cd /var/log/
-			vim mysqld.log
+			touch mysqld.log
 			：wq
 
 			chmod 777 mysqld.log
@@ -646,12 +698,12 @@
 			cd /var/run/
 			mkdir mysqld
 			cd mysqld
-			vi mysqld.pid
+			touch mysqld.pid
 			：wq
 			# 给权限
 			cd ..
 			chmod 777 mysqld
-			chown -R mysql:mysql /mysqld
+			chown -R mysql:mysql mysqld
 		③ 初始化数据库
 			# 初始化数据库，并指定启动mysql的用户，否则就会在启动MySQL时出现权限不足的问题
 			/usr/local/mysql/bin/mysqld --initialize --user=mysql --basedir=/usr/local/mysql --datadir=/usr/local/mysql/data --lc_messages_dir=/usr/local/mysql/share --lc_messages=en_US
@@ -697,6 +749,29 @@
 
 		# 修改root用户密码为123456
 		set password for root@localhost=password("123456");
+	8. 设置MySQL开机重启后，重启Linux，解决MySQL没有自启的问题
+		① 原因是/var/run/mysql/mysqld.pid丢失
+		② mysqld.pid创建在系统的run目录下，该目录是运行在内存中的，因此服务器重启后文件不存在
+		③ 编辑 /etc/init.d/mysqld
+			A. vim /etc/init.d/mysqld
+			B. 修改 mysqld_pid_file_path=/var/lib/mysqld/mysqld.pid
+			C. 保存并退出：:wq!
+		④ 编辑 /etc/my.cnf
+			A. vim /etc/my.cnf
+			B. 修改pid-file=/var/lib/mysqld/mysqld.pid
+			C. 保存并退出：:wq!
+		⑤ 创建 /var/lib/mysqld/目录
+			mkdir -p /var/lib/mysqld/
+		⑥ 在/var/lib/mysqld/目录中新建 mysqld.pid文件
+			A. vim /var/lib/mysqld/mysqld.pid
+			B. 保存并退出：:wq!
+		⑦ 修改在/var/lib/mysqld/的权限
+			chmod 777 /var/lib/mysqld
+		⑧ 启动 MySQL
+			service mysqld start
+			MySQL Start Success!
+		⑨ 重启Linux，MySQL自启成功
+			
 九、离线升级gcc g++
 	1. 下载地址：https://ftp.gnu.org/gnu/gcc/
 	2. 下载gcc依赖包
@@ -738,7 +813,7 @@
 	4. 解决升级后还是原先版本的问题
 		① 升级后使用 gcc -v 查看版本，发现仍然是原先版本
 		② 使用 find / -name gcc 全局搜 gcc
-			A. /usr/local/lib/gcc：对应新版本gcc
+			A. /usr/local/bin/gcc：对应新版本gcc
 			B. /usr/bin/gcc：对应旧版本gcc
 		③ 解决方法
 			mv /usr/bin/gcc /usr/bin/gcc4.8
@@ -761,10 +836,12 @@
 			nohup ./minio server /root/data/minio > /root/logs/minio/minio.log 2>&1 &
 		③ 访问 http://192.168.161.3:9000/ 进行登录。
 	2. 设置minio开机自启
-		① 设置minio开机自启
+		① 编辑/etc/rc.local
 			vi /etc/rc.local
 		② 添加自启脚本位置
 			/root/minio/run.sh
+		③ 修改/etc/rc.local权限
+			chmod +x /etc/rc.local
 	3. MinIO系统的基本用法
 		① 创建 bucket
 			A. 登录之后在浏览器上面，点击右下角“红色的加号”创建 bucket 来存储对象。我们要了解什么是bucket，说白了就是上传的对象文件的分类
@@ -786,6 +863,7 @@
 		② 示例：nohup java -jar xxx.jar &
 		③ 执行上述命令，nohup会把执行结果中的日志默认输出到当前文件夹下面的nohup.out文件中。
 		④ 可以手动指定日志输出到哪个文件中：nohup java -jar xxx.jar > nohup.log  2>&1 & 
+		⑤ 不需要nohup命令输出日志：nohup java -jar xxx.jar > /dev/null &
 	2. 具体示例
 		① 创建目录/usr/local/fight-manage-system，将SpringBoot的jar包上传到该目录
 		② 在 /usr/local/fight-manage-system 目录中创建 startup.sh 文件，并输入以下内容，并保存退出
@@ -801,9 +879,266 @@
 	3. 关闭 SpringBoot项目后台程序
 		ps -ef | grep java
 		kill -9 PID
+	4. 设置SpringBoot项目开机自启：
+		① 编辑/etc/rc.local
+			vi /etc/rc.local
+		② 添加自启脚本位置
+			/usr/local/fight-manage-system/startup.sh
+十二、centos7离线安装gitLab
+	1. 相关依赖准备：gitlab前要安装相关依赖。需要用到policycoreutils-python、openssh、postfix、cronie组件
+		① 查看是否安装 openssh
+			rpm -qa | grep openssh
+		② 查看是否安装 postfix
+			rpm -qa | grep postfix
+		③ 查看是否安装 cronie
+			rpm -qa | grep cronie
+		④ 查看是否安装 policycoreutils-python
+			A. rpm -qa | grep policycoreutils-python
+			B. 如果没有安装，则查看yum源中是否有相关rpm包
+				yum list | grep policycoreutils-python
+			C. 如果有yum源中有相关rpm包，则使用yum命令进行安装
+				yum install -y policycoreutils-python
+			D. 如果没有，则需要提前下载好相关的rpm包，下载地址：
+				https://centos.pkgs.org/7/centos-x86_64/7/
+	2. 下载：使用清华大学开源软件镜像站：https://mirrors.tuna.tsinghua.edu.cn/gitlab-ce/yum/el7/
+	3. 安装
+		① 设置SSH
+			A. 将ssh服务设置开机启动
+				systemctl enable sshd
+			B. 启动ssh服务
+				systemctl start sshd
+			C. 查看ssh服务状态
+				systemctl status sshd
+			D. active(running)表示ssh服务已启动
+		② 设置postfix
+			A. 设置postfix开机启动
+				systemctl enable postfix
+			B. 启动postfix服务
+				systemctl start postfix
+			C. 查看postfix服务状态
+				systemctl status postfix
+			D. active(running)表示postfix服务已启动
+		③ 安装 gitlab
+			rpm -ivh gitlab-ce-12.1.17-ce.0.el7.x86_64.rpm
+		④ 等待服务器的安装，安装成功后重启虚拟机：reboot
+		⑤ 初始化配置gitlib: gitlab-ctl reconfigure
+		⑥ 修改Gitlib的默认默认端口号以及开放防火墙
+			A. 首先需要先备份/etc/gitlab/gitlab.rb与/var/opt/gitlab/nginx/conf/gitlab-http.conf 至 /myconfig
+				mkdir -p /usr/local/gitlib/myconfig/
+				cp /etc/gitlab/gitlab.rb /usr/local/gitlib/myconfig/
+				cp /var/opt/gitlab/nginx/conf/gitlab-http.conf /usr/local/gitlib/myconfig/
+			A. gitlab 默认的端口号是80 ，通常会被其他服务占用，所以要更改端口号，防止冲突
+			B. 修改gitlib的配置文件：vim /etc/gitlab/gitlab.rb
+			C. 添加以下内容，注意 external_url 可能会有默认配置，修改即可。本人的（localhost = 192.168.107.26，端口号为48）
+				external_url 'http://localhost:端口号'
+				nginx['listen_port'] = 端口号
+				nginx['listen_https'] = false
+			D. 修改nginx 端口号：vim /var/opt/gitlab/nginx/conf/gitlab-http.conf
+			E. 按照以下配置，修改端口号，该服务已经存在gitlab-http.conf文件中，只需要修改配置项即可
+				server {
 
+					listen *:端口号;
+					if ($http_host = "") {
+					   set $http_host_with_default "localhost:端口号";
+					}
+				}
+			F. 重新启动：sudo gitlab-ctl restart
+			G. 开放端口号：
+				a. 执行查看zones firewall-cmd --get-active-zones 
+				firewall-cmd --permanent --zone=public --list-ports指令
+				b. 执行开放端口号 firewall-cmd --zone=public --add-port=端口号/tcp --permanent 指令
+				c. 执行重启防火墙 firewall-cmd --reload 指令
+				d. 执行查看端口号是否开启 firewall-cmd --query-port=端口号/tcp 指令
+	4. 登录gitlab服务器：
+		① 输入ip地址:防火墙：192.168.107.26:48
+		② 第一次访问gitlab首页需要为root用户设置登录密码
+	5. gitlab开启和关闭的问题
+		① 重新启动gitlab服务: sudo gitlab-ctl restart
+		② 启动gitlab服务：sudo gitlab-ctl start
+		③ 停止gitlab服务：sudo gitlab-ctl stop
+		④ 禁止gitlab开机自启动：sudo systemctl disable gitlab-runsvdir.service
+		⑤ 开启gitlab开机自启动：sudo systemctl enable gitlab-runsvdir.service
+		⑥ 查看gitlab的状态：sudo gitlab-ctl status
+	6. 重置管理员root的密码，GitLab 官网去找对应版本的命令
+		① 进入 GitLab 控制台
+			gitlab-rails console -e production 或者 gitlab-rails console production
+		② 查看 root 用户
+			执行命令： user = User.where(id: 1).first ，此 user 则表示 root 用户
+		③ 修改密码
+			修改密码：user.password = 'secret_pass' 
+			确认密码：user.password_confirmation = 'secret_pass' 
+		④ 保存密码
+			执行命令：user.save!
+		⑤ 退出控制台
+			执行命令： exit 
+十三、CentOS7离线安装supervisor
+	1. 安装 setuptools
+		① 下载 setuptools 安装包：
+			wget --no-check-certificate  https://pypi.python.org/packages/source/s/setuptools/setuptools-0.6c11.tar.gz
+		② 注意:其中是需要用到--no-check-certificate。因为使用wget下载HTTPS开头的网址域名，会去要求证书，我们添加上--no-check-certificate不去检查证书
+		③ 安装 setuptools
+			tar -zxvf setuptools-0.6c11.tar.gz && cd setuptools-0.6c11
+			python setup.py build
+			python setup.py install
+	2. 安装 meld 
+		① 下载 meld 安装包：
+			wget https://pypi.python.org/packages/45/a0/317c6422b26c12fe0161e936fc35f36552069ba8e6f7ecbd99bbffe32a5f/meld3-1.0.2.tar.gz#md5=3ccc78cd79cffd63a751ad7684c02c91
+		② 安装 meld 
+			tar -zxvf meld3-1.0.2.tar.gz
+			cd meld3-1.0.2
+			python setup.py install
+	3. 安装 supervisor
+		① 下载 supervisor 安装包：
+			wget https://pypi.python.org/packages/31/7e/788fc6566211e77c395ea272058eb71299c65cc5e55b6214d479c6c2ec9a/supervisor-3.3.3.tar.gz#md5=0fe86dfec4e5c5d98324d24c4cf944bd
+		② 安装 supervisor
+			tar -zxvf supervisor-3.3.3.tar.gz
+			cd supervisor-3.3.3
+			python setup.py install
+	4. 验证安装是否成功
+		supervisorctl --help
+	5. 设置开机自启	
+		① 生成配置文件
+			echo_supervisord_conf > /etc/supervisord.conf
+			mkdir /etc/supervisor
+		② 启动
+			supervisord -c /etc/supervisord.conf
+		③ 在 /usr/lib/systemd/system 目录下新建 supervisord.service 文件
+[Unit]
+Description=Supervisor daemon
 
+[Service]
+Type=forking
+ExecStart=/usr/bin/supervisord -c /etc/supervisord.conf
+ExecStop=/usr/bin/supervisorctl $OPTIONS shutdown
+ExecReload=/usr/bin/supervisorctl $OPTIONS reload
+KillMode=process
+Restart=on-failure
+RestartSec=42s
 
+[Install]
+WantedBy=multi-user.target
+		④ 重新加载Systemd配置（必须运行），使得Supervisord配置生效：
+			systemctl daemon-reload
+		⑤ 执行命令: 
+			systemctl enable supervisord
+			systemctl is-enabled supervisord
+			systemctl stop supervisord
+			systemctl start supervisord
+			systemctl status supervisord
+			systemctl reload supervisord
+			systemctl restart supervisord
+			systemctl status supervisord
+	6. 设置Tomcat开机自启
+		① 修改配置文件
+			vim /etc/supervisord.conf
+			shift + g 将光标定位到最后一行
+		② 删掉前边的注释（分号）。然后更改如下
+			[include]
+			files = /etc/supervisor/*.conf
+		③ 运行
+			systemctl start supervisord
+		④ 在/etc/supervisor中新建tomcat.conf文件
+[program:tomcat]
+directory=/usr/local/tomcat/apache-tomcat-8.5.65
+command=/usr/local/tomcat/apache-tomcat-8.5.65/bin/catalina.sh run
+environment=JAVA_HOME="/usr/local/java/jdk1.8.0_261",JAVA_BIN="/usr/local/java/jdk1.8.0_261/bin"
+user=root
+autostart=true
+autorestart=true
+stdout_logfile=/var/log/supervisor/%(program_name)s.log
+stderr_logfile=/var/log/supervisor/%(program_name)s.log
+		⑤ 重启supervisor
+			A. systemctl restart supervisord
+			B. 如果重启失败，journalctl -xe，查看失败原因，/var/log/supervisor/tomcat.log does not exists
+				mkdir /var/log/supervisor
+				touch /var/log/supervisor/tomcat.log
+				chmod 777 /var/log/supervisor
+			C. 重启supervisor
+		⑦ 启动tomcat命令
+			supervisorctl -c /etc/supervisord.conf start tomcat
+			supervisorctl -c /etc/supervisord.conf stop tomcat
+			supervisorctl -c /etc/supervisord.conf restart tomcat
+		⑧ 重启测试
+			reboot
+		⑨ 二次测试
+			重启后执行supervisorctl status
+	7. 解决Tomcat启动慢
+		① 问题：org.apache.jasper.servlet.TldScanner.scanJars At least one JAR was scanned for TLDs，
+		启动成功了，但是启动时间超级长。
+		② 原因：org.apache.catalina.util.SessionIdGeneratorBase.createSecureRandom Creation of SecureRandom instance for session ID 
+		generation using [SHA1PRNG] took [528,295] milliseconds.
+		③ 解决：
+			A. 打开$JAVA_PATH/jre/lib/security/java.security这个文件，找到下面的内容：
+				vi /usr/local/java/jdk1.8.0_261/jre/lib/security/java.security
+			B. 找到内容securerandom.source=file:/dev/random
+			C. 将其替换为：ecurerandom.source=file:/dev/./urandom
+		④ reboot重启
+十四、制作ISO镜像
+	1、yum下载mondorescue库：
+		① 进入yum下载库
+			cd /etc/yum.repos.d/
+		② 安装
+			wget ftp://ftp.mondorescue.org/centos/7/x86_64/mondorescue.repo
+		③ 如果没有 wget 命令
+			yum list | grep wget
+			yum install -y wget.x86_64
+	2. 安装 mondorescue
+		① yum install mondo
+		② 执行yum install mondo报错：在后面加上 --nogpgcheck，执行
+			yum install mondo --nogpgcheck
+	3. 启动mondorescue
+		mondoarchive
+	4. 开始备份
+		① 选择备份到硬盘Hard disk，其他的按提示一步步来，基本按默认的选择即可
+	5. 最后在默认iso生成目录：/var/cache/mondo 得到iso文件
+	6. 启动测试
+		下载.iso文件到本地电脑。VMware选择Centos 64位虚拟机，加载镜像后，开始测试：
+		如果自动安装镜像的话，输入nuke，回车
+十五、离线安装nginx
+	1. 安装环境
+		① 操作系统：centos7
+		② 联网状态：无互联网-内网
+	2. 准备工作
+		① 准备环境包gcc gcc-c++
+		② 准备准备离线安装包
+			openssl
+			zlib
+			pcre
+			nginx
+		③ 下载包的网站
+			https://centos.pkgs.org/
+	3. 安装离线包
+		① 查看 gcc 和 g++版本
+			gcc -v
+			g++ -v
+		② 安装pcre，由于机器上已经有低版本的pcre，所以强制安装
+			rpm -ivh pcre-8.32-17.el7.x86_64.rpm --force
+			rpm -ivh pcre-devel-8.32-17.el7.x86_64.rpm --force
+		③ 安装zlib
+			rpm -ivh zlib-1.2.7-18.el7.x86_64.rpm --force
+			rpm -ivh zlib-devel-1.2.7-18.el7.x86_64.rpm --force
+		④ 安装openssl
+			# rpm -ivh openssl-1.0.2k-19.el7.x86_64.rpm --force
+	4. 安装nginx
+		①下载解压
+			tar -xzvf nginx-1.20.0.tar.gz
+			cd  nginx-1.8.1
+			./configure --prefix=/usr/local/nginx
+		② 编译并安装
+			make && make install
+		③ 运行nginx
+			cd /usr/local/nginx/sbin
+			./nginx
+			
+mkdir a
+mkdir b
+mount /dev/cdrom a
+cp a/* b
+cd b
+tar -xvf vmtools
+cd vmtools
+./install			
+			
+			
 
-
-
+			
