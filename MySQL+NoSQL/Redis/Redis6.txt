@@ -1,0 +1,532 @@
+一、Redis_事务_秒杀案例
+	1. 计数器和人员记录
+		① 产品key："sk:" + prodId + ":num";
+		② 用户key："sk:" + prodId + ":user"
+	2. 秒杀并发模拟--Jmeter
+		① 安装
+			A. 下载官网：https://jmeter.apache.org/
+			B. 安装，直接解压apache-jmeter-5.4.1.zip到指定目录
+			C. 切换语言：Options -> Choose Language -> Chinese(Simplified)
+		① 压测示例
+			A. 添加线程组：新建测试计划，右键测试计划，选择添加 -> 线程（用户） -> 线程组
+			B. 在线程组中，设置线程属性
+				a. 线程数：200（两百个用户同时进行访问）
+				b. Ramp-Up时间（秒）：1（1秒内启动200个线程）
+				c. 循环次数：
+					a. 勾选永远：则会一直循环压测下去，知道点击STOP按钮
+					b. 输入100： 每个线程发送一百次请求
+				d. 至此，一秒内有两万个请求进行测试
+			A. 添加HTTP请求：右键线程组，选择添加 -> 取样器 -> HTTP请求
+			B. 在HTTP请求中，在 基本 -> Web服务器 中设置请求信息
+				a. 协议：http
+				b. 服务器名称或IP：localhost
+				c. 端口：8090
+				d. HTTP请求：GET
+				e. 路径：/secondKill?prodId=1
+			C. 添加查看测试结果：
+				a. 结果树
+					(1) 右键线程组，选择添加 -> 监听器 -> 查看结果树
+					(2) 在查看结果树中，可以查看每个请求是否成功，以及返回的数据
+				b. 汇总报告
+					(1) 右键线程组，选择添加 -> 监听器 -> 汇总报告
+					(2) 在汇总报告中，可以查看各种指标，比如多少个样本，最大和最小响应时间等。
+				c. 聚合报告
+					(1) 右键线程组，选择添加 -> 监听器 -> 聚合报告
+					(2) 聚合报告，可以查看各种指标，比如样本数，平均值，中位数等。
+			D. 点击工具栏的开始图标，开始压力测试
+	3. 在高并发下出现超卖问题，利用乐观锁淘汰用户
+		public String secondKill(String prodId) {
+
+			// 判断是否为空
+			if (prodId == null || prodId.isEmpty()) {
+				System.out.println("请输入产品编号");
+				return "请输入产品编号";
+			}
+
+			// 获取用户ID
+			String userId = new Random().nextInt(100000) + "";
+
+			// 产品key和用户key
+			String prodKey = "sk:" + prodId + ":num";
+			String userKey = "sk:" + prodId + ":user";
+
+			// 连接redis
+			try (Jedis jedis = new Jedis("10.10.0.26", 6379)) {
+
+				// 判断秒杀产品是否存在
+				String prodValue = jedis.get(prodKey);
+				if (prodValue == null) {
+					System.out.println("秒杀未开始");
+					return "秒杀未开始";
+				}
+
+				// 判断秒杀是否结束
+				if (Integer.parseInt(jedis.get(prodKey)) <= 0) {
+					System.out.println("秒杀已结束");
+					return "秒杀已结束";
+				}
+
+				// 判断用户是否重复参与秒杀
+				if (jedis.sismember(userKey, userId)) {
+					System.out.println("不能重复参与秒杀");
+					return "不能重复参与秒杀";
+				}
+
+				// 秒杀过程
+				// 监视库存
+				jedis.watch(prodKey);
+
+				// 开启事务
+				Transaction multi = jedis.multi();
+
+				// 组队操作
+				multi.decr(prodKey);
+				multi.sadd(userKey, userId);
+
+				// 执行
+				List<Object> exec = multi.exec();
+
+				if (exec == null || exec.size() == 0) {
+					System.out.println("秒杀失败");
+					return "秒杀失败";
+				}
+
+				System.out.println("秒杀成功");
+				return "秒杀成功";
+			}
+		}
+		4. 连接超时，通过连接池解决
+			① 节省每次连接redis服务带来的消耗，把连接好的实例反复利用。
+			② 链接池参数
+				A. MaxTotal：控制一个pool可分配多少个jedis实例，通过pool.getResource()来获取；如果赋值为-1，则表示不限制；如果pool已经分配了
+				MaxTotal个jedis实例，则此时pool的状态为exhausted。
+				B. maxIdle：控制一个pool最多有多少个状态为idle(空闲)的jedis实例；
+				C. MaxWaitMillis：表示当borrow一个jedis实例时，最大的等待毫秒数，如果超过等待时间，则直接抛JedisConnectionException；
+				D. testOnBorrow：获得一个jedis实例的时候是否检查连接可用性（ping()）；如果为true，则得到的jedis实例均是可用的；
+			③ 代码
+				import redis.clients.jedis.JedisPool;
+				import redis.clients.jedis.JedisPoolConfig;
+
+				public class JedisPoolUtil {
+
+					private static volatile JedisPool jedisPool = null;
+
+					private static final String HOST = "10.10.0.26";
+
+					private static final Integer PORT = 6379;
+
+					private static final Integer TIMEOUT = 60000;
+
+					private JedisPoolUtil() {}
+
+					public static JedisPool getJedisPool() {
+						if (jedisPool == null) {
+							synchronized (JedisPoolUtil.class) {
+								if (jedisPool == null) {
+									JedisPoolConfig poolConfig = new JedisPoolConfig();
+									poolConfig.setMaxTotal(200);
+									poolConfig.setMaxIdle(32);
+									poolConfig.setMaxWaitMillis(100 * 1000);
+									poolConfig.setBlockWhenExhausted(true);
+									poolConfig.setTestOnBorrow(true);
+									jedisPool = new JedisPool(poolConfig, HOST, PORT, TIMEOUT);
+								}
+							}
+						}
+
+						return jedisPool;
+					}
+				}
+		5. 解决库存遗留问题
+			① 已经秒光，可是还有库存。原因，就是乐观锁导致很多请求都失败。先点的没秒到，后点的可能秒到了。
+			② LUA脚本
+				A. Lua 是一个小巧的脚本语言，Lua脚本可以很容易的被C/C++ 代码调用，也可以反过来调用C/C++的函数，Lua并没有提供强大的库，一个完整的Lua
+				解释器不过200k，所以Lua不适合作为开发独立应用程序的语言，而是作为嵌入式脚本语言。
+				B. 很多应用程序、游戏使用LUA作为自己的嵌入式脚本语言，以此来实现可配置性、可扩展性。
+				C. 这其中包括魔兽争霸地图、魔兽世界、博德之门、愤怒的小鸟等众多游戏插件或外挂。https://www.w3cschool.cn/lua/
+			③ LUA脚本在Redis中的优势
+				A. 将复杂的或者多步的redis操作，写为一个脚本，一次提交给redis执行，减少反复连接redis的次数。提升性能。
+				B. LUA脚本是类似redis事务，有一定的原子性，不会被其他命令插队，可以完成一些redis事务性的操作。
+				C. 但是注意redis的lua脚本功能，只有在Redis 2.6以上的版本才可以使用。
+				D. 利用lua脚本淘汰用户，解决超卖问题。
+				E. redis 2.6版本以后，通过lua脚本解决争抢问题，实际上是redis 利用其单线程的特性，用任务队列的方式解决多任务并发问题。
+			④ 代码
+				public String secondKillByScript(String prodId) {
+					// 判断是否为空
+					if (prodId == null || prodId.isEmpty()) {
+						System.out.println("请输入产品编号");
+						return "请输入产品编号";
+					}
+
+					// 获取用户ID
+					String userId = new Random().nextInt(100000) + "";
+
+					// 连接redis
+					try (Jedis jedis = JedisPoolUtil.getJedisPool().getResource()) {
+
+						// 编写 LUA 脚本
+						String script = "local userId = KEYS[1];\n" +
+								"local prodId = KEYS[2];\n" +
+								"local prodKey = \"sk:\"..prodId..\":num\";\n" +
+								"local userKey = \"sk:\"..prodId..\":user\";\n" +
+								"local prodNum = redis.call(\"get\", prodKey);\n" +
+								"if prodNum == false then\n" +
+								"\treturn 0;\n" +
+								"end\n" +
+								"local userExists = redis.call(\"sismember\", userKey, userId);\n" +
+								"if tonumber(userExists) == 1 then\n" +
+								"\treturn 3;\n" +
+								"end\n" +
+								"if tonumber(prodNum) <= 0 then\n" +
+								"\treturn 2;\n" +
+								"else\n" +
+								"\tredis.call(\"decr\", prodKey);\n" +
+								"\tredis.call(\"sadd\", userKey, userId);\n" +
+								"end\n" +
+								"return 1;";
+
+						// 加载 LUA 脚本
+						String sha1 = jedis.scriptLoad(script);
+
+						// 执行 LUA 脚本
+						Object evalsha = jedis.evalsha(sha1, 2, userId, prodId);
+						int result = Integer.parseInt(evalsha.toString());
+						if (result == 0) {
+							System.out.println("秒杀未开始");
+							return "秒杀未开始";
+						} else if (result == 2) {
+							System.out.println("秒杀已结束");
+							return "秒杀已结束";
+						} else if (result == 3) {
+							System.out.println("不能重复参与秒杀");
+							return "不能重复参与秒杀";
+						} else if (result == 1) {
+							System.out.println("秒杀成功");
+							return "秒杀成功";
+						} else {
+							System.out.println("秒杀失败");
+							return "秒杀失败";
+						}
+					}
+				}
+二、Redis集群
+	1. 问题
+		① 容量不够，redis如何进行扩容？
+		② 并发写操作， redis如何分摊？
+		③ 另外，主从模式，薪火相传模式，主机宕机，导致ip地址发生变化，应用程序中配置需要修改对应的主机地址、端口等信息。
+		④ 之前通过代理主机来解决，但是redis3.0中提供了解决方案。就是无中心化集群配置。
+	2. 什么是集群
+		① Redis 集群实现了对Redis的水平扩容，即启动N个redis节点，将整个数据库分布存储在这N个节点中，每个节点存储总数据的1/N。
+		② Redis 集群通过分区（partition）来提供一定程度的可用性（availability）： 即使集群中有一部分节点失效或者无法进行通讯，
+		集群也可以继续处理命令请求。
+	3. 制作6个实例
+		① 删除持久化数据，将rdb,aof文件都删除掉
+		② 配置基本信息
+			daemonize yes
+			pidfile /var/run/redis_6379.pid
+			port 6379
+			logfile ""
+			dbfilename dump.rdb
+			appendonly no
+		③ redis cluster配置修改		
+			include /usr/local/redis/conf/redis_cluster.conf
+			port 6379
+			pidfile "/var/run/redis_6379.pid"
+			dbfilename "dump6379.rdb"
+			cluster-enabled yes
+			cluster-config-file nodes-6379.conf
+			cluster-node-timeout 15000
+		④ 修改好redis6379.conf文件，拷贝多个redis.conf文件，并且进行修改
+		⑤ 将六个节点合成一个集群
+			A. 确保所有redis实例启动后，nodes-xxxx.conf文件都生成正常
+			B. 命令：
+				redis-cli --cluster create --cluster-replicas 1 192.168.11.101:6379 192.168.11.101:6380 192.168.11.101:6381 
+				192.168.11.101:6389 192.168.11.101:6390 192.168.11.101:6391
+			C. 此处不要用127.0.0.1，用真实IP地址
+			D. replicas 1 采用最简单的方式配置集群，一台主机，一台从机，正好三组。
+	4. 登录：
+		① -c 采用集群策略连接，设置数据会自动切换到相应的写主机
+		② 举例：redis-cli -c -p 6379
+		③ 通过 cluster nodes 命令查看集群信息
+	5. redis cluster 如何分配这六个节点
+		① 一个集群至少要有三个主节点。
+		② 选项 --cluster-replicas 1 表示我们希望为集群中的每个主节点创建一个从节点。
+		③ 分配原则尽量保证每个主数据库运行在不同的IP地址，每个从库和主库不在一个IP地址上。
+	6. 什么是slots
+		① 一个 Redis 集群包含 16384 个插槽（hash slot）， 数据库中的每个键都属于这 16384 个插槽的其中一个
+		② 集群使用公式 CRC16(key) % 16384 来计算键 key 属于哪个槽， 其中 CRC16(key) 语句用于计算键 key 的 CRC16 校验和
+		③ 集群中的每个节点负责处理一部分插槽。 举个例子， 如果一个集群可以有主节点， 其中：
+			A. 节点 A 负责处理 0 号至 5460 号插槽。
+			B. 节点 B 负责处理 5461 号至 10922 号插槽。
+			C. 节点 C 负责处理 10923 号至 16383 号插槽。
+	7. 在集群中录入值
+		① 在redis-cli每次录入、查询键值，redis都会计算出该key应该送往的插槽，如果不是该客户端对应服务器的插槽，redis会报错，并告知应前往的
+		redis实例地址和端口。
+		② redis-cli客户端提供了 –c 参数实现自动重定向。
+		③ 如 redis-cli  -c –p 6379 登入后，再录入、查询键值对可以自动重定向。
+		④ 不在一个slot下的键值，是不能使用mget,mset等多键操作。
+			mset k1 v1 k2 v2 k3 v3
+			(error)CROSSSLOT Keys in request don't hash to the same slot
+		⑤ 可以通过{}来定义组的概念，从而使key中{}内相同内容的键值对放到一个slot中去。
+			mset k1{c} v1 k2{c} v2 k3{c} v3
+	8. 查询集群中的值
+		① CLUSTER GETKEYSINSLOT <slot><count>：返回 count 个 slot 槽中的键。
+		② CLUSTER keyslot cust：返回cust组所在的插槽数
+		③ CLUSTER countkeysinslot 4847：返回所在插槽数 key 的数量
+	9. 故障恢复
+		① 主节点下线，从节点自动升为主节点
+		② 主节点恢复后，主节点回来变成从机
+		③ 所有某一段插槽的主从节点都宕掉，redis服务是否还能继续
+			A. 如果某一段插槽的主从都挂掉，而cluster-require-full-coverage 为yes ，那么 ，整个集群都挂掉
+			B. 如果某一段插槽的主从都挂掉，而cluster-require-full-coverage 为no ，那么，该插槽数据全都不能使用，也无法存储。
+			C. redis.conf中的参数  cluster-require-full-coverage
+	10. 集群的Jedis开发
+		① 即使连接的不是主机，集群会自动切换主机存储。主机写，从机读。
+		② 无中心化主从集群。无论从哪台主机写的数据，其他主机上都能读到数据。
+		③ 代码：
+			public void testJedisCluster() {
+
+				Set<HostAndPort> nodes = new HashSet<>();
+				nodes.add(new HostAndPort("192.168.230.24", 6380));
+				nodes.add(new HostAndPort("192.168.230.24", 6379));
+				nodes.add(new HostAndPort("192.168.230.24", 6381));
+				nodes.add(new HostAndPort("192.168.230.24", 6389));
+				nodes.add(new HostAndPort("192.168.230.24", 6390));
+				nodes.add(new HostAndPort("192.168.230.24", 6391));
+				JedisCluster jedisCluster = new JedisCluster(nodes);
+
+				String name1 = jedisCluster.get("name1");
+				System.out.println(name1);
+			}
+	11. SpringBoot 整合 Redis 集群
+		① 引入依赖
+			<dependency>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-starter-data-redis</artifactId>
+			</dependency>
+		② 配置yml
+			spring:
+			  redis:
+				timeout: 60000 #连接超时时间（毫秒）
+				database: 0 #Redis数据库索引（默认为0）
+				cluster: # 集群节点
+				  nodes:
+					- 192.168.230.24:6379
+					- 192.168.230.24:6380
+					- 192.168.230.24:6381
+					- 192.168.230.24:6389
+					- 192.168.230.24:6390
+					- 192.168.230.24:6391
+				lettuce:
+				  pool:
+					max-active: 1000  #连接池最大连接数（使用负值表示没有限制）
+					max-idle: 10 # 连接池中的最大空闲连接
+					min-idle: 5 # 连接池中的最小空闲连接
+					max-wait: -1 # 连接池最大阻塞等待时间（使用负值表示没有限制）
+		③ 编写配置类
+			import com.fasterxml.jackson.annotation.JsonAutoDetect;
+			import com.fasterxml.jackson.annotation.PropertyAccessor;
+			import com.fasterxml.jackson.databind.ObjectMapper;
+			import org.springframework.cache.CacheManager;
+			import org.springframework.cache.annotation.CachingConfigurerSupport;
+			import org.springframework.cache.annotation.EnableCaching;
+			import org.springframework.context.annotation.Bean;
+			import org.springframework.context.annotation.Configuration;
+			import org.springframework.context.annotation.Primary;
+			import org.springframework.data.redis.cache.RedisCacheConfiguration;
+			import org.springframework.data.redis.cache.RedisCacheManager;
+			import org.springframework.data.redis.connection.RedisConnectionFactory;
+			import org.springframework.data.redis.core.RedisTemplate;
+			import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
+			import org.springframework.data.redis.serializer.RedisSerializationContext;
+			import org.springframework.data.redis.serializer.RedisSerializer;
+			import org.springframework.data.redis.serializer.StringRedisSerializer;
+
+			@EnableCaching
+			@Configuration
+			public class MyRedisConfig extends CachingConfigurerSupport {
+
+				@Bean
+				@Primary
+				public RedisTemplate<Object, Object> redisTemplate(RedisConnectionFactory redisConnectionFactory) {
+					RedisTemplate<Object, Object> redisTemplate = new RedisTemplate<>();
+					redisTemplate.setConnectionFactory(redisConnectionFactory);
+
+					ObjectMapper objectMapper = new ObjectMapper();
+					objectMapper.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
+
+					Jackson2JsonRedisSerializer<Object> jackson2JsonRedisSerializer = new Jackson2JsonRedisSerializer<>(Object.class);
+					jackson2JsonRedisSerializer.setObjectMapper(objectMapper);
+
+					StringRedisSerializer stringRedisSerializer = new StringRedisSerializer();
+					redisTemplate.setKeySerializer(stringRedisSerializer);
+					redisTemplate.setValueSerializer(jackson2JsonRedisSerializer);
+					redisTemplate.setHashValueSerializer(stringRedisSerializer);
+					redisTemplate.setHashValueSerializer(jackson2JsonRedisSerializer);
+
+					return redisTemplate;
+				}
+
+				@Bean
+				@Primary
+				public CacheManager cacheManager(RedisConnectionFactory factory) {
+					RedisSerializer<String> redisSerializer = new StringRedisSerializer();
+					Jackson2JsonRedisSerializer<Object> jackson2JsonRedisSerializer = new Jackson2JsonRedisSerializer<>(Object.class);
+					ObjectMapper objectMapper = new ObjectMapper();
+					objectMapper.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
+					jackson2JsonRedisSerializer.setObjectMapper(objectMapper);
+
+					RedisCacheConfiguration redisCacheConfiguration = RedisCacheConfiguration.defaultCacheConfig()
+							.serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(redisSerializer))
+							.serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(jackson2JsonRedisSerializer))
+							.disableCachingNullValues();
+
+					return RedisCacheManager.builder(factory)
+							.cacheDefaults(redisCacheConfiguration)
+							.build();
+				}
+			}
+		④ 测试类
+			@Test
+			public void testRedisTemplate() {
+				redisTemplate.opsForValue().set("name5", "WangHP");
+
+				System.out.println(redisTemplate.opsForValue().get("name5"));
+			}
+	12. Redis 集群提供了以下好处
+		① 实现扩容
+		② 分摊压力
+		③ 无中心配置相对简单
+	13. Redis 集群的不足
+		① 多键操作是不被支持的 
+		② 多键的Redis事务是不被支持的。lua脚本不被支持
+		③ 由于集群方案出现较晚，很多公司已经采用了其他的集群方案，而代理或者客户端分片的方案想要迁移至redis cluster，
+		需要整体迁移而不是逐步过渡，复杂度较大。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
