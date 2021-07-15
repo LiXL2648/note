@@ -402,74 +402,561 @@
 		② 多键的Redis事务是不被支持的。lua脚本不被支持
 		③ 由于集群方案出现较晚，很多公司已经采用了其他的集群方案，而代理或者客户端分片的方案想要迁移至redis cluster，
 		需要整体迁移而不是逐步过渡，复杂度较大。
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+三、Redisson
+	1. 本地锁在分布式下的问题
+		如果是单机情况下，线程之间共享内存，只要使用线程锁就可以解决并发问题。但如果是分布式情况下，线程锁就无法起到作用了，这时候就要用到分布式锁来解决
+	2. 分布式锁原理与使用
+		① 原理：多个进程在一个公共区域获取锁，如果先获取锁，就先执行逻辑，否则就等待，直到其他进程释放锁。
+		② redis客户端使用：
+			A. 命令：SET key value [EX seconds] [PX milliseconds] [NX|XX]
+			B. 选项说明
+				a. EX seconds：设置键key的过期时间，单位时秒
+				b. PX milliseconds：设置键key的过期时间，单位时毫秒
+				c. NX：只有键key不存在的时候才会设置key的值
+				d. XX：只有键key存在的时候才会设置key的值
+			C. 举例：set lock 1 NX
+		③ Java 使用：
+			A. 方法：boolean redisTemplate.opsForValue.setIfAbsent(String key, String value)
+			B. 举例：
+				public String testSetNx() {
+					boolean lock = redisTemplate.opsForValue.setIfAbsent("lock", "1");
+					if(lock) {
+						// 加锁成功，执行业务代码，查询数据库，并将业务代码执行的结果保存到缓存
+						执行业务代码……
+						// 释放锁
+						redisTemplate.delete("lock");
+					} else {
+						// 加锁失败，休眠100ms，重试
+						return testSetNx(); // 自旋
+					}
+				}
+		
+	3. 分布式锁演进
+		① 阶段一：
+										+-------+
+										| redis |
+										+-------+
+											↓
+							  +----------------------------+				
+							  | 获取锁，setnx("lock", "1") | <----------+
+							  +----------------------------+			|
+									返回OK	|	返回null				| 等待100ms，自旋重试
+							+--------------------------------+			|
+							↓								 ↓			|
+					   +----------+					   +------------+	|
+					   | 获取到锁 |					   | 没获取到锁 | --+
+					   +----------+					   +------------+
+							↓
+					   +----------+			
+					   | 执行业务 |
+					   +----------+	
+							↓
+					   +----------+			
+					   |  删除锁  |
+					   +----------+
+							↓
+					   +----------+			
+					   |   结束   |
+					   +----------+
+			A. 问题：setnx 获取了锁，业务代码异常或者程序在执行过程中宕机。没有执行删除锁逻辑，这就造成了死锁。
+			B. 解决：设置锁的自动过期，即使没有删除，会自动删除
+			C. 举例：
+				public String testSetNx() {
+					boolean lock = redisTemplate.opsForValue.setIfAbsent("lock", "1");
+					if(lock) {
+						// 设置过期时间
+						redisTemplate.expire("lock", 30, TimeUnit.SECEND);
+						// 加锁成功，执行业务代码，查询数据库，并将业务代码执行的结果保存到缓存
+						执行业务代码……
+						// 释放锁
+						redisTemplate.delete("lock");
+					} else {
+						// 加锁失败，休眠100ms，重试
+						return testSetNx(); // 自旋
+					}
+				}
+		② 阶段二：
+										+-------+
+										| redis |
+										+-------+
+											↓
+							  +----------------------------+				
+							  | 获取锁，setnx("lock", "1") | <----------+
+							  +----------------------------+			|
+									返回OK	|	返回null				| 等待100ms，自旋重试
+							+--------------------------------+			|
+							↓								 ↓			|
+					   +----------+					   +------------+	|
+					   | 获取到锁 |					   | 没获取到锁 | --+
+					   +----------+					   +------------+
+							↓
+					 +--------------+
+					 | 设置过期时间 |
+					 +--------------+
+							↓
+					   +----------+			
+					   | 执行业务 |
+					   +----------+	
+							↓
+					   +----------+			
+					   |  删除锁  |
+					   +----------+
+							↓
+					   +----------+			
+					   |   结束   |
+					   +----------+
+			A. 问题：setnx 获取了锁，正要去设置过期时间，宕机，又出现死锁
+			B. 解决：设置过期时间和占位必须是原子的，redis支持使用 setnx ex 命令
+			C. 命令：set lock 1 EX 30 NX
+			D. 举例：
+				public String testSetNx() {
+					boolean lock = redisTemplate.opsForValue.setIfAbsent("lock", "1", 30, TimeUnit.SECEND);
+					if(lock) {
+						// 设置过期时间，必须是原子操作
+						// redisTemplate.expire("lock", 30, TimeUnit.SECEND);
+						// 加锁成功，执行业务代码，查询数据库，并将业务代码执行的结果保存到缓存
+						执行业务代码……
+						// 释放锁
+						redisTemplate.delete("lock");
+					} else {
+						// 加锁失败，休眠100ms，重试
+						return testSetNx(); // 自旋
+					}
+				}
+		③ 阶段三：
+											+-------+
+											| redis |
+											+-------+
+												↓
+							  +----------------------------------+				
+							  | 获取锁，setnxex("lock", "1", 30) | <------------+
+							  +----------------------------------+				|
+										返回OK	|	返回null					| 等待100ms，自旋重试
+							+--------------------------------------+			|
+							↓									   ↓			|
+					   +----------+					   		+------------+		|
+					   | 获取到锁 |					   		| 没获取到锁 | -----+
+					   +----------+					   		+------------+
+							↓
+					   +----------+			
+					   | 执行业务 |
+					   +----------+	
+							↓
+					   +----------+			
+					   |  删除锁  |
+					   +----------+
+							↓
+					   +----------+			
+					   |   结束   |
+					   +----------+
+			A. 问题：如果由于业务时间超长，锁自己过期了，直接删除锁，有可能把别人正在持有的锁删除了
+			B. 解决：占锁的时候，值指定为uuid，每个人匹配是自己的锁才删除
+			C. 举例：
+				public String testSetNx() {
+					String uuid = UUID.randomUUID().toString();
+					boolean lock = redisTemplate.opsForValue.setIfAbsent("lock", uuid, 30, TimeUnit.SECEND);
+					if(lock) {
+						// 设置过期时间，必须是原子操作
+						// redisTemplate.expire("lock", 30, TimeUnit.SECEND);
+						// 加锁成功，执行业务代码，查询数据库，并将业务代码执行的结果保存到缓存
+						执行业务代码……
+						// 释放锁，匹配是自己的锁才删除
+						// redisTemplate.delete(""lock);
+						String lockValue = redisTemplate.opsForValue.get("lock");
+						if(uuid.equals(lockValue)) {
+							redisTemplate.delete("lock");
+						}
+					} else {
+						// 加锁失败，休眠100ms，重试
+						return testSetNx(); // 自旋
+					}
+				}
+		④ 阶段四：
+											+-------+
+											| redis |
+											+-------+
+												↓
+							  +-----------------------------------+				
+							  | 获取锁，setnxex("lock", UUID, 30) | <------------+
+							  +-----------------------------------+				 |
+										返回OK	|	返回null					 | 等待100ms，自旋重试
+							+---------------------------------------+			 |
+							↓									    ↓			 |
+					   +----------+					   		 +------------+		 |
+					   | 获取到锁 |					   		 | 没获取到锁 | -----+
+					   +----------+					   		 +------------+
+							↓
+					   +----------+			
+					   | 执行业务 |
+					   +----------+	
+							↓
+				   +------------------+		  +--------+	
+				   | 获取当前锁的值， | ----> | 删除锁 |
+				   | 如果是之前的UUID |		  +--------+
+			       +------------------+
+							↓
+					   +----------+			
+					   |   结束   |
+					   +----------+
+			A. 问题：如果正好判断是当前值，正要删除的时候，锁已经过期，别人已经设置到了新的值。那我们删除的是别人的锁
+			B. 删除锁必须保证原子性，使用redis + Lua 脚本完成
+			C. 举例：
+				public String testSetNx() {
+					String uuid = UUID.randomUUID().toString();
+					boolean lock = redisTemplate.opsForValue.setIfAbsent("lock", uuid, 30, TimeUnit.SECEND);
+					if(lock) {
+						// 设置过期时间，必须是原子操作
+						// redisTemplate.expire("lock", 30, TimeUnit.SECEND);
+						// 加锁成功，执行业务代码，查询数据库，并将业务代码执行的结果保存到缓存
+						执行业务代码……
+						// 释放锁，匹配是自己的锁才删除
+						// redisTemplate.delete(""lock);
+						// 获取值对比，对比成功再删除，必须是原子操作，使用redis + Lua脚本
+						// String lockValue = redisTemplate.opsForValue.get("lock");
+						// if(uuid.equals(lockValue)) {
+						//	redisTemplate.delete("lock");
+						// }
+						String script = "if redis call('get', KEYS[1] == ARGV[1]) then return redis.call('del', KEYS[1])" + 
+							"else return 0 end";
+						redisTemplate.execute(new DefaultRedisScript<Long>(script, Long.class), Arrays.asList("lock"), uuid);
+					} else {
+						// 加锁失败，休眠100ms，重试
+						return testSetNx(); // 自旋
+					}
+				}
+		⑤ 分布式演进，阶段五，最终形态
+											+-------+
+											| redis |
+											+-------+
+												↓
+							  +-----------------------------------+				
+							  | 获取锁，setnxex("lock", UUID, 30) | <------------+
+							  +-----------------------------------+				 |
+										返回OK	|	返回null					 | 等待100ms，自旋重试
+							+---------------------------------------+			 |
+							↓									    ↓			 |
+					   +----------+					   		 +------------+		 |
+					   | 获取到锁 |					   		 | 没获取到锁 | -----+
+					   +----------+					   		 +------------+
+							↓
+					   +----------+			
+					   | 执行业务 |
+					   +----------+	
+							↓
+				+----------------------+
+				| 脚本解锁，保证原子行 |
+			    +----------------------+
+							↓
+					   +----------+			
+					   |   结束   |
+					   +----------+
+			A. LUA脚本: String script = "if redis call('get', KEYS[1] == ARGV[1]) then return redis.call('del', KEYS[1])" + 
+							"else return 0 end";
+			B. 保证加锁（占位+过期时间）和释放锁（判断+删除）的原子性。
+			C. 问题：锁的自动续期
+			D. 解决方法一：设置过期时间超长，执行完业务代码后，释放锁
+			E. 举例：
+				public String testSetNx() {
+					String uuid = UUID.randomUUID().toString();
+					boolean lock = redisTemplate.opsForValue.setIfAbsent("lock", uuid, 30, TimeUnit.SECEND);
+					if(lock) {
+						try {
+							// 设置过期时间，必须是原子操作
+							// redisTemplate.expire("lock", 30, TimeUnit.SECEND);
+							// 加锁成功，执行业务代码，查询数据库，并将业务代码执行的结果保存到缓存
+							执行业务代码……
+							// 释放锁，匹配是自己的锁才删除
+							// redisTemplate.delete(""lock);
+							// 获取值对比，对比成功再删除，必须是原子操作，使用redis + Lua脚本
+							// String lockValue = redisTemplate.opsForValue.get("lock");
+							// if(uuid.equals(lockValue)) {
+							//	redisTemplate.delete("lock");
+							// }
+							
+						} finally {
+							String script = "if redis call('get', KEYS[1] == ARGV[1]) then return redis.call('del', KEYS[1])" + 
+								"else return 0 end";
+							redisTemplate.execute(new DefaultRedisScript<Long>(script, Long.class), Arrays.asList("lock"), uuid);
+						}
+						
+					} else {
+						// 加锁失败，休眠100ms，重试
+						return testSetNx(); // 自旋
+					}
+				}
+	4. Redisson 简介、整合
+		① 概述：Redisson是一个在 Redis 的基础上实现的 Java 驻内存数据网格（In-Memory Data Grid），它不仅提供了一系列的分布式的 Java 常用对象，
+		还提供了许多分布式服务（BitSet、Set、Multimap、SortedSet、Map、List、Queue、BlockingQueue、Deque、BlockingDeque、Semaphore、Lock、
+		AtomicLong、CountDowmLatch、Publish / Subscribe、Bloom filter、Remote service、Springcache、Executor service、Live Object service、
+		Scheduler service），Redisson 提供了最简单和最便捷的方法，Redisson的宗旨是促进使用者对 Redis 的关注分离（Separation of Concern），
+		从而让使用者能够将精力更集中地放在处理业务逻辑上。
+		② Spring Boot 整合 Redisson
+			A. pom.xml 引入 Redisson 依赖
+				<dependency>
+					<groupId>org.redisson</groupId>
+					<artifactId>redisson</artifactId>
+					<version>3.16.0</version>
+				</dependency>
+			B. YML 写配置
+				spring:
+				  redis:
+					host: 10.10.0.26
+					port: 6379
+			C. 配置 Redisson
+				a. 程序化配置方法，通过构建 Config 对象实例来实现
+				b. 代码：
+					@Configuration
+					public class MyRedissonConfig {
+
+						@Value("${spring.redis.host}")
+						private String host;
+
+						@Value("${spring.redis.port}")
+						private int port;
+
+						@Bean(destroyMethod = "shutdown")
+						public RedissonClient redisson() {
+
+							// 创建配置
+							Config config = new Config();
+							config.useSingleServer().setAddress("redis://" + host + ":" + port);
+
+							// 根据Config 创建出 RedissonClient对象
+							return Redisson.create(config);
+						}
+					}
+		③ 可重入锁（Reentrant Lock）
+			A. 基于Redisson 分布式可重入锁 RLock Java 对象实现了 java.concurrent.locks.Lock 接口。同时还提供了同步（Async）、反射式（Reative）
+			和 RxJava2 标准的接口
+			B. 负责存储这个分布式锁的 Redisson 节点宕机以后，如果这个锁正好处于锁住的状态时，这个锁会出现锁死的状元。为了避免这种情况的发生，
+			Redisson内部提供了一个监控的看门狗，它的作用是在 Redisson 实例关闭前，不断地延长锁的有效期。默认情况下，看门狗检查锁的超时时间是
+			30秒，也可以通过修改Config.lockWatchdogTimeout来另行指定。解决的问题：
+				a. 锁的自动续期，如果业务超长，运行期间可自动给锁续上新的30s，不用担心业务长，锁自动过期被删除
+				b. 加锁的业务只要运行完成，就不会给当前锁续期，即使不手动释放锁，锁也会默认在30s以后自动删除
+			C. 另外Redisson还通过加锁的方法提供了leaseTime的参数来指定加锁的时间，超过这个时间后锁便自动解开了，一旦有处理业务的时间超过锁的
+			自动过期时间，在业务还没执行完成时，锁被释放，等业务执行完成后尝试删除锁，会报错，即删除不是当前线程的锁，因此自动解锁时间一定要
+			大于业务执行时间，但是此时的锁不会自动续期。
+				a. 如果设置了锁的超时时间，就会给redis 发生Lua脚本，进行占锁，默认超时就是我们指定的时间，并且不会进行锁的自动续期。
+				b. 如果未指定锁的超时时间，就会使用lockWatchdogTimeout看门狗的默认时间，只要占锁成功，就会启动一个定时任务，重新给锁设置过期时
+				间，即看门狗时间，时间间隔为 LockWatchdogTimeout/3 s
+			D. 最佳实战：使用超时自动解锁的方式加锁，lock.lock(30, TimeUnit.SECEND)，省掉自动续期的操作，并进行手动解锁
+			E. 举例：
+				public String hello() {
+
+					// 获取一把锁，只要锁的名字一样，就是同一把锁
+					RLock lock = redisson.getLock("hello-lock");
+
+					// 加锁，阻塞式等待
+					lock.lock();
+					// lock.lock(10, TimeUnit.SECONDS);
+					try {
+						System.out.println("加锁成功，执行业务逻辑中……" + Thread.currentThread().getId());
+						Thread.sleep(30000);
+					} catch (Exception e) {
+						e.printStackTrace();
+					} finally {
+						System.out.println("释放锁……" + Thread.currentThread().getId());
+						lock.unlock();
+					}
+					return "Hello World";
+				}
+		④ 读写锁
+			A. 保证一定能读到最新数据，修改期间，写锁是一个排他锁（互斥锁 / 独享锁），读锁是一个共享锁。
+			B. 写锁没释放，就必须等待。
+				a. 读 + 读：相当于无锁，只会在redis中记录好，所有当前读锁，都会同时加锁成功
+				b. 写 + 读：等待写锁释放
+				c. 写 + 写：阻塞等待
+				d. 读 + 写：等待读锁的释放
+			C. 举例：
+				@RequestMapping("/write")
+				public String write() {
+					String uuid = UUID.randomUUID().toString();
+					RReadWriteLock readWriteLock = redisson.getReadWriteLock("rw-lock");
+					// 改数据加写锁
+					RLock rLock = readWriteLock.writeLock();
+					rLock.lock();
+					try {
+						Thread.sleep(30000);
+						stringRedisTemplate.opsForValue().set("uuid", uuid);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					} finally {
+						// 释放写锁
+						rLock.unlock();
+					}
+
+					return uuid;
+				}
+
+				@RequestMapping("/read")
+				public String read() {
+					RReadWriteLock readWriteLock = redisson.getReadWriteLock("rw-lock");
+					// 读数据加读锁
+					RLock rLock = readWriteLock.readLock();
+					rLock.lock();
+					try {
+						return stringRedisTemplate.opsForValue().get("uuid");
+					} finally {
+						// 释放读锁
+						rLock.unlock();
+					}
+				}
+		⑤ 闭锁：
+			A. 应用场景：放假锁门，只有等所有班级都走完了，才能锁门
+			B. 举例：
+				@RequestMapping("/lockDoor")
+				public String lockDoor() throws Exception {
+					// 声明闭锁
+					RCountDownLatch countDownLatch = redisson.getCountDownLatch("door-lock");
+					// 等待几个锁的释放
+					countDownLatch.trySetCount(5);
+					// 等待闭锁都完成
+					countDownLatch.await();
+
+					return "放假了……";
+				}
+
+				@RequestMapping("/go/{id}")
+				public String go(@PathVariable("id") Long id) {
+					// 声明闭锁
+					RCountDownLatch countDownLatch = redisson.getCountDownLatch("door-lock");
+					// 技术减1
+					countDownLatch.countDown();
+					return id + "走了";
+				}
+		⑥ 信号量
+			A. 信号量可用于访问限流，即先设置好信号量，每访问服务一次则减少一个信号，如果信号量为0，则其他访问需要等待信号量的释放。RSemaphore.acquire()
+			是阻塞式等待，即信号量为0时，需要等待其他线程的释放，而使用RSemaphore.tryAcquire()，是非阻塞式等待，即信号量为0时，直接返回。
+			B. 应用场景：车库停车，假如车库有三个车位，停一辆车减少一个车位，开走一辆车增加一个车位
+				@RequestMapping("/park")
+				public String park() throws Exception {
+					RSemaphore semaphore = redisson.getSemaphore("park");
+					// 获取一个信号，阻塞式等待
+					// semaphore.acquire();
+					// 非阻塞式等待
+					boolean b = semaphore.tryAcquire();
+					if (b) {
+						// 执行业务
+						return "park成功";
+					}
+					return "park失败";
+				}
+
+				@RequestMapping("/leave")
+				public String leave() {
+					RSemaphore semaphore = redisson.getSemaphore("park");
+					// 释放一个信号
+					semaphore.release();
+					return "leave";
+				}
+四、缓存的常见问题
+	1. 缓存一致性解决
+		① 问题：缓存里面的数据如何和数据库保持一致性
+		② 缓存一致性
+			A. 双写模式			
+									 +----------------------------------+
+				+----------+		 |	+----------+		+--------+	|
+				| 数据更新 | ------> | 	| 写数据库 | ----->	| 写缓存 |	|
+				+----------+		 |	+----------+		+--------+	|
+									 +----------------------------------+
+							 读到的最新数据有延迟：最终一致性
+							
+							 关键点								   关键点
+								|									 |
+				+-------------+	|									 | +-----------+
+				| 写数据库 -1 |	| ---------------------------------- | | 写缓存 -2 |
+				+-------------+	|									 | +-----------+
+								|									 |
+								|									 |
+								| +-------------+	   +-----------+ |
+								| | 写数据库 -2 | ---- | 写缓存 -2 | | ------------>
+								| +-------------+	   +-----------+ |
+								|									 |
+				a. 场景：由于卡顿等原因，导致写缓存2在最前面，写缓存1在后面就出现了不一致
+				b. 脏数据问题：这是暂时性的脏数据问题，但是在数据稳定，缓存过期以后，又能得到最新的正确数据
+				c. 解决方法，给每个并发操作加锁，等整个写的过程执行完成后，再释放锁。如果系统允许不一致性，那么也可以忽略这种情况，前提是
+				需要给缓存加上过期时间，因此再解决方案产生的脏数据只是暂时性的。
+			B. 失效模式	
+									 +----------------------------------+
+				+----------+		 |	+----------+		+--------+	|
+				| 数据更新 | ------> | 	| 写数据库 | ----->	| 写缓存 |	|
+				+----------+		 |	+----------+		+--------+	|
+									 +----------------------------------+
+									 
+									  关键点								   关键点
+										 |										 |
+				+-------------+--------+ |										 |
+				| 写数据库 -1 | 删缓存 | |										 |
+				+-------------+--------+ |										 |
+							+------------|---------------------------+---------+ |
+							| 写数据库-2   			  	 			 |	删缓存 | |			 
+							+------------|---------------------------+---------+ |
+										 | +--------+------------+				 | +----------+
+										 | | 读缓存 | 读数据库-1 |				 | | 更新缓存 |
+										 | +--------+------------+				 | +----------+
+										 |										 |
+				a. 场景：当线程A写完数据库，并删除缓存后，线程B想写数据库，但是由于改操作持续的时间太长，还每写完数据库，线程C读了缓存，没有
+				获取到数据，进而读数据库，但是由于卡顿，没有及时更新缓存，线程B写完数据，而线程C
+				此时更新缓存的是线程A更新完的而线程B还没更新的数据。
+				b. 解决方法，会写和读数据加上读写锁
+		③ 缓存一致性方案
+			A. 无论是双写模式，还是失效模式，都会导致缓存的不一致性问题，即多个实例同时更新会出现问题。
+				a. 如果是用户维度数据（订单数据、用户数据），这种并发几率非常小，不用考虑这个问题，缓存数据加上过期时间，每隔一段时间触发读的
+				主动更新即可。
+				b. 如果是菜单、商品介绍等基础数据，也可以去使用canal订阅binlog的方式
+				c. 缓存数据+过期时间也足够解决大部分业务对于缓存的要求
+				d. 通过加锁保证并发读写，写写的时候按照顺序排好队，读读无所谓，所有适合使用读写锁（业务不关心脏数据，允许临时数据可忽略）
+			B. 总结：
+				a. 我们能放入缓存的数据本就不应该是实时性、一致性要求超高的。所以缓存数据的时候加上过期时间，保证每天拿到当前最新数据即可
+				b. 我们不应该过度设计、增加系统的复杂性
+				c. 遇到实时性、一致性要求高的数据，就应该查询数据库，即使速度慢点。
+		④  canal
+			A. 使用 Canal 更新缓存
+				+---------------+						   +-------+
+				|    业务代码   |						   | Redis |
+				+---------------+						   +-------+
+						↓									   ↑
+				+---------------+						   +-------+
+				| 更新 Database | 					 	   | canal |
+				+---------------+						   +-------+
+						|									   |
+						|			  +--------+	订阅       |
+						+------------ | Binlog | --------------+
+									  +--------+
+			B. 使用 Canal 进行数据异构
+				+--------------+					+--------------+
+				| 192.168.1.26 |					| 192.168.1.26 |
+				| 访问记录表   |					|  商品信息表  |
+				+--------------+					+--------------+
+					   |									|
+					   |	Binlog	  +-------+		Binlog	|
+					   +------------- | Canal | ------------+
+							订阅	  +-------+		订阅
+										  |
+										  ↓ 分析计算
+									+------------+
+									|  异构系统  |
+									| 用户推荐表 |
+									+-------------
+										  ↑
+										  |
+									+------------+
+									| 	  Web	 |
+									+------------+
+	2. 高并发下缓存失效问题
+		① 缓存穿透
+			A. 缓存穿透指查询一个一定不存在的数据，由于缓存是不命中，将去查询数据库，但是数据库也无此记录，我们没有将这次查询的 null 写入缓存，
+			这将导致不存在的数据每次请求都要到数据库去查询，失去了缓存的意义。
+			B. 风险：利用不存在的数据进行攻击，数据库瞬间压力增大，最终导致崩溃
+			C. 解决；null 结果缓存，并加入短暂的过期时间。
+		② 缓存雪崩
+			A. 缓存雪崩指的是在我们设置缓存时 key 采用了相同的过期时间，导致缓存在某一时刻同时失效，请求全部转发到数据库查询，数据库瞬间压力过重
+			雪崩
+			B. 解决：原有的失效时间基础上增加一个随机值，比如 1-5 分钟随机，这样每个缓存的过期时间重复率就会降低，就很难引发集体失效的事件。
+		③ 缓存击穿
+			A. 对于一些设置了过期时间的 key，如果这些 key 可能会在某些时间点被超高并发地访问，是一种非常“热点”的数据。
+			B. 如果这个 key 在大量请求同时进来前正好失效，那么所有对这个key的数据查询都会落到数据库，称之为缓存击穿。
+			C. 解决：加锁。大量并发只让一个人去查，其他人等待，查到以后释放锁，其他人获取到锁，先先查缓存，	就会有数据，不用查询数据库
 
 
 
