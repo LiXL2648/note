@@ -1068,10 +1068,16 @@ stderr_logfile=/var/log/supervisor/%(program_name)s.log
 		② 原因：org.apache.catalina.util.SessionIdGeneratorBase.createSecureRandom Creation of SecureRandom instance for session ID 
 		generation using [SHA1PRNG] took [528,295] milliseconds.
 		③ 解决：
-			A. 打开$JAVA_PATH/jre/lib/security/java.security这个文件，找到下面的内容：
-				vi /usr/local/java/jdk1.8.0_261/jre/lib/security/java.security
-			B. 找到内容securerandom.source=file:/dev/random
-			C. 将其替换为：ecurerandom.source=file:/dev/./urandom
+			A. 在JVM中解决
+				a. 打开$JAVA_PATH/jre/lib/security/java.security这个文件，找到下面的内容：
+					vi /usr/local/java/jdk1.8.0_261/jre/lib/security/java.security
+				b. 找到内容securerandom.source=file:/dev/random
+				c. 将其替换为：securerandom.source=file:/dev/./urandom
+			B. 在 Tomcat 环境中解决
+				a. 打开catalina.sh文件
+					vi /usr/local/tomcat/apache-tomcat-8.5.65/bin/catalina.sh
+				b. 添加以下内容
+					JAVA_OPTS="$JAVA_OPTS -Djava.security.egd=file:/dev/urandom"
 		④ reboot重启
 十四、制作ISO镜像
 	1、yum下载mondorescue库：
@@ -1129,16 +1135,145 @@ stderr_logfile=/var/log/supervisor/%(program_name)s.log
 		③ 运行nginx
 			cd /usr/local/nginx/sbin
 			./nginx
-			
-mkdir a
-mkdir b
-mount /dev/cdrom a
-cp a/* b
-cd b
-tar -xvf vmtools
-cd vmtools
-./install			
-			
-			
+十六、安装虚拟机，挂在vtool步骤			
+	mkdir a
+	mkdir b
+	mount /dev/cdrom a
+	cp a/* b
+	cd b
+	tar -xvf vmtools
+	cd vmtools
+	./install			
+十七、离线安装Mongodb
+	1. 下载安装包
+		① 在mongodb官网下载所需安装包：https://www.mongodb.com/try/download/community
+		② 在可用下载分别选择5.0.3, RetHat / CentOS 7.0, tgz
+	2. 安装
+		① 将上传后的MongoDB包进行解压，将其解压至/usr/local目录下
+			tar -xvf mongodb-linux-x86_64-rhel70-5.0.3.tgz -C /usr/local
+		② 将MongoDB解压后的文件名重命名为mongodb
+			mv mongodb-linux-x86_64-rhel70-5.0.3 mongodb
+		③ 在mongodb目录下建立所需文件
+			A. 建立data文件夹，用于存放数据文件
+				mkdir data
+			B. 建立log文件夹，用于存放日志文件
+				mkdir log
+			C. 建立conf文件夹，用于存放配置文件。此目录的建立是便于存放配置类的文件，也可不进行建立，将配置类的文件放置于/usr/local/mongodb/bin目录下
+				mkdir conf
+		④ 配置mongodb.conf文件
+			A. 进入conf目录，执行如下命令建立配置文件
+				vi mongodb.conf
+			B. 按照如下的内容进行配置
+				# 数据存放目录
+				dbpath=/usr/local/mongodb/data
 
-			
+				# 存放日志路径, 要先把目录新建好
+				logpath=/usr/local/mongodb/log/mongodb.log
+
+				# 布尔值， 是否追加方式记录日志
+				logappend=true
+
+				# mongodb绑定的ip地址，127.0.0.1只允许本机访问，如果想让其他主机能访问请修改为0.0.0.0
+				bind_ip=0.0.0.0
+
+				# 端口号，默认为27017
+				port=27017
+
+				# 设置oplog的大小(MB)
+				oplogSize=10000
+
+				# 以后台方式运行进程
+				# 以守护程序的方式启用，即在后台运行
+				fork=true
+
+				# 启用日志文件，默认启用，生产环境强烈推荐打开
+				# 每次写入会记录一条操作日志（通过journal可以重新构造出写入的数据）。
+				journal=true
+
+				# 使用此选项，可以配置的MongoDB将数据存储在不同的磁盘设备上，以提高写入吞吐量或磁盘容量。默认为false。
+				# 建议一开始就配置此选项
+				directoryperdb=true
+
+				# 最大同时连接数  
+				maxConns=100
+
+				# 不启用验证  
+				noauth=true
+
+				# 存储引擎有mmapv1、wiretiger、mongorocks
+				storageEngine=wiredTiger
+		⑤ 启动/关闭MongoDB服务
+			A. 在mongodb目录执行如下命令启动
+				bin/mongod -f conf/mongodb.conf（bin/mongod --config conf/mongodb.conf）
+			B. 在mongodb目录执行如下命令关闭
+				bin/mongod -f conf/mongodb.conf --shutdown（bin/mongod --config conf/mongodb.conf --shutdown）
+	3. 设置 mongodb 开机自启
+		① 在/lib/systemd/system/下新建mongodb.service
+			vi /lib/systemd/system/mongodb.service
+		② 按照如下配置编写mongodb.service文件
+			[Unit]
+
+			Description=mongodb
+			After=network.target remote-fs.target nss-lookup.target
+
+			[Service]
+			ExecStart=/usr/local/mongodb/bin/mongod -f /usr/local/mongodb/conf/mongodb.conf
+			ExecReload=/bin/kill -s HUP $MAINPID
+			ExecStop=/usr/local/mongodb/bin/mongod -f /usr/local/mongodb/conf/mongodb.conf --shutdown
+			PrivateTmp=true
+
+			[Install]
+			WantedBy=multi-user.target
+		③ 修改文件权限
+			chmod 775 /lib/systemd/system/mongodb.service
+		④ 进行服务的重新加载、启动、停止、重启、自启和查看是否自启
+			systemctl daemon-reload
+			systemctl start mongodb
+			systemctl stop mongodb
+			systemctl restart mongodb
+			systemctl enable mongodb
+			systemctl is-enabled mongodb
+	4. 解决 mongodb 启动报错的问题
+		① 在安装完MongoDB之后项目启动异常报错报错
+			A. 的大概内容是：
+				about to fork child process, waiting until server is ready for connections.
+				forked process: 25486
+				ERROR: child process failed, exited with error number 1
+				To see additional information in this output, start without the "--fork" option.
+			B. 解决方法
+				mongodb非正常关闭后，再次启动会产生about to fork child process, waiting until server is ready for connection此异常。
+				删除mongodb 的db目录下的mongod.lock文件，重启mongodb即可。该文件会生成在日志文件下（跟bin目录同级），cd 日志文件后 rm指令删除mongod.lock文件
+		② 服务无法启动
+			A. 执行systemctl start mongodb启动mongodb，查看启动状态，出现如下
+				mongod.service - High-performance, schema-free document-oriented database
+				   Loaded: loaded (/usr/lib/systemd/system/mongod.service; enabled; vendor preset: disabled)
+				   Active: failed (Result: exit-code) since Sat 2016-12-17 21:35:08 CST; 3s ago
+					 Docs: https://docs.mongodb.org/manual
+				  Process: 1570 ExecStart=/usr/bin/mongod $OPTIONS run (code=exited, status=1/FAILURE) 
+				Main PID: 1570 (code=exited, status=1/FAILURE)
+
+				Dec 17 21:35:08 localhost.localdomain systemd[1]: Started High-performance, s...
+				Dec 17 21:35:08 localhost.localdomain systemd[1]: Starting High-performance, ...
+				Dec 17 21:35:08 localhost.localdomain mongod[1570]: about to fork child proce...
+				Dec 17 21:35:08 localhost.localdomain mongod[1570]: forked process: 1591
+				Dec 17 21:35:08 localhost.localdomain systemd[1]: mongod.service: main proces...
+				Dec 17 21:35:08 localhost.localdomain systemd[1]: Unit mongod.service entered...
+				Dec 17 21:35:08 localhost.localdomain systemd[1]: mongod.service failed.
+			B. 解决办法：
+				编辑mongod.conf，把fork修改为 false，重新进行步骤3.4
+	5. 权限校验
+		① 进入到mongo的bin目录中
+			cd /usr/local/mongodb/bin
+		② 开启mongo shell
+			./mongo
+		③ 依次执行
+			use admin
+			db.createUser({user:"admin",pwd:"password",roles:["root"]})
+			db.auth('admin', 'password')
+
+
+
+
+
+
+		

@@ -233,6 +233,22 @@
 				a. static：保存所有的静态资源
 				b. template：保存所有的模板页面，SpringBoot默认使用jar包进行打包，使用嵌入式Tomcat，因此不支持JSP页面，故需要使用模板引擎
 				c. application.properties：SpringBoot应用的配置文件，可以修改一些默认设置。
+		④ 自动添加创建者和创建时间等信息
+			A. 打开File > Settings...
+			B. 查找 File and Code Templates
+			C. 切换到 Includes
+			D. 选择 File Header
+			E. 添加以下内容
+				/**
+				* @author Li XiaoLiang
+				* @date ${DATE}
+				*/
+		⑤ 关闭 Dangling Javadoc comment 提示
+			A. File -> Settings -> Editor -> Inspections -> Java -> Javadoc -> Dangling Javadoc comment
+			B. 将该设置关闭即可
+		⑥ IDEA提示类注释的wrong tag警告的解决办法
+			A. 当创建一个类的时候，给类写上注释时，出现类似于"Wrong tag ‘date' less... (Ctrl+F1)”这种警告，解决方式是：
+			B. alt + enter -> add to custom tags；
 	2. 配置文件：
 		① Spring Boot使用一个全局的配置文件
 			A. application.properties

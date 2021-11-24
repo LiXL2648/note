@@ -1,0 +1,201 @@
+一、消息队列
+	1. MQ 的相关概念
+		① 什么是 MQ
+			MQ（Message Queue），从字面意思上看，本质是个队列，FIFO先进先出。只不过队列钟存放的内容是 Message 而已，还是一种跨进程的通信机制，
+			用于上下游传递消息。在互联网架构中，MQ 是一种非常常见的上下游“逻辑解耦+物理解耦”的消息通信服务。使用 MQ 之后，消息发送只需要依赖
+			MQ，不用依赖其他服务。
+		② 为什么要用 MQ
+			A. 流量消峰：
+				举个例子，如果订单系统最多能处理一万次订单，这个处理能力应付正常时段的下单时绰绰有余，正常时段我们下一单一秒后就能
+			返回结果。但是在高峰期，如果有两万次下单操作系统是处理不了的，只能限制订单超过一万后不允许用户下单。使用消息队列做缓冲，我们可以
+			取消这个限制，把一秒内下的订单分散成一段时间来处理，这时有些用户可能在下单十几秒后才能收到下单成功的操作，但是比不能下单的体验要好。
+			B. 应用解耦：
+				以电商应用为例，应用中有订单系统、库存系统、物流系统、支付系统。用户创建订单后，如果耦合调用库存系统、物流系统、支付
+			系统，任何一个子系统出了故障，都会造成下单操作异常。当转变成基于消息队列的方式后，系统间调用的问题就会减少很多，比如物流系统因为
+			发生故障，需要几分钟来修复。在这几分钟的时间里，物流系统要处理的内存被缓存在消息队列中，用户的下单操作可以正常完成。当物流系统恢复
+			后，继续处理订单信息即可，下单的过程中，用户感受不到物流系统的故障，提升系统的可用性。
+			C. 异步处理
+				有些服务间调用是异步的，例如 A 调用 B，B 需要花费很长时间执行，但是 A 需要知道 B 什么时候可以执行完，以前一般有两种方式，A 过
+			一段时间去调用 B 的 查询 API 查询。或者 A 提供一个 callback API，B 执行完之后调用 API 通知 A 服务。两种方式都不是很优雅，使用消息
+			总线，可以很方便解决这个问题，A 调用 B 服务后，只需要监听 B 处理完的消息，当 B 处理完成后，会发送一条消息给 MQ，MQ 会将消息转发给
+			A 服务。这样A 服务既不用循环调用 B 服务的查询 API，也不用提供 callback API。同样 B 服务也不用做这些操作。A 服务还能及时的得到异步
+			处理成功的消息。
+		③ MQ 的分类
+			A. ActiveMQ
+				a. 优点：单机吞吐万级，时效性 ms 级，基于主从架构实现高可用性，消息可靠性，较低的概率丢失数据
+				b. 缺点：官方社区现在对 ActiveMQ 5，x 维护越来越少，高吞吐量场景较少使用。
+			B. Kafka
+				a. 大数据的杀手锏，谈到大数据领域内的消息传输，则绕不开 Kafaka，这款为 大数据而生的消息中间件，以其百万计 TPS 的吞吐量名声大
+				噪，迅速成为大数据领域的宠儿，在数据采集、传输、存储的过程中发挥着举足轻重的作用。目前已经被 LinkIn、Uber、Twitter、Netflix等
+				大公司所采纳
+				b. 优点：性能卓越，单机写入 TPS 约在百万条/秒，最大的优点，就是吞吐量高。时效性 ms 级可用性非常高。Kafka 是分布式，一个数据多
+				个副本，少数机器宕机，不会丢失数据，不会导致不可用，消费者采用 Pull 方式获取消息，消息有序，通过控制能够保证所有消息被消费且仅
+				被消费一次；有第三方 Kafka Web 管理界面 KafkaManager，在日志领域比较成熟，被多家公司合多个开源项目使用。功能支持：功能较为简单，
+				主要支持简单的 MQ 功能，在大数据领域的实时计算以及日志采集被大规模使用。
+				c. 缺点：Kafka 单机超过 64 个队列/分区，Load 会发生明显的飙高现象，队列越多，load 越高，发送消息响应时间变长，使用短轮询方式，
+				实时性取决于轮询间隔时间，消费失败不支持重试，支持消息顺序，但是一台代理宕机后，就会发送消息乱序，社区更新较慢。
+			C. RocketMQ
+				a. RocketMQ 出自阿里巴巴的开源产品，用 Java 语言实现，在设计时参考了 Kafka，并做出了自己的一些改进。被阿里巴巴广泛应用在订单、
+				交易、充值、流计算、消息推送、日志流式处理、binglog 分发等场景
+				b. 优点：单机吞吐量十万级，可用性非常高，分布式架构，消息可以做到 0 丢失，MQ 功能较为完善，还是分布式的，扩展性好，支持 10 亿
+				级别的消息堆积，不会因为堆积导致性能下降，源码是 Java，我们可以自己阅读源码，定制自己的 MQ
+				c. 缺点：支持的客户端语言不多，目前是 Java 及 C++，其中 C++ 不成熟，社区活跃度一般，没有在 MQ 核心中去实现 JMS 等接口，有些系
+				统要迁移需要修改大量代码
+			D. RabbitMQ
+				a. 2007年发布，是一个在 AMQP（高级消息队列协议）基础上完成的，可复用的企业消息系统，是当前最主流的消息中间件之一
+				b. 优点：由于 erlang 语言的高并发特性，性能较好；吞吐量达到万级，MQ 功能比较完备、健壮、稳定、易用、跨平台、支持多种语言，如：
+				Python、Ruby、.NET、Java、JMS、C 、PHP、ActionScript、XMPP、STOMP等，支持 AJAX 文档齐全；开源提供管理界面非常棒，用起来很好用，
+				社区活跃度高；更新频率相当高
+				c. 商业版需要收费，学习成本较高
+		④ MQ 的选择
+			A. Kafka
+				Kafka 主要特点是基于 Pull 的模式来处理消息消费，追求高吞吐量，一开始的目的就是为了日志收集和传输，适合大量数据的互联网服务的数
+			据收集业务。大型公司建议可以选用，如果有日志采集功能，肯定是首选 Kafka。
+			B. RocketMQ
+				天生为金融互联网领域而生，对于可靠性要求很高的场景，尤其是电商里面的订单扣款，以及业务消峰，在大量交易涌入时，后端可能无法及时
+			处理的情况。RocketMQ 在稳定性上可能更值得信赖，这些业务场景在阿里双 11 已经经历了多次考验，如果你的业务有上述并发场景，建议可以选择
+			RocketMQ。
+			C. 	RabbitMQ
+				结合 erlang 语言本身的并发优势，性能好时效微秒级，社区活跃度也比较高，管理界面用起来十分方便，如果数据量没有那么大，中小型公司
+			优先选择功能比较完备的 RabbitMQ
+	2. RabbitMQ
+		① RabbitMQ 的概念
+			RabbitMQ 是一个消息中间件：它接收并转发消息。可以把它当作一个快递点，当要发送一个包裹时，把包裹放在快递站，快递员最终会把快递送到收
+			件人那里，按照这个逻辑 RabbitMQ 是一个快递站，一个快递员传递快件。RabbitMQ 与 快递站的主要区别在于，它不处理快件，而是接收，存储和转
+			发消息数据
+		② 四大核心概念
+			A. 生产者：产生数据发送消息的程序是生产者
+			B. 交换机：交换机是 RabbitMQ 非常重要的一个部件，一方面它接收来自生产者的消息，另一方面它将消息推送到队列中。交换机必须确切知道它如
+			何处理它接收到的消息，是将这些消息推送到特定的队列还是推送到多个队列，亦或是将消息丢弃，这个得有交换机类型决定
+			C. 队列：队列是 RabbitMQ 内部使用得一种数据结构，尽管消息流经 RabbitMQ 和应用程序，但它们只能存储在队列中，队列仅受主机得内存和磁盘
+			限制得约束，本质上是一个大得消息缓冲区。许多生产者可以将消息发送到一个队列，许多消费者可以尝试从一个队列接收数据。这就是我们使用队列
+			的方式。
+			D. 消费者：消费者与接收者具有相似的含义，消费者大多时候是等待一个接收消息的程序，请注意生产者，消费者和消息中间件很多时候并不在同一
+			个机器上，同一个应用程序既可以是生产者又可以是一个消费者。
+		③ RabbitMQ 核心部分（六大模式）
+			A. HelloWorld（简单模式）
+			B. Work queues（工作模式）
+			C. Publish/Subscribe（发布/订阅模式）
+			D. Routing（路由模式）
+			E. Topics（主题模式）
+			F. Publish/Confirms（发布/确认模式）
+		④ 各个名词介绍
+			A. RabbitMQ 工作原理				
+															
+															+-----------------------------------+
+															| 		Broker（RabbitMQ）			|
+															|									|
+									+-------------+			|						  +-------+ |		+-------------+
+									| Connection  |			|					+---> | Queue |	|		| Connection  |
+				+----------+		|   		  |			| +----------+		|	  +-------+	|		|   		  |		  +----------+
+				| Producer | -----> | +---------+ | ------> | | Exchange | -----+				| ---->	| +---------+ | ----> | Consumer |
+				+----------+		| | Channel | |			| +----------+		|	  +-------+	|		| | Channel | |		  +----------+
+									| +---------+ |			|           		+---> | Queue |	|		| +---------+ |
+									+-------------+			|						  +-------+	|		+-------------+
+															+-----------------------------------+
+			B. Broker：接收和分发消息的应用，RabbitMQ Server 就是 Message Broker
+			C. Virtual host：出于多租户和安全因素设计，把 AMQP 的基本组件划分到一个虚拟的分组中，类似于网络中的 namespace 概念。当多个不同用户
+			使用同一个 RabbitMQ Server 提供服务时，可划分出多个 vhost，每个用户在自己的 vhost 创建 exchange /queue。
+			D. Connection：producer / consumer 和 Broker 之间的 Tcp 连接
+			E. Channel：如果每一次访问 RabbitMQ 都建立一个 Connection，在消息量大的时候建立 TCP Connection 的开销是巨大的，效率也低。Channel 是在 
+			Connection 内部建立的逻辑连接，如果应用程序支持多线程，通常每个 Thread 创建单独的 Channel 进行通讯，AMQP method 包含了 Channel id 帮助
+			客户端和 message broker 识别 Channel，所以 Channel 之间是完全隔离的。Channel 作为 轻量级的 Connection 极大减少了 操作系统建立 TCP 
+			connection 的开销。
+			F. Exchange：message 到达 Broker 的第一站，根据分发规则，匹配查询表中的 Routing key，分发到 queue 中去。常用的类型有：direct（point-to-point），
+			Topic（publish/subscribe）and fanout（multicast）
+			G. Queue：消息最终被送到 Queue 等待 Consumer 取走
+			H. Binding：exchange 和 queue 之间的虚拟连接，bingding中可以包含 routing key，Bingding 信息被保存到 exchange 中的查询表中，用于 message 
+			的分发依据。
+		⑤ 安装
+			A. 官网
+				a. Rabbit 下载地址：https://www.rabbitmq.com/download.html
+				b. Erlang 下载地址：https://www.erlang-solutions.com/downloads/#
+			B. 文件上传：将文件上传到 /opt 目录
+			C. 安装 Erlang
+				a. 源码安装 
+					(1) 选择安装erlang的文件夹，下载erlang
+						cd /opt
+						wget http://erlang.org/download/otp_src_24.0.tar.gz
+					(2) 解压并进入到erlang目录
+						tar -zxvf otp_src_24.0.tar.gz
+						cd otp_src_24.0/
+					(3) 配置
+						./configure --prefix=/usr/local/erlang
+					(4) 此时会再报“error: No curses library functions found”错，是因为没安装ncurses-devel，使用下面命令安装
+						yum install -y ncurses-devel
+					(5) 再次配置，此时会出现一堆信息，关注的是“APPLICATIONS DISABLED”内的区域，这里是我们缺少的组件，需要一个一个安装。看“APPLICATIONS 
+					DISABLED”信息发现缺少oepnssl和odbc。
+					(6) 安装opensll
+						yum install -y openssl openssl-devel
+					(7) 安装odbc
+						yum -y install unixODBC-devel
+					(8) 再配置，编译和安装
+						./configure --prefix=/usr/local/erlang
+						make && make install
+					(9) 配置环境变量
+						vi /etc/profile
+						shift+g，输入以下内容
+						export ERLANG_HOME=/usr/local/erlang
+						export PATH=$PATH:$ERLANG_HOME/bin
+						:wq!
+						source /etc/profile
+					(10) 验证是否安装成功
+						erl -version
+				b. rpm方式安装
+					(1) 安装依赖项
+						yum install -y epel-release
+					(2) 下载rpm包
+						wget https://packages.erlang-solutions.com/erlang/rpm/centos/7/x86_64/esl-erlang_24.0-1~centos~7_amd64.rpm
+					(3) 安装erlang
+						yum -y install esl-erlang_24.0-1~centos~7_amd64.rpm
+					(4) 验证是否安装成功
+						erl -version
+			D. 安装 RabbitMQ
+				a. 安装依赖项
+					yum install socat -y
+				b. 安装RabbitMQ
+					rpm -ivh rabbitmq-server-3.8.22-1.el7.noarch.rpm
+			E. 常用命令
+				a. 添加开机启动 RabbitMQ 服务
+					chkconfig rabbitmq-server on
+				b. 启动服务
+					/sbin/service rabbitmq-server start
+				c. 查看服务状态
+					/sbin/service rabbitmq-server status
+				d. 关闭服务
+					/sbin/service rabbitmq-server stop
+			F. 开启 web 管理插件
+				a. 关闭服务
+					/sbin/service rabbitmq-server stop
+				b. 开启 web 管理插件
+					rabbitmq-plugins enable rabbitmq_management
+				c. 启动服务
+					/sbin/service rabbitmq-server start
+				d. 用默认账号密码（guest）访问地址：10.10.0.26:15762
+					User can only log in via localhost -- 没有权限
+			G. 添加用户
+				a. 创建账号
+					rabbitmqctl add_user admin 2648
+				b. 设置用户角色
+					rabbitmqctl set_user_tags admin administrator
+				c. 设置用户权限
+					rabbitmqctl set_permissions [-p <vhostpath>] <user> <conf> <write> <read>
+					rabbitmqctl set_permissions -p "/" admin ".*" ".*" ".*"
+					用户 user_admin 具有 /vhost1 这个 virtual host 中所有资源的配置、写、读权限
+				d. 当前用户和角色
+					rabbitmqctl list_users
+					user	tags
+					admin	[administrator]
+					guest	[administrator]
+
+
+
+
+
+
+
+
+
+
+
+
