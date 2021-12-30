@@ -692,7 +692,7 @@ default-time_zone = '+8:00'
 			：wq
 
 			chmod 777 mysqld.log
-			chown mysql:mysql mysqld.log
+			chown -R mysql:mysql mysqld.log
 		② 初始化pid文件，防止没有权限
 			#手动编辑一下日志文件，什么也不用写，直接保存退出
 			cd /var/run/
@@ -767,6 +767,7 @@ default-time_zone = '+8:00'
 			B. 保存并退出：:wq!
 		⑦ 修改在/var/lib/mysqld/的权限
 			chmod 777 /var/lib/mysqld
+			chown -R mysql:mysql mysqld
 		⑧ 启动 MySQL
 			service mysqld start
 			MySQL Start Success!

@@ -1,0 +1,108 @@
+一、新特性概述
+	1. JDK15 的发布
+		① 2020-9-15 当天，Oracle 宣布 Java /JDK15 正式发布。这是Java 迭代周期缩短为六个月以后的第六个版本。随着迭代速度的加快，让 Java 的设计、开发、测试
+		人员能够更加轻松的面对迭代中的变化
+		② 发布版本说明：根据发布的规划，这次发布的 JDK15 将是一个短期的过渡板，只会被 Oracle 支持（维护）6个月，直到第二年 3 月 JDK16 发布此版本将停止维护。
+		而 Oracle 下一个长期支持版（LTS 版本）会在第二年的9 月份发布（Java17），LTS 版本每 3 年发布一个，上一次长期支持版本是 18 年 9 月发布的 JDK11，而下
+		一个长期支持（LTS）版本将是 JDK17。
+	2. 主要功能
+		① 这次发布的主要功能有：Java15 为用户提供了 14 项主要的增强/更改，包括一个孵化器模块，三个预览功能，两个不推荐使用的功能，以及两个删除功能，网址：
+		http://openjdk.java.net/projects/jdk/15/
+			339: 	Edwards-Curve Digital Signature Algorithm (EdDSA)
+			360: 	Sealed Classes (Preview)
+			371: 	Hidden Classes
+			372: 	Remove the Nashorn JavaScript Engine
+			373: 	Reimplement the Legacy DatagramSocket API
+			374: 	Disable and Deprecate Biased Locking
+			375: 	Pattern Matching for instanceof (Second Preview)
+			377: 	ZGC: A Scalable Low-Latency Garbage Collector
+			378: 	Text Blocks
+			379: 	Shenandoah: A Low-Pause-Time Garbage Collector
+			381: 	Remove the Solaris and SPARC Ports
+			383: 	Foreign-Memory Access API (Second Incubator)
+			384: 	Records (Second Preview)
+			385: 	Deprecate RMI Activation for Removal
+		② 对应中文特性：（JEP：JDK Enhancement Proposals，JDK 增强建议，也就是 JDK 的特性新增和改进提案）
+			A. JEP 339：EdDSA 数字签名算法
+			B. JEP 360：密封类（预览）
+			C. JEP 371：隐藏类
+			D. JEP 372：移除 Nashorn JavaScript 引擎
+			E. JEP 373：重新实现 Legacy DatagramSocket API
+			F. JEP 374：禁用偏向锁定
+			G. JEP 375：instanceof 模式匹配（第二次预览）
+			H. JEP 377：ZGC（一个可扩展的低延迟垃圾收集器）
+			I. JEP 378：文本块
+			J. JEP 379：Shenandoah（低暂停时间垃圾收集器）
+			K. JEP 381：移除 Solaris 和 SPARC 端口
+			L. JEP 383：外部存储器访问 API（第二次孵化版本）
+			M. JEP 384：Records（第二次预览）
+			N. JEP 385：废弃 RMI 激活机制
+		③ 总结：JDK15 整体来看新特性方面并不算很亮眼，它主要是对之前版本预览特性的功能做了确定，如：文本块、ZGC等，这么一来就可以放心大胆的使用了
+	3. 做出贡献的企业：主力军是 Oracle 干了 79.68% 的工作量，其实是开源巨头红帽，但还是有不少企业参与其中。国内企业贡献最多的是腾讯，阿里巴巴和华为也做出了不可
+	磨灭的贡献。
+	4. 开发工具
+		① 支持 Java15 的开发工具
+			A. 目前，支持 Java15 的工具，有以下三款
+				a. JetBrains IDEA
+				b. Apache NetBeans
+				c. Eclipse Marketplace
+			B. 运行 JDK15 要求 IDEA 2020.02才能支持
+		② JDK15 下载路径
+			https://www.oracle.com/java/technologies/javase/jdk15-archive-downloads.html
+二、密封类
+	1. 简介
+		① Sealed Classes (Preview)密封类和接口（预览）
+		② 通过密封的类和接口来增强 Java 编程语言，这是新的预览特性
+		③ 用于限制超类的使用，密封的类和接口限制其他可能继承或者实现他们的类和接口
+		④ 这个特性的目标包括--允许类或者接口的开发者来控制哪些代码负责实现，提供了比限制使用超类的访问修饰符声明方式更多选择，并通过支持对模式的详尽分析而支持模式
+		匹配的未来发展
+		⑤ 在 Java中，类层次结构通过继承实现代码的重用，父类的方法可以被许多子类继承，但是，类层次结构的目前并不是总是重用代码。有时，其目的是对域中存在的各种可能性
+		进行建模，例如图形库支持的形状类型或金融应用程序支持的贷款类型，当以这种方式使用类层次结构时，我们可能需要限制子类集从而来简化建模。
+	2. 具体使用
+		① 因为我们引入了 sealed class 或者 interface，这些 class 或者 interface 只允许被指定的类或者 interface 进行扩展和实现
+		② 使用修饰符 sealed，可以声明一个类或者接口为密封类。密封类使用 reserved 关键字 permits 列出可以直接扩展它的类，子类可以是最终，非密封的或者密封的。
+		③ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

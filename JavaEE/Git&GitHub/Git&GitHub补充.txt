@@ -134,7 +134,7 @@ git pull [远程库地址别名] [远程分支名]
 		⑤ 开启gitlab开机自启动：sudo systemctl enable gitlab-runsvdir.service
 		⑥ 查看gitlab的状态：sudo gitlab-ctl status
 
-
+token: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
 
 
 	
