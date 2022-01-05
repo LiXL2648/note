@@ -61,43 +61,217 @@
 	2. 具体使用
 		① 因为我们引入了 sealed class 或者 interface，这些 class 或者 interface 只允许被指定的类或者 interface 进行扩展和实现
 		② 使用修饰符 sealed，可以声明一个类或者接口为密封类。密封类使用 reserved 关键字 permits 列出可以直接扩展它的类，子类可以是最终，非密封的或者密封的。
-		③ 
+		③ 示例
+			sealed public class Person permits Student, Teacher, Worker {}
 
+			final class Teacher extends Person {}
 
+			sealed class Student extends Person permits MiddleSchoolStudent, undergraduate {}
 
+			final class MiddleSchoolStudent extends Student {}
 
+			final class undergraduate extends Student {}
 
+			non-sealed class Worker extends Person {}
 
+			class Doctor extends Worker {}
+三、隐藏类
+	1. 简介
+		① JEP 371：Hidden Classes（隐藏类）
+		② 该提案通过启用标准 API 来定义无法发现且具有有限生命周期的隐藏类，从而提高 JVM 上所有的效率。JDK 内布和外部的框架将能够动态生成类，而这些类可以定义隐藏类。通
+		常来说基于 JVM 的很多语言都有动态生成类的机制，这样可以提高语言的灵活性和效率
+			A. 隐藏类天生为框架设计的，在运行时生成内部的class
+			B. 隐藏类只能通过反射访问，不能直接被其他类的字节码访问
+			C. 隐藏类可以独立于其他类加载、卸载，这可以减少框架的内存占用
+	2. Hidden Classes（隐藏类）是什么
+		① Hidden Classes 就是不能直接被其他 class 的二进制代码使用的 class，Hidden Classes 主要被一些框架用来生成运行时类，但是这些类不是被同来直接使用的，而是通过反射
+		机制来调用
+		② 比如在 JDK8 中引入的 lambda 表达式，JVM 并不会在编译的时候将 lambda 表达式转换为专门的类，而是在运行时将相应的字节码动态生成相应的类对象
+		③ 另外使用动态代理也可以为某些类生成新的动态类
+	3. 动态生成的类需要具有什么特性
+		① 不可发现性，因为我们是未某些静态的类动态生成的动态类，所以我们希望把这个动态生成的类看作是静态类的一部分，所以我们不希望除了静态类之外的其他机制发现
+		② 访问控制性：我们希望在访问控制静态类的同时，也能控制动态生成的类
+		③ 生命周期：动态生成类的生命周期一般都比较短，我们并不需要将其保存和静态类的生命周期一致。
+	4. API 的支持，
+		① 所以我们需要一些 API 来定义无法发现的且具有有限生命周期的隐藏类，这样提高所有基于 JVM 的语言实现的效率。比如：
+			A. java.lang.reflect.Proxy：可以定义隐藏类作为实现代理接口的代理类。
+			B. java.lang.invoke.StringConcatFactory：可以生成隐藏类来保存常量连接方法
+			C. java.lang.invoke.LambdaMetafactory：可以生成隐藏类的 nestmate 类，以容纳访问封闭变量的 lambda 主体
+		② 普通类是通过调用 ClassLoader::defineClass 创建的，而隐藏类是通过调用 Lookup::defineHiddenClass 创建的，这使 JVM 从提供的字节码中派生一个隐藏类，链接该隐藏类，
+		并返回提供对隐藏类的反射访问的查找对象。调用程序可以通过返回的查找对象来获取隐藏类的class对象。
+四、instanceof 模式匹配
+	1. 简介
+		① JEP 375：Pattern Matching for instanceof (Second Preview) instanceof 模式匹配（第二次预览）
+		② 在 Java14 中作为预览语言功能引入的 instanceof 模式匹配，在 Java15中处于第二次预览，而没有任何更改
+	2. 匹配模式允许程序中的通用逻辑（主要是从对象中的条件提取组件）可以更简洁地表达。Hashell 和 C# 等语言已采用模式匹配来实现简洁和安全性
+		① 旧写法
+			// 先判断类型
+			if (obj instanceof String) {
+				// 然后转换
+				String s = (String) obj;
+				// 然后才能使用
+			}
+		② 新写法：（自动匹配模式）
+			if (obj instanceof String s) {
+				// 如果匹配，直接使用
+			}
+五、ZGC 功能转正
+	1. 简介
+		① JEP 377：ZGC: A Scalable Low-Latency Garbage Collector ZGC（一个可扩展的低延迟垃圾收集器）
+		② ZGC 是 Java11 引入的新的垃圾收集箱（JDK9以后默认的垃圾回收箱是G1），经过了多个实验阶段，自此终于成为正式特性
+		③ 自 2018 年以来，ZGC 已增加了许多改进，从并发类卸载、取消使用未使用的内存、对类数据共享的支持到改进的 NUMA 感知。此外，最大堆大小从4 TB 增加到 16 TB。支持的平台
+		包括 Linux、Windows 和 macOS
+		④ ZGC 是一个重新设计的并发的垃圾回收器，通过减少 GC 停顿时间来提高性能
+		⑤ 但是这并不是替换默认的 GC，默认的 GC 仍然还是 G1；之前需要通过 -XX:+UnlockExperimentalVMOptions -XX:+UseZGC 来启用 ZGC，现在只需要 -XX:+UseZGC 就可以了，相信不久
+		的将来它必将成为默认的垃圾回收器
+	2. 相关的参数有
+		① ZAllocationSpikeTolerance、ZCollectionInterval、ZFragmentationLimit、ZMarkStackSpaceLimit、ZProactive、ZUncommit、ZUncommitDelay ZGC-specific JFR 
+		events（ZAllocationStall、ZPageAllocation、ZPageCacheFlush、ZRelocationSet、ZRelocationSetGroup、Zunicommit）也从 experimental 变成 product
+六、文本块功能转正
+	1. 简介
+		① JEP 378：Text Blocks 文本块
+		② Text Blocks 首次是在 JDK13 中以预览功能出现的，然后在 JDK14 中又以预览了一次，终于在 JDK15 中被确定了下来
+		③ 文本块是一种多行字符串文字，它避免了大多数转义序列的需要，以一种可预览的方式自动设置字符串的格式，并在需要时使开发人员可以控制格式，简化编写 Java 程序的任务
+		④ 文本块建议的目标是提高 Java 程序中的字符串的可读性，这些字符串表示以非 Java 语言编写的代码
+		⑤ 另一个目标是支持从字符串文本迁移，规定任何新构造都可以表达与字符串文本相同的字符串集，解释相同的转义序列，并且以与字符串文本相同的方式进行操作。OpenJDK开发人员希望
+		添加转义序列来管理显示空白和换行控件。
+	2. 举例
+		public class TestString {
 
+			public static void main(String[] args) {
+				String text1 = "hello\n" +
+						"world";
+				System.out.println(text1);
+				System.out.println(text1.length());
 
+				// \表示取消换行，\s 表示空格
+				String text2 = """
+						hello
+						world\ 
+						""";
+				System.out.println(text2);
+				System.out.println(text2.length());
+			}
+		}
+七、Records
+	1. 简介
+		① JEP 384：Records (Second Preview) Records（第二次预览）
+		② Records Class 也是第二次出现的预览功能，它在 JDK14 中也出现过一次，使用 Record 可以更方便的创建一个常量类
+		③ 当使用 Record 声明一个类时，该类将自动拥有以下功能
+			A. 获取成员变量的简单方法，以下面代码为例：name() 和 balance()，注意区别于平常 getter 的写法
+			B. 一个 equals 方法的实现，执行比较时会比较该类的所有成员属性
+			C. 重写 equals 方法当然要重写 hashCode
+			D. 一个可以打印该类所有成员属性的 toString 方法
+			E. 注意只有一个构造方法
+	2. 举例：
+		① 旧写法
+			public class Employee {
+				private String name;
+				private Integer age;
+				private Double salary;
 
+				@Override
+				public boolean equals(Object o) {
+					if (this == o) return true;
+					if (o == null || getClass() != o.getClass()) return false;
+					Employee employee = (Employee) o;
+					return Objects.equals(name, employee.name) &&
+							Objects.equals(age, employee.age) &&
+							Objects.equals(salary, employee.salary);
+				}
 
+				@Override
+				public int hashCode() {
+					return Objects.hash(name, age, salary);
+				}
 
+				@Override
+				public String toString() {
+					return "Employee{" +
+							"name='" + name + '\'' +
+							", age=" + age +
+							", salary=" + salary +
+							'}';
+				}
+			}
+		② 新写法
+			// record 不可声明为 abstract，不可显示继承于其他类
+			public record Customer(String name, Double balance) {
+				// 还可以声明构造器、静态的变量、静态方法、实例方法
 
+				public Customer(String name) {
+					this(name, null);
+				}
 
+				public static void main(String[] args) {
+					Customer customer = new Customer("LiSisi", 100.00);
+					System.out.println(customer.toString());
 
+					System.out.println(customer.name()); // 类似于 getName()
+					System.out.println(customer.balance()); // 类似于 getBalance()
+				}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+				// 不可以在 record 中声明 实例变量，但是可以声明静态变量
+			}
+八、其他新特新
+	1. EdDSA 数字签名算法
+		① JEP 339：Edwards-Curve Digital Signature Algorithm (EdDSA) EdDSA 数字签名算法
+		② 这是一个新的功能，新加入基于 Edward-Curve 数字签名算法（EdDSA-Edward-Curve Digital Signature Algorithm）的加密签名，即爱德华兹曲线数字签名算法
+		③ 在许多其他加密库（如 OpenSSL 和 BoringSSL）中得到支持
+		④ 与 JDK 中的现有签名方案相比，EdDSA具有更高的安全性和性能，因此备受关注。它已经在 OpenSSL 和 BoringSSL 等加密库中得到支持，在区块链领域用的比较多
+		⑤ EdDSA 是一种现代椭圆曲线方案，具有 JDK 中现有签名方案的优点，EdDSA 将只有在 SunEC 提供商中实现
+	2. DatagramSocket API
+		① JEP 373：Reimplement the Legacy DatagramSocket API 重新实现 Legacy DatagramSocket API
+		② 新的计划是 JEP 353 的后续，该方案重新实现了遗留的套接字 API
+		③ java.net.datagram.Socket 和 java.net.MulticastSocket 的当前实现可追溯到 JDK 1.0，那时 IPv6 还在开发中，因此，当前的多播套接字实现尝试调和 IPv4 和 IPv6 难以维护
+		的方式
+			A. 通过替换 java.net.datagram.Socket 和 java.net.MulticastSocket API 的底层实现替换为更简单、更现代的实现来重新实现遗留的 DatagramSocket API
+			B. 新的实现：
+				a. 易于调试和维护
+				b. 与 Project Loom 中正在探索的虚拟线程协同
+	3. 禁用偏向锁定
+		① EP 374：Disable and Deprecate Biased Locking 禁用偏向锁定
+		② 在默认情况下禁用偏向锁定，并弃用所有相关命令行选项。目标是确定是否需要继续支持偏向锁定的高维护成本的遗留同步优化，HotSpot 虚拟机使用该优化来减少非竞争锁定的开销。
+		尽管某些 Java 应用程序在禁用偏向锁后可能会出现性能下降，但偏向锁的性能提高通常不像以前那么明显
+		③ 该特性默认禁用了 biased locking（-XX:+useBiasedLocking），并且废弃了所有相关的命令选型（BiasedBockingStartupDelay，BiasedLockingBulkRebiasThreshold，
+		BiashedLockingBulkRevokeThreshold，BiasedLockingDecayTime，UseOptoBiasInlining，PrintBiasedLockingStatistics and PrintPreciseBiasedLockingStatistics）
+	4. Shenandoah 垃圾回收算法
+		① Shenandoah: A Low-Pause-Time Garbage Collector JEP 379：Shenandoah（低暂停时间垃圾收集器）
+		② Shenandoah 垃圾回收算法 终于从实验特性转变为产品特性，这是一个从 JDK12 引入得回收算法，该算法通过与正在运行的 Java 线程同时进行疏散工作来减少 GC 暂停时间。Shenandoah
+		的暂停时间与堆大小无关，无论堆栈是 200MB 还是 200GB，都具有相同的一致暂停时间
+		③ ZGC 和 Shenandoah 的关系，异同点大概如下：
+			A. 相同点：性能几乎认为是相同的
+			B. 不同点：ZGC 是 Oracle JDK 的，而 Shenandoah 只存在于 OpenJDK中，因此使用时需注意 JDK 版本
+		④ 打开方式：使用 -XX:+UseShenandoahGC 命令行参数打开
+		⑤ Shenandoah 在 JDK12 被作为experimental 引入，在 JDK15 变成 production 之前需要 -XX:+UnlockExperimentalVMOptions -XX:+UseShenandoahGC 来启用，现在只需要
+		-XX:+UseShenandoahGC即可启用
+	5. 外部存储器访问 API
+		① JEP 383：Foreign-Memory Access API (Second Incubator) 外部存储器访问 API（第二次孵化版本）
+		② 目的是引入一个 API，以允许 Java 程序安全、有效访问 Java 堆之外的外部存储器。如：本机、持久和托管难
+		③ 有很多 Java 程序是访问外部内存的，比如 Ignite 和 MaoDB。该 API 将有助于避免与垃圾收集相关的成本以及与跨进程共享内存以及通过将文件映射道内存来序列和反序列化内容内容
+		相关的不可预测性。该 Java API 目前没有为访问外部内存提供令人满意的解决方案。但是在新的提议中，API不应该破坏 JVM  的安全性
+		⑤ Foreign-Memory Access API 在 JDK14 被作为 incubating API 引入，在 JDK15 处于 second Incubator，提供了改进
+	6.  移除 Solaris 和 SPARC 端口
+		① JEP 381：Remove the Solaris and SPARC Ports 移除 Solaris 和 SPARC 端口
+		② 删除 Solaris / SPARC、Solaris / x64 和 Linux / SPARC 端口的源代码和构建支持，在 JDK14 中被标记为废弃，在 JDK15 版本中正式移除
+		③ 在许多正在开发的项目和功能（如 valhalla、Loom 和 Panama）需要进行重大更改以适应 CPU 架构和操作系统特定代码
+		④ 近年来，Solaris 和 SPARC 都已经被 Linux 操作系统和因特尔处理器取代，放弃对 Solaris 和 SPARC 端口的支持将使 OpenJDK 社区的贡献者能够加速开发新功能，从而推动平台向前发展
+	7. 移除 Nashorn JavaScript 引擎
+		① JEP 372：Remove the Nashorn JavaScript Engine 移除 Nashorn JavaScript 引擎
+		② Nashorn 是在 JDK 提出的脚本执行引擎，该功能是 2014 年 3 月发布的 JDK 8 的新特性，在 JDK11 就已经把它标记为废弃了，JDK15 完全移除了
+		③ 在 JDK11 中取而代之的是 GraalVM。GraalVM 是一个运行时平台，它支持 Java 和其他基于 Java 字节码的语言，但也支持其他语言，如 JavaScript、Ruby、Python或者 LLVM。性能是
+		Nashorn 的 2 倍以上。
+		④ JDK15 移除了 Nashorn JavaScript Engine 及 jjs 命令行工具。具体就是 jdk.scripting.nashorn 及 jdk.scripting.nashorn.shell 这两个模块被移除了。
+		⑤ 补充：Graal VM 在 HotSpot VM 基础上增强而成的跨语言全栈虚拟机，可作为“任何语言”的运行平台使用，语言包括：Java、Scala、Groovy、Kotlin、C、C++、JavaScript、Ruby、Python、R等
+	8. 废弃 RMI 激活机制 
+		① JEP 385：Deprecate RMI Activation for Removal 废弃 RMI 激活机制
+		② RMI Activation 被标记为 Deprecate，将会在未来的版本中删除，RMI 激活机制是 RMI 中一个过时的部分，自 Java8 以来一直是可选的而非必选项。RMI 激活机制增加了持续的维护负担。
+		RMI 的其他部分暂时不会被弃用
+		③ 在 RMI 系统中，我们使用延迟激活。延迟激活将激活对象推迟到客户第一次使用（即第一次方法调用）之前
+		④ RMI Activation 这么好用，为什么会被废弃，因为对于现代应用程序来说，分布式系统大部分都是基于 Web 的，Web 服务器已经解决了穿越防火墙，过滤请求，身份验证和安全性问题，并且也提供
+		了很多延迟加载的技术
+		⑤ 所以在现代应用程序中，RMI Activation 已经很少被使用了，并且在各种开源代码库中，也基本找不到 RMI Activation 的使用代码了
+	    ⑥ 为了减少 RMI Activation 的维护成本，在 JDK8 中，RMI Activation被置为可选的，在 JDK15中，被废弃了。
 
 
 
