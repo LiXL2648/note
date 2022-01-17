@@ -1,0 +1,1565 @@
+一、Docker 复杂安装详说
+	1. 安装 MySQL 主从复制
+		① 主从复制原理
+		② 主从搭建步骤
+			A. 新建主服务容器 3307
+				docker run -p 3307:3306 --name mysql-master \
+				-v /usr/local/mydata/mysql-master/log:/var/log/mysql \
+				-v /usr/local/mydata/mysql-master/data:/var/lib/mysql \
+				-v /usr/local/mydata/mysql-master/conf:/etc/mysql \
+				-e MYSQL_ROOT_PASSWORD=2648 -d mysql:5.7.30
+			B. 进入 /usr/local/mydata/mysql-master/conf 目录下新建 my.cnf
+[mysqld]
+## 设置server_id，同一局域网中需要唯一
+server_id=101
+## 指定不需要同步的数据库名称
+binlog-ignore-db=mysql
+## 开启二进制日志功能
+log-bin=li-mysql-bin
+## 设置二进制日志使用内存大小（事务）
+binlog_cache_size=1M
+## 设置使用的二进制日志格式（mixed,statement,row）
+binlog_format=mixed
+## 二进制日志过期清理时间。默认值为0，表示不自动清理。
+expire_logs_days=7
+## 跳过主从复制中遇到的所有错误或指定类型的错误，避免slave端复制中断。
+## 如：1062错误是指一些主键重复，1032错误是因为主从数据库数据不一致
+slave_skip_errors=1062
+			C. 修改完配置后重启master实例
+				docker restart mysql-master
+				docker ps
+			D. 进入mysql-master容器
+				docker exec -it mysql-master /bin/bash
+				mysql -uroot -p2648
+			E. master容器实例内创建数据同步用户
+				CREATE USER 'slave'@'%' IDENTIFIED BY '2648';
+				GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'slave'@'%';
+			F. 新建从服务器容器实例3308
+				docker run -p 3308:3306 --name mysql-slave \
+				-v /usr/local/mydata/mysql-slave/log:/var/log/mysql \
+				-v /usr/local/mydata/mysql-slave/data:/var/lib/mysql \
+				-v /usr/local/mydata/mysql-slave/conf:/etc/mysql \
+				-e MYSQL_ROOT_PASSWORD=2648 -d mysql:5.7.30
+			G. 进入/mydata/mysql-slave/conf目录下新建my.cnf
+[mysqld]
+## 设置server_id，同一局域网中需要唯一
+server_id=102
+## 指定不需要同步的数据库名称
+binlog-ignore-db=mysql
+## 开启二进制日志功能，以备Slave作为其它数据库实例的Master时使用
+log-bin=li-mysql-slave1-bin
+## 设置二进制日志使用内存大小（事务）
+binlog_cache_size=1M
+## 设置使用的二进制日志格式（mixed,statement,row）
+binlog_format=mixed
+## 二进制日志过期清理时间。默认值为0，表示不自动清理。
+expire_logs_days=7
+## 跳过主从复制中遇到的所有错误或指定类型的错误，避免slave端复制中断。
+## 如：1062错误是指一些主键重复，1032错误是因为主从数据库数据不一致
+slave_skip_errors=1062
+## relay_log配置中继日志
+relay_log=li-mysql-relay-bin
+## log_slave_updates表示slave将复制事件写进自己的二进制日志
+log_slave_updates=1
+## slave设置为只读（具有super权限的用户除外）
+read_only=1
+			H. 修改完配置后重启slave实例
+				docker restart mysql-slave
+				docker ps
+			I. 在主数据库中查看主从同步状态
+				show master status;
+			J. 进入mysql-slave容器
+				docker exec -it mysql-slave /bin/bash
+				mysql -uroot -p2648
+			K. 在从数据库中配置主从复制
+				a. 主从复制命令参数说明
+					(1) master_host：主数据库的IP地址；
+					(2) master_port：主数据库的运行端口；
+					(3) master_user：在主数据库创建的用于同步数据的用户账号；
+					(4) master_password：在主数据库创建的用于同步数据的用户密码；
+					(5) master_log_file：指定从数据库要复制数据的日志文件，通过查看主数据的状态，获取File参数；
+					(6) master_log_pos：指定从数据库从哪个位置开始复制数据，通过查看主数据的状态，获取Position参数；
+					(7) master_connect_retry：连接失败重试的时间间隔，单位为秒。
+				b. 命令
+					change master to master_host='宿主机ip', master_user='slave', master_password='123456', master_port=3307, master_log_file='mall-mysql-bin.000001', master_log_pos=617, master_connect_retry=30;
+				c. 举例
+					change master to master_host='192.168.230.48', master_user='slave', master_password='2648', master_port=3307, master_log_file='li-mysql-bin.000003', master_log_pos=617, master_connect_retry=30;
+			L. 在从数据库中查看主从同步状态
+				a. 命令
+					show slave status \G;
+				b. 结果
+					Slave_IO_Running: No
+					Slave_SQL_Running: No
+			M. 在从数据库中开启主从同步
+				start slave;
+			N. 查看从数据库状态发现已经同步
+				a. 命令
+					show slave status \G;
+				b. 结果
+					Slave_IO_Running: Yes
+					Slave_SQL_Running: No
+			O. 主从复制测试
+				a. 在主数据库中新建数据库 db01，新建表 t1以及插入数据
+					create database db01;
+					show databases;
+					use db01;
+					create table t1 (id int, name varchar(20));
+					show tables;
+					insert into t1 values (1, 'Li');
+					select * from t1;
+				b. 在从数据库中查看数据库，查看表以及查看记录
+					show databases;
+					use db01;
+					show tables;
+					select * from t1;
+				c. 结论：主从复制搭建成功
+	2. 安装 Redis 集群（大厂面试题第四季-分布式存储案例，cluster（集群）模式-docker 版哈希槽分区进行亿级数据存储）
+		① 面试题：
+			A. 问题：1~2亿条数据需要缓存，请问如何设计这个存储案例
+			B. 回答：单机单台100%不可能，肯定是分布式存储
+			C. 问题：如用redis进行解决？
+			D. 一般业界有3种解决方案
+				a. 哈希取余分区
+								+------+
+								| 用户 |
+								+------+
+									|
+								读写操作
+									↓
+							+---------------+
+							| hash(key) / 3 |
+							+---------------+
+									|
+							+-------+-------+
+							↓		↓		↓
+					+-------+	+-------+	+-------+
+					| redis |	| redis |	| redis |
+					+-------+	+-------+	+-------+
+					(1) 2亿条记录就是2亿个k,v，我们单机不行必须要分布式多机，假设有3台机器构成一个集群，用户每次读写操作都是根据公式：hash(key) % N个机器台数，计算出哈希值，用来决定数据映射到哪一个节点上。
+					(2) 优点：简单粗暴，直接有效，只需要预估好数据规划好节点，例如3台、8台、10台，就能保证一段时间的数据支撑。使用Hash算法让固定的一部分请求落到同一台服务器上，这样每台服务器固定处理一部分请求
+						（并维护这些请求的信息），起到负载均衡+分而治之的作用。
+					(3) 缺点：原来规划好的节点，进行扩容或者缩容就比较麻烦了额，不管扩缩，每次数据变动导致节点有变动，映射关系需要重新进行计算，在服务器个数固定不变时没有问题，如果需要弹性扩容或故障停机的情况下，
+					原来的取模公式就会发生变化：Hash(key)/3会变成Hash(key) /?。此时地址经过取余运算的结果将发生很大变化，根据公式获取的服务器也会变得不可控。某个redis机器宕机了，由于台数数量变化，会导致hash取余
+					全部数据重新洗牌。
+				b. 一致性哈希算法分区
+					(1) 一致性Hash算法背景：一致性哈希算法在1997年由麻省理工学院中提出的，设计目标是为了解决分布式缓存数据变动和映射问题，某个机器宕机了，分母数量改变了，自然取余数不OK了。
+					(2) 能干嘛：提出一致性Hash解决方案。目的是当服务器个数发生变动时，尽量减少影响客户端到服务器的映射关系
+					(3) 3大步骤
+						(A) 算法构建一致性哈希环：
+							(a) 一致性哈希环：一致性哈希算法必然有个 hash 函数并按照算法产生 hash 值，这个算法的所有可能哈希值会构成一个全量集，这个集合可以成为一个 hash 空间[0, 2^32-1]。这是一个线性空间，但是在
+							算法中，我们通过适当的逻辑控制将它首尾相连（0=2^32），这样让它逻辑上形成一个环形空间
+							(b) 它也是按照使用取模的方法，前面介绍的节点取模法是对节点（服务器）的数量进行取模。而一致性 Hash 算法是对 2^32 取模，简单来说，一致性 Hash 算法将整个哈希值空间组织成一个虚拟的圆环，如
+							假设某哈希函数 H 的值空间为0-2^32-1（即哈希值是一个 32 位无符号整形），整个空间按顺时针方向组织，圆环的正上方的点代表 0，0 点的右侧的第一个点代表 1，以此类推，2、3、4、…… 直到 2^32-1，
+							也就是说 0 点左侧的第一个点代表 2^32-1，0 和 2^32-1 在零点中方向重合，我们把这个由 2^32 个点组成的圆环称为 Hash 环。
+						(B) 节点映射：
+							(a) 将集群中各个 IP 节点映射到环上的某一个位置
+							(b) 将各个服务器使用 Hash 进行一个哈希，具体可以选择服务器的 IP 或者主机名作为关键字进行哈希，这样每台机器就能确定其在哈希环上的位置。假如 4 个节点 NodeA、B、C、D，经过 IP 地址鞥带哈希
+							函数计算（hash(ip)），使用 IP 地址哈希后在环空间的位置如下
+						(C) Key 落到服务器的落键规则
+							(a) 当我们需要存储一个 K/V 键值对时，首先计算 key 的 hash 值，hash(key)，将这个 key 使用相同的函数 Hash 计算出哈希值并确定此数据在换上的位置，从此位置沿环顺时针“行走”，第一台遇到的服务
+							器就是应该定位到的服务器，并将该键值对存储在该节点上。
+							(b) 如果我们有 ObjectA、ObjectB、ObjectC、ObjectD 四个数据对象，经过哈希计算后，在环空间上，根据一致性 Hash 算法，数据 A 会被定位 NodeA 上，B 会被定位 NodeB 上，C 会被定位 NodeC 上，
+							D 会被定位 NodeD 上。
+					(4) 优点
+						(A) 一致性哈希算法的容错性：假设 NodeC 宕机，可以看到此时对象 A、B、D不会受到影响，只有 C 对象被定位到 NodeD，一般的，在一致性 Hash 算法中，如果一台服务器不可用，则受影响的数据仅仅是此服
+						务器到环空间中前一台服务器（即沿着逆时针方向走遇到的第一台服务器）之间数据，其他不会受到影响。简单说，就是 C 挂了，受影响的只是 B、C 之间的数据，并且这些数据会转移到 D 进行存储。
+						(B) 一致性哈希算法的扩展性：数据量增加，需要增加一台节点 NodeX，X 的位置在 A 和 B 之间，那受到影响的也就是A 到 X 之间的数据，重新把 A 到 X 的数据录入到 X 上即可，不会导致 hash 取余全部数据
+						重新洗牌。
+					(5) 缺点：一致性哈希算法的数据倾斜问题，一致性 Hash 算法在服务节点太少时，容易因为节点分布不均匀而造成数据倾斜（被缓存的对象大部分集中缓存在某一台服务器上）问题。
+					(6) 总结：
+						(A) 为了在节点数目发生改变时尽可能少的迁移数据
+						(B) 将所有的存储节点排列在首尾相接的 Hash 环上，每个 key 在计算 Hash 后会顺时针找到临近的存储节点存放。而当有节点加入或退出时仅影响该节点在 Hash  环上顺时针相邻的后续节点
+						(C) 优点：加入和删除节点只影响哈希环中顺时针方向的相邻节点，对其他节点无影响
+						(D) 缺点：数据分布和节点的位置有关，因为这些节点不是均匀的分布在哈希环上的，所以数据在进行存储时达不到均匀分布的效果。
+				c. 哈希槽分区
+					(1) 是什么
+						(A) 为什么会出现：解决一致性哈希算法的数据倾斜问题，哈希槽实质上就是一个数组，数组[0, 2^14-1] 形成 hash slot 空间
+						(B) 能干嘛：
+							(a) 解决均匀分配得问题，在数据和节点之间又加入了一层，把这层称为哈希槽（slot），用于管理数据和节点之间的关系，现在就相当于节点上放的是槽，槽哩放的是数据。
+							(b) 槽解决的是粒度问题，相当于把粒度变大了，这样便于数据移动。
+							(c) 哈希解决的是映射问题，使用 key 的哈希值来计算所在的槽，便于数据分配
+						(C) 多少个 hash 槽：一个集群只能有 16384 个槽，编号 0-16383（0-2^14-1）。这些槽会分配给集群中的所有主节点，分配策略没有要求，可以指定哪些编号的槽分配给哪个主节点。集群会记录节点和槽的对应关系，
+						解决了节点和槽的关系后，接下来就需要对 key 求哈希值，然后对 16384 取余，余数是几 key 就落入对应的槽哩。slot=CRC16(key)%16384。以槽为单位移动数据，因为槽的数目是固定的，处理起来比较容易，这样
+						数据移动问题就解决了。
+					(2) 经典面时题
+						(A) 为什么 redis 集群的最大槽数是 16384个
+							(a) Redis 集群并没有使用一致性 hash 而是引入了哈希槽的概念。Redis 集群有16384 个哈希槽，每个 key 通过 CRC16 校验后对 16384 取模来决定放置在哪个槽，集群的每个节点复制一部分槽。但是为什么
+							哈希槽的数量是 16384(2^14)个呢？
+							(b) CRC16 算法产生的 hash 值有 16bit，该算法可以产生 2^16=65536个值，换句话说值是分布在0-65535之间，那么作者做mod运算的时候，为什么不mod65536，而选择 mod16384?
+						(B) 说明1：正常的心跳数据包带有节点的完整配置，可以用幂等方式用旧的节点替换旧节点，以便更新旧的配置这就意味着他们包含原始节点的插槽配置，该节点使用 2k 的空间和 16k 的插槽，但是会使用 8k 的空
+						间（使用 65k 的插槽），同时，由于其他设计折衷，Redis 集群不太可能扩展到 1000 个以上的主节点因此 16k 处于正确的范围内，以确保每个主机具有足够的插槽，最多可以容纳 1000 个矩阵，但数量足够少，
+						可以轻松地将插槽配置组为原始位图传播。注意：在小型集群中，位图将难以压缩，因此 N 较小时，位图将设置的 slot/N 位占位置位的很大百分比。
+						(C) 说明2：
+							(a) 如果槽位为 65536，发送心跳信息的消息头达 8k，发送的心跳包过于庞大，在消息头中最占空间的是 myslot[CLUSTER_SLOTS/8]。当槽位为 65536，这块大小是：65536/8/1024=8k，因为每秒钟，redis 节点
+							需要发送一定数量的 ping 消息作为心跳包，如果槽位 65536，这个 ping 消息的消息头太大了，浪费带宽
+							(b) redis 的集群主节点数量基本不可能超过 1000 台，集群节点越多，心跳包的消息体内携带的数据越多。如果节点超过 1000 个，也会导致网络拥堵。因此 redis 作者不建议 redis cluster 节点数量超过
+							1000个。那么，对于节点数在1000以内的 redis cluster 集群，16384 个槽位够用了，没有必要扩展到 65536 个。
+							(c) 槽位越小，节点少的情况下，压缩比高，容易传输，Redis 主节点的配置信息中它负责的哈希槽是通过一张 bitmap 的形式来保存的，在传输过程中会对 bitmap 进行压缩，但是如果 bitmap 的填充率
+							slots/N很高的话（N表示节点数），bitmap 的压缩率就很低。如果节点数很少，而哈希槽数量很多的话，bitmap 的压缩率就很
+					(3) 哈希槽计算：Redis 集群中内置了 16384 个哈希槽，redis 会根据节点数量大致均等的将哈希槽映射到不同的节点。当需要在 Redis 集群中放置一个 key-value 时，redis 先对 key 使用 crc16 算法算出一个结果，
+					然后把结果对 16384 求余数，这样每个 key 都会对应一个编号在 0-16383之间的哈希槽，也就是映射到某个节点上。
+		② 3主3从redis集群扩缩容配置案例架构说明
+		③ 步骤
+			A. 3主3从redis集群配置
+				a. 新建 6 个 docker 容器实例
+					docker run -d --name redis-node-1 --net host --privileged=true -v /usr/local/mydata/redis-node-1:/data redis:6.0.8 --cluster-enabled yes --appendonly yes --port 6381 --protected-mode no
+					docker run -d --name redis-node-2 --net host --privileged=true -v /usr/local/mydata/redis-node-2:/data redis:6.0.8 --cluster-enabled yes --appendonly yes --port 6382 --protected-mode no
+					docker run -d --name redis-node-3 --net host --privileged=true -v /usr/local/mydata/redis-node-3:/data redis:6.0.8 --cluster-enabled yes --appendonly yes --port 6383 --protected-mode no
+					docker run -d --name redis-node-4 --net host --privileged=true -v /usr/local/mydata/redis-node-4:/data redis:6.0.8 --cluster-enabled yes --appendonly yes --port 6384 --protected-mode no
+					docker run -d --name redis-node-5 --net host --privileged=true -v /usr/local/mydata/redis-node-5:/data redis:6.0.8 --cluster-enabled yes --appendonly yes --port 6385 --protected-mode no
+					docker run -d --name redis-node-6 --net host --privileged=true -v /usr/local/mydata/redis-node-6:/data redis:6.0.8 --cluster-enabled yes --appendonly yes --port 6386 --protected-mode no
+				b. 命令分步解释
+					(1) docker run：创建并运行docker容器实例
+					(2) --name redis-node-6：容器名字
+					(3) --net host：使用宿主机的IP和端口，默认
+					(4) --privileged=true：获取宿主机root用户权限
+					(5) -v /usr/local/mydata/redis-node-6:/data：容器卷，宿主机地址:docker内部地址
+					(6) redis:6.0.8：redis镜像和版本号
+					(7) --cluster-enabled yes：开启redis集群
+					(8) --appendonly yes：开启持久化
+					(9) --port 6386：redis端口号
+				c. 进入容器redis-node-1并为6台机器构建集群关系
+					(1) 进入容器
+						docker exec -it redis-node-1 /bin/bash
+					(2) 构建主从关系
+						(A) 注意，进入docker容器后才能执行一下命令，且注意自己的真实IP地址
+						(B) redis-cli --cluster create 192.168.230.48:6381 192.168.230.48:6382 192.168.230.48:6383 192.168.230.48:6384 192.168.230.48:6385 192.168.230.48:6386 --cluster-replicas 1
+						redis-cli --cluster create redis-node-1:6381 redis-node-2:6382 redis-node-3:6383 redis-node-4:6384 redis-node-5:6385 redis-node-6:6386 --cluster-replicas 1
+						(C) --cluster-replicas 1 表示为每个master创建一个slave节点
+					(3) 至此，3 主 3 从搭建完毕
+				d. 链接进入6381作为切入点，查看集群状态
+					(1) 连接 6381
+						redis-cli -p 6381
+					(2) cluster info
+						cluster_state:ok
+						cluster_slots_assigned:16384
+						cluster_slots_ok:16384
+						cluster_slots_pfail:0
+						cluster_slots_fail:0
+						cluster_known_nodes:6
+						cluster_size:3
+						cluster_current_epoch:6
+						cluster_my_epoch:1
+						cluster_stats_messages_ping_sent:286
+						cluster_stats_messages_pong_sent:292
+						cluster_stats_messages_sent:578
+						cluster_stats_messages_ping_received:287
+						cluster_stats_messages_pong_received:286
+						cluster_stats_messages_meet_received:5
+						cluster_stats_messages_received:578
+					(3) cluster nodes
+						fcb99f2e830063b022a30207b144fed7b1faa28b 192.168.230.48:6381@16381 myself,master - 0 1641454837000 1 connected 0-5460
+						65fd2107a69a06131130c80696bd1f5cd3a7fc1b 192.168.230.48:6384@16384 slave fcb99f2e830063b022a30207b144fed7b1faa28b 0 1641454840375 1 connected
+						63b384c7e2db4bbacd45931e0bc032adfad9fc06 192.168.230.48:6385@16385 slave f2aecd05718bafde6553e730aee361736cee830d 0 1641454839000 2 connected
+						f2aecd05718bafde6553e730aee361736cee830d 192.168.230.48:6382@16382 master - 0 1641454839353 2 connected 5461-10922
+						a221023dbb5510d34a0d9c1d6a9f9373e03dcb8f 192.168.230.48:6383@16383 master - 0 1641454838000 3 connected 10923-16383
+						ad48a2a5c23d36ab79966e9c571cdfbaccbeccce 192.168.230.48:6386@16386 slave a221023dbb5510d34a0d9c1d6a9f9373e03dcb8f 0 1641454838000 3 connected
+			B. 主从容错切换迁移案例
+				a. 数据读写存储
+					(1) 启动6机构成的集群并通过exec进入
+						docker exec -it redis-node-1 /bin/bash
+					(2) 对6381新增两个key
+						set k1 v1
+						(error) MOVED 12706 192.168.230.48:6383
+						set k2 v2
+						OK
+						出现错误的原因是，连上某一台集群的redis，如果 key 的哈希槽不在该节点的哈希槽范围内，则无法进行存储
+					(3) 防止路由失效加参数-c并新增两个key
+						redis-cli -p 6381 -c
+						set k1 v1
+						-> Redirected to slot [12706] located at 192.168.230.48:6383
+						OK
+					(4) 查看集群信息
+						redis-cli --cluster check 192.168.230.48:6382
+				b. 容错切换迁移
+					(1) 主6381和从机切换，先停止主机6381
+						docker stop redis-node-1
+					(2) 再次查看集群信息
+						docker exec -it redis-node-2 /bin/bash
+						redis-cli -p 6382 -c
+						cluster nodes
+						f2aecd05718bafde6553e730aee361736cee830d 192.168.230.48:6382@16382 myself,master - 0 1641456110000 2 connected 5461-10922
+						a221023dbb5510d34a0d9c1d6a9f9373e03dcb8f 192.168.230.48:6383@16383 master - 0 1641456109065 3 connected 10923-16383
+						ad48a2a5c23d36ab79966e9c571cdfbaccbeccce 192.168.230.48:6386@16386 slave a221023dbb5510d34a0d9c1d6a9f9373e03dcb8f 0 1641456108045 3 connected
+						fcb99f2e830063b022a30207b144fed7b1faa28b 192.168.230.48:6381@16381 master,fail - 1641455991908 1641455988000 1 disconnected
+						65fd2107a69a06131130c80696bd1f5cd3a7fc1b 192.168.230.48:6384@16384 master - 0 1641456112126 7 connected 0-5460
+						63b384c7e2db4bbacd45931e0bc032adfad9fc06 192.168.230.48:6385@16385 slave f2aecd05718bafde6553e730aee361736cee830d 0 1641456111106 2 connected
+						6381 宕机，6384 成为新的 master
+					(3). 先还原之前的3主3从
+						docker start redis-node-1
+					(4) 查看集群状态
+						cluster nodes
+						f2aecd05718bafde6553e730aee361736cee830d 192.168.230.48:6382@16382 myself,master - 0 1641456400000 2 connected 5461-10922
+						a221023dbb5510d34a0d9c1d6a9f9373e03dcb8f 192.168.230.48:6383@16383 master - 0 1641456404017 3 connected 10923-16383
+						ad48a2a5c23d36ab79966e9c571cdfbaccbeccce 192.168.230.48:6386@16386 slave a221023dbb5510d34a0d9c1d6a9f9373e03dcb8f 0 1641456403000 3 connected
+						fcb99f2e830063b022a30207b144fed7b1faa28b 192.168.230.48:6381@16381 slave 65fd2107a69a06131130c80696bd1f5cd3a7fc1b 0 1641456402000 7 connected
+						65fd2107a69a06131130c80696bd1f5cd3a7fc1b 192.168.230.48:6384@16384 master - 0 1641456405027 7 connected 0-5460
+						63b384c7e2db4bbacd45931e0bc032adfad9fc06 192.168.230.48:6385@16385 slave f2aecd05718bafde6553e730aee361736cee830d 0 1641456403007 2 connected
+						6384 仍然是 master，而6381 恢复成成为了 slaver
+					(5) 如果要恢复成	redis-node-1 为 master，则需关掉 6384，再次启动即可
+						docker stop redis-node-1
+						docker start redis-node-1
+			C. 主从扩容案例
+				a. 新建6387、6388两个节点+新建后启动+查看是否8节点
+					docker run -d --name redis-node-7 --net host --privileged=true -v /usr/local/mydata/redis-node-7:/data redis:6.0.8 --cluster-enabled yes --appendonly yes --port 6387
+					docker run -d --name redis-node-8 --net host --privileged=true -v /usr/local/mydata/redis-node-8:/data redis:6.0.8 --cluster-enabled yes --appendonly yes --port 6388
+				b. 进入6387容器实例内部
+					docker exec -it redis-node-7 /bin/bash
+				c. 将新增的6387节点(空槽号)作为master节点加入原集群
+					 redis-cli --cluster add-node 192.168.230.48:6387 192.168.230.48:6381
+					 6387 就是将要作为 master 新增节点
+					 6381 就是原来集群节点的领路人。
+				d. 检查集群情况第1次
+					redis-cli --cluster check 192.168.230.48:6381
+					192.168.230.48:6387 (cf61ea8f...) -> 0 keys | 0 slots | 0 slaves.
+					新增的节点暂未分配槽点
+				e. 重新分派槽号
+					(1) 重新分派槽号命令：redis-cli --cluster reshard IP地址:端口号
+					(2) 举例：redis-cli --cluster reshard 192.168.230.48:6381
+					(3) 步骤
+						(A) How many slots do you want to move (from 1 to 16384) ? 4096 (16384 / 4)
+						(B) What is the receiving node ID ? 新增节点的ID
+						(C) Source node # 1：all
+						(D) Do you want to proceed with the proposed reshard plan (yes/no)? yes
+				f. 检查集群情况第2次
+					(1) redis-cli --cluster check 192.168.230.48:6381
+					(2) 槽号分派说明：为什么6387是3个新的区间，以前的还是连续？重新分配成本太高，所以前3家各自分出来一部分，从6381/6382/6383三个旧节点分别分出1364个槽位给新节点6387
+				g. 为主节点6387分配从节点6388
+					(1) 命令：redis-cli --cluster add-node ip:新slave端口 ip:新master端口 --cluster-slave --cluster-master-id 新主机节点ID
+					(2) 举例：redis-cli --cluster add-node 192.168.230.48:6388 192.168.230.48:6387 --cluster-slave --cluster-master-id cf61ea8fa839ba0212e47a1ac4f2289e74ccc0e8
+				h. 检查集群情况第3次
+					redis-cli --cluster check 192.168.230.48:6381
+			D. 主从缩容案例
+				a. 目的：6387和6388下线
+				b. 检查集群情况1获得6388的节点ID
+					redis-cli --cluster check 192.168.230.48:6381
+				c. 将6388删除，从集群中将4号从节点6388删除
+					(1) 命令：redis-cli --cluster del-node ip:从机端口 从机6388节点ID 
+					(2) 举例：redis-cli --cluster del-node 192.168.230.48:6388 347708556d6f1b1717d7cc018053bff2e18168cc
+					(3) redis-cli --cluster check 192.168.230.48:6381 检查一下发现，6388被删除了，只剩下7台机器了。
+				d. 将6387的槽号清空，重新分配，本例将清出来的槽号都给6381
+					(1) redis-cli --cluster reshard 192.168.230.48:6381
+					(2) How many slots do you want to move (from 1 to 16384)? 4096
+					(3) What is the receiving node ID? fcb99f2e830063b022a30207b144fed7b1faa28b
+					(4) Source node #1: cf61ea8fa839ba0212e47a1ac4f2289e74ccc0e
+					(5) Source node #2: done
+					(6) Do you want to proceed with the proposed reshard plan (yes/no)? yes
+				e. 检查集群情况第二次
+					redis-cli --cluster check 192.168.230.48:6381
+				f. 将6387删除
+					redis-cli --cluster del-node 192.168.230.48:6387 cf61ea8fa839ba0212e47a1ac4f2289e74ccc0e8
+				g. 检查集群情况第三次
+					redis-cli --cluster check 192.168.230.48:6381
+二、DockerFile解析
+	1. 是什么
+		① Dockerfile 是用来构建 Docker 镜像的文本文件，是由一条条构建镜像所需的指令和参数构成的脚本。
+		② 概述
+															+-----------------------------------------------------------+
+															|															↓ push
+			+-----------------------------------------------+-------------------------------------------+		+-----------------+
+			|												|											|		|				  |
+			|							+-------------------+-------------------+						|		| Docker registry |
+			|							|    tar +-----↓	↓					|						|		| 				  |
+			|							|	     |	 +------------+				|						|		+-----------------+
+			|	+------------+   build	|  	     +-- |		 	  |				|						|				| pull
+			|	| Dockerfile | ---------+----------> |   images	  |	<-----------+-----------------------+---------------+
+			|	+------------+			| 	     +-> |			  | --+			|						|
+			|							|	     |	 +------------+	  |			|						|
+			|						    | commit |					  | run		|						|
+			|							|	     |	 +------------+	  |			|						|
+			|							|	     |	 |			  | <-+			|						|
+			|							|	     +-- | Containers | 			|						|
+			|							|		     |			  | --+ stop	|						|
+			|							|		     +------------+	  | start	|						|
+			|							|				    ↑---------+ restart |						|
+			|							|										|						|
+			|							|		Local Docker instance			|						|
+			|							+---------------------------------------+						|
+			|																							|
+			|										  My Computer										|
+			+-------------------------------------------------------------------------------------------+
+		③ 官网：https://docs.docker.com/engine/reference/builder/
+		④ 构建三步骤
+			A. 编写 Dockerfile 文件
+			B. docker build 命令构建镜像
+			C. docker run 依镜像运行容器实例
+	2. DockerFile构建过程解析
+		① Dockerfile内容基础知识
+			A. 每条保留字指令都必须为大写字母且后面要跟随至少一个参数
+			B. 指令按照从上到下，顺序执行
+			C. #表示注释
+			D. 每条指令都会创建一个新的镜像层并对镜像进行提交
+		② Docker执行Dockerfile的大致流程
+			A. docker从基础镜像运行一个容器
+			B. 执行一条指令并对容器作出修改
+			C. 执行类似docker commit的操作提交一个新的镜像层
+			D. docker再基于刚提交的镜像运行一个新容器
+			E. 执行dockerfile中的下一条指令直到所有指令都执行完成
+		③ 总结
+			A. 从应用软件的角度来看，Dockerfile、Docker 镜像与 Docker 容器分别代表软件的三个不同阶段，Dockerfile面向开发，Docker镜像成为交付标准，Docker容器则涉及部署与运维，三者缺一不可，合力充当Docker体系的基石。
+				a. Dockerfile 是软件的原材料
+				b. Docker 镜像是软件的交付品
+				c. Docker 容器可以认为是软件镜像的运行态，也即依照镜像运行的容器实例
+			B. Dockerfile，需要定义一个 Dockerfile，Dockerfile 定义了进程需要的一切东西，Dockerfile 涉及的内容包括执行代码或者是文件、环境变量、依赖包、运行时环境、动态链接库、操作系统的发行版、服务进程和内核进程（
+			当应用进行需要和系统服务和内核进程打交道，这时需要考虑如何设计 namespace 的权限控制等）等待。
+			C. Docker 镜像，在用 Dockerfile 定义一个文件之后，Docker build 时会产生一个 Docker 镜像，当运行 Docker 镜像时会真正开始提高服务
+			D. Docker 容器：容器是直接提高服务的。
+	3. DockerFile 常用保留字指令
+		① 参考tomcat8的dockerfile入门：https://github.com/docker-library/tomcat
+		② FROM：基础镜像，当前新镜像是基于哪个镜像的，指定一个已经存在的镜像作为模板，第一条必须是from
+		③ MAINTAINER：镜像维护者的姓名和邮箱地址
+		④ RUN
+			A. 容器构建时需要运行的命令
+			B. 两种格式
+				a. shell格式
+					(1) RUN <命令行命令> 等同于在终端操作 shell 命令。
+					(2) 举例：RUN yum -y install vim
+				b. exec格式
+					(1) RUN ["可执行文件", "参数1", "参数2"]
+					(2) 举例：RUN ["./test.php", "dev", "offline"] 等价于 ./test.php dev offline
+			C. RUN 是在 Docker build 时运行的
+		⑤ EXPOSE：当前容器对外暴露出的端口
+		⑥ WORKDIR：指定在创建容器后，终端默认登陆的进来工作目录，一个落脚点
+		⑦ USER：指定该镜像以什么样的用户去执行，如果都不指定，默认是root
+		⑧ ENV：
+			A. 用来在构建镜像过程中设置环境变量
+			B. 举例：ENV MY_PATH /usr/mydata
+			C. 说明：这个环境变量可以在后续的任何 RUN 指令中使用，这就如同在命令前面指定了环境变量前缀一样，也可以在其他指令中直接使用这些环境变量
+			D. 比如：WORKDIR $MY_PATH
+		⑥ ADD：将宿主机目录下的文件拷贝进镜像且会自动处理URL和解压tar压缩包
+		⑩ COPY：
+			A. 类似ADD，拷贝文件和目录到镜像中。将从构建上下文目录中 <源路径> 的文件/目录复制到新的一层的镜像内的 <目标路径> 位置
+			B. COPY src dest
+			C. COPY ["src", "dest"]
+				a. <src源路径>：源文件或者源目录
+				b. <dest目标路径>：容器内的指定路径，该路径不用事先建好，路径不存在的话，会自动创建。
+		①① VOLUME：容器数据卷，用于数据保存和持久化工作，相当于 -v
+		①② CMD：
+			A. 指定容器启动后的要干的事情
+				a. CMD 容器启动命令
+				b. CMD 指令的格式和 RUN 相似，也是两种格式
+					(1) shll 格式：CMD <命令>
+					(2) exec 格式：CMD ["可执行文件", "参数1", "参数2"]
+					(3) 参数列表格式：CMD ["参数1", "参数2"]，在指定了 ENTRYPOINT 指令后，用 CMD 指定具体的参数
+			B. 注意：
+				a. Dockerfile 中可以有多个 CMD 指令，但只有最后一个生效，CMD 会被 docker run 之后的参数替换，如果运行容器：docker run -it -p 8080:8080 tomcat，则会执行 tomcat dockerfile 的 CMD ["catalina.sh", "run"] 指令，
+				如果运行容器：docker run -it -p 8080:8080 tomcat /bin/bash，则不会执行 tomcat dockerfile 的 CMD ["catalina.sh", "run"] 指令
+			C. 它和前面RUN命令的区别
+				a. CMD是在docker run 时运行。
+				b. RUN是在 docker build时运行。
+		①③ ENTRYPOINT：
+			A. 也是用来指定一个容器启动时要运行的命令
+			B. 类似于 CMD 指令，但是 ENTRYPOINT 不会被 docker run 后面的命令覆盖，而且这些命令行参数会被当作参数送给 ENTRYPOINT 指令指定的程序
+			C. 命令格式和案例说明
+				a. 命令格式：ENTRYPOINT ["<executeable>", "<param1>", "<param2>", ...]
+				b. ENTRYPOINT 可以和 CMD 一起使用，一般是变参才会使用 CMD，这里的 CMD 等于是在给 ENTRYPOINT 传参。当指定了 ENTRYPOINT 后，CMD 的含义就发生了变化，不再是直接运行其命令而是将 CMD 的内容作为参数传递给ENTRYPOINT 
+				指令，他两个组合会变成 <ENTRYPOINT> "<CMD>"
+				c. 案例如下：假设已通过 DockerFile 构建了 nginx:test 镜像
+					FROM nginx
+					ENTRYPOINT ["nginx", "-c"] # 定参
+					CMD ["/etc/nginx/nginx.conf"] # 变参
+					+------------------+--------------------------------+-------------------------------------------+
+					| 是否传参		   | 按照 Dockerfile 编写执行		| 传参运行 									|
+					+------------------+--------------------------------+-------------------------------------------+
+					| Docker 命令 	   | docker run nginx:test			| docker run nginx:test	/etc/nginx/new.conf |
+					+------------------+--------------------------------+-------------------------------------------+
+					| 衍生出的实际命令 | nginx -c /etc/nginx/nginx.conf | nginx -c /etc/nginx/new.conf				|
+					+------------------+--------------------------------+-------------------------------------------+
+		①④ 总结：dockerfile
+			+---------------+---------+------------+
+			| BUILD 		| BOTH	  | RUN 	   |
+			+---------------+---------+------------+
+			| FROM			| WORKDIR | CMD	       |
+			+---------------+---------+------------+
+			| MAINTAINER	| USER	  | ENV		   |
+			+---------------+---------+------------+
+			| COPY 			|		  | EXPOSE	   |
+			+---------------+---------+------------+
+			| ADD 			|		  | VOLUME	   |
+			+---------------+---------+------------+
+			| RUN 			|		  | ENTRYPOINT |
+			+---------------+---------+------------+
+			| ONBUILD		|		  |			   |
+			+---------------+---------+------------+
+			| .dockerignore | 		  |			   |
+			+---------------+---------+------------+
+	4. 案例
+		① 自定义镜像mycentosjava8
+			A. 要求
+				a. Centos7镜像具备vim+ifconfig+jdk8
+				b. JDK的下载镜像地址：https://mirrors.yangxingzhen.com/jdk/
+			B. 编写 Dockerfile
+				a. 新建目录
+					/usr/local/mydata/mydocker/mycentosjava
+				b. 在 mycentosjava 中拷贝 jdk-8u261-linux-x64.tar.gz
+				c. 新增 Dockerfile 文件，编写指令
+					FROM centos
+					MAINTAINER LiXL<1634491328@qq.com>
+
+					ENV MYPATH /usr/local
+					WORKDIR $MYPATH
+
+					# 安装vim编辑器
+					RUN yum -y install vim
+					# 安装ifconfig命令查看网络IP
+					RUN yum -y install net-tools
+					# 安装java8及lib库
+					RUN yum -y install glibc.i686
+					RUN mkdir /usr/local/java
+					# ADD 是相对路径jar,把jdk-8u261-linux-x64.tar.gz添加到容器中,安装包必须要和Dockerfile文件在同一位置
+					ADD jdk-8u261-linux-x64.tar.gz /usr/local/java/
+					# 配置java环境变量
+					ENV JAVA_HOME /usr/local/java/jdk1.8.0_261
+					ENV JRE_HOME $JAVA_HOME/jre
+					ENV CLASSPATH $JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar:$JRE_HOME/lib:$CLASSPATH
+					ENV PATH $JAVA_HOME/bin:$PATH
+
+					EXPOSE 80
+
+					CMD echo $MYPATH
+					CMD echo "success--------------ok"
+					CMD /bin/bash
+			C. 构建
+				a. 命令：docker build -t 新镜像名字:TAG .
+				b. 举例：docker build -t mycentosjava:8.261 .
+			D. 报错解决
+				a. 构建时出现以下错误
+					(1) [Warning] IPv4 forwarding is disabled. Networking will not work.
+					(2) 解决
+						在宿主机上面执行： 
+							echo net.ipv4.ip_forward=1 >> /usr/lib/sysctl.d/00-system.conf
+						重启network和docker服务 
+							systemctl restart network && systemctl restart docker
+				b. 用docker run 命令起一个容器，容器刚运行就自动退出了
+					(1) 原因：Docker容器后台运行,就必须有一个前台进程，容器运行的命令如果不是那些一直挂起的命令（比如运行top，tail），就是会自动退出的
+					(2) 解决方法：设置不会自动退出的启动命令就可以避免此问题
+						docker run -d --name mycentos09 lixl/centos:1.5 ping 10.10.0.26
+				c. 关闭 docker 服务，提示以下内容
+					Warning: Stopping docker.service, but it can still be activated by:
+						docker.socket
+					(1) 这是docker在关闭状态下被访问自动唤醒机制，很人性化，下面是执行流程：
+						(A) systemctl stop docker 出现警告
+						(B) systemctl status docker 状态为 dead
+						(C) docker ps，执行docker命令，即可唤醒 docker
+						(D) systemctl status docker 状态为 active
+					(2) 如果不希望docker被访问自动唤醒：执行 systemctl stop docker 后再执行 systemctl stop docker.socket
+					(3) systemctl status docker 状态为 dead
+			E. 运行
+				a. 命令：docker run -it 新镜像名字:TAG 
+				b. 举例：docker run -it mycentosjava:8.261
+		② 虚悬镜像
+			A. 是什么
+				a. 构建和删除出错导致仓库名、标签都是<none>的镜像，俗称dangling image
+				b. 举例
+					REPOSITORY                                             TAG       IMAGE ID       CREATED          SIZE
+					<none>                                                 <none>    52704071f825   28 seconds ago   72.8MB
+				c. Dockerfile写一个
+					(1) 创建 Dockerfile 文件
+						mkdir -p /usr/local/mydata/mydocker/myubuntu
+						vi Dockerfile
+					(2) 输入以下内容
+						from ubuntu
+						CMD echo 'action is success'
+					(3) 构建
+						docker build .
+			B. 查看
+				a. docker image ls -f dangling=true
+				b. 结果
+					REPOSITORY   TAG       IMAGE ID       CREATED         SIZE
+					<none>       <none>    52704071f825   7 minutes ago   72.8MB
+					<none>       <none>    0035f1149be5   2 days ago      209MB
+			C. 删除
+				a. 虚悬镜像已经失去存在的价值，可以删除
+				b. 命令：docker image prune
+三、Docker微服务实战
+	1. 通过IDEA新建一个普通微服务模块
+	2. 通过dockerfile发布微服务部署到docker容器
+		① 新建目录
+			mkdir /usr/local/mydata/mydocker/itele
+		② IDEA工具里面搞定微服务 jar 包，将 jar 包上传至 itele目录
+		③ 编写Dockerfile
+			FROM centos
+				MAINTAINER LiXL<1634491328@qq.com>
+
+				ENV MYPATH /usr/local
+				WORKDIR $MYPATH
+
+				# 安装jdk
+				# RUN yum -y install glibc.i686
+				RUN mkdir /usr/local/java
+				ADD jdk-8u261-linux-x64.tar.gz /usr/local/java/
+				ENV JAVA_HOME /usr/local/java/jdk1.8.0_261
+				ENV JRE_HOME $JAVA_HOME/jre
+				ENV CLASSPATH $JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar:$JRE_HOME/lib:$CLASSPATH
+				ENV PATH $JAVA_HOME/bin:$PATH
+
+				# 部署微服务
+				RUN mkdir -p /usr/local/itele/log
+				COPY itele-1.0-SNAPSHOT.jar /usr/local/itele/
+				ENTRYPOINT ["java", "-jar", "/usr/local/itele/itele-1.0-SNAPSHOT.jar"]
+
+				EXPOSE 9090
+				CMD echo "JDK安装成功"
+				CMD echo "部署微服务成功"
+		④ 构建镜像
+			docker build -t itele:1.0 .
+		⑤ 运行容器
+			docker run -d --name itele -v /usr/local/mydata/mydocker/itele/log:/usr/local/itele/log -p 9090:9090 itele:1.0
+		⑥ 访问测试
+			访问成功
+四、 docker不启动，默认网络情况
+	1. 是什么
+		① docker不启动，默认网络情况
+			A. ifconfig
+			B. ens33：宿主机网卡，包含了宿主机 IP
+			C. lo（local）：本地回环链路
+			D. virbr0
+				a. 在 CentOS7 的安装过程中如果有选择相关虚拟化的服务安装系统后，启动网卡时会发现有一个以网桥连接的私网地址的 virbr0 网卡（virbr0 网卡：它有一个固定的默认 IP 地址：
+				192.168.122.1），是做虚拟机网桥使用的，其作用是为连接其上的虚拟机网卡提高 NAT 访问外网的功能
+				b. 安装 Linux 时，勾选安装系统的时候附带了 libvirt 服务才会生成的一个东西，如果不需要可以直接将 libvirt 卸载
+					yum remove libvirt-libs.x86_64
+		② docker启动后，网络情况，会产生一个名为 docker0 的虚拟网桥
+	2. 基本命令
+		① All命令，docker network --help
+			A. connect：连接网桥
+			B. create：创建网桥
+			C. disconnect：断开连接网桥
+			D. inspect：查看网桥信息
+			E. ls：查看所有网桥
+			F. prune：删除所有虚悬网桥
+			G. rm：删除网桥
+		② 查看网络：docker network ls
+		③ 查看网络源数据：docker network inspect  XXX网络名字
+		④ 删除网络：docker network rm XXX网络名字
+	3. 能干嘛
+		① 容器间的互联和通信以及端口映射
+		② 容器IP变动时候可以通过服务名直接网络通信而不受到影响
+	4. 网络模式
+		① 总体介绍
+			A. bridge模式：为每一个容器分配、设置 IP 等，并将容器连接到一个 docker0，虚拟网桥，默认为该模式。使用 --network bridge 指定，默认使用 docker0
+			B. host模式：容器将不会虚拟出自己的网卡，配置自己的 IP 等，而是使用宿主机的 IP 和端口。使用 --network host 指定
+			C. none模式：容器有独立的 Network namespace，但并没有对其进行任何网络设置，如分配 veth pair 和网桥连接，IP 等。使用 --network none 指定
+			D. container模式：新创建的容器不会创建自己的网卡和配置自己的 IP，而是和一个指定的容器共享 IP、端口范围等。使用 --network container:NAME或者容器 ID 指定
+		② 容器实例内默认网络IP生产规则
+			A. 说明
+				a. 启动 Ubuntu 容器 u1
+					docker run -it --name u1 ubuntu bash
+				b. 退出 u1
+					ctrl + p + q
+				c. 启动 Ubuntu 容器 u2
+					docker run -it --name u2 ubuntu bash	
+				d. 退出 u2
+					ctrl + p + q
+				e. 查看 u1 ip
+					docker inspect u1 | tail -n 20
+					IP: "172.17.0.2
+				f. 查看 u2 ip
+					docker inspect u2 | tail -n 20
+					IP: 172.17.0.3
+				g. 删除 u2
+					docker rm -f u2
+				h. 启动 Ubuntu 容器 u3
+					docker run -it --name u3 ubuntu bash
+				i. 查看 u3 ip
+					docker inspect u1 | tail -n 20
+					IP: 172.17.0.3,
+			B. docker 容器内部的 ip 是有可能会发生改变的
+		③ 案例：
+			A. bridge
+				a. 是什么
+					(1) Docker 服务默认会创建一个 docker0 网桥（其上有一个 docker0 内部接口），该桥接网络的名称为 docker0，它在内核层连通了其他物理或虚拟网卡，这就将所有容器和本地
+					主机都放到同一个物理网络。Docker 默认指定了 docker0 接口的 IP 地址和子网掩码，让主机和容器之间可以通过网桥相互通信
+					(2) 查看 bridge 网络的详细信息，并通过 grep 获取名称项
+						docker network inspect bridge | grep name
+							"com.docker.network.bridge.name": "docker0",
+					(3) ifconfig
+						flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+				b. 说明
+					(1) Docker 使用 Linux 桥接，在宿主机虚拟一个 Docker 容器网桥（docker0），Docker 启动一个容器时会根据 Docker 网桥的网段分配给容器一个 IP 地址，称为 Container-IP，同时
+					Docker 网桥是每个容器的默认网关。因为在同一宿主机内的容器都接入同一个网桥，这样容器之间就能够通过容器的 Container-IP 直接通信
+					(2) Docker run 的时候，没有指定 network 的话默认使用的网桥模式是 bridge，使用的就是 docker0。在宿主机 ifconfig，就可以看到 docker0 和自己 create 的 network（eth0，eth1，
+					eth2，代表网卡一，网卡二，网卡三）。lo 代表 127.0.0.1，即 localhost，inet addr 用来表示网卡的 IP 地址
+					(3)网桥 docker0 创建一对对虚拟设备接口一个叫 veth，另一个叫 eth0，成对匹配。
+						(A) 整个宿主机的网桥模式都是 docker0，类似于一个交换机有一堆接口，每个接口叫 veth，在本地主机和容器内分别创建一个虚拟接口，并让他们彼此联通（这样一对接口叫 veth pair）
+						(B) 每个容器实例内部也有一块网卡，每个接口叫 eth0
+						(C) docker0 上面的每个 veth 匹配某个容器实例内部的 eth0，两两配对，一一匹配
+					(4) 通过上述，将宿主机上的所有容器都连接到这个内部网络上，两个容器在同一个网络下，会从这个网关下各自拿到分配的 IP，此时两个容器的网络是互通的。
+						+---------------------------------------------------------------------------+
+						|	+------------------+	+------------------+	+------------------+	|
+						|	| Docker Container |	| Docker Container |	| Docker Container |	|
+						|	|	  +------+	   |	|	  +------+	   |	|	  +------+	   |	|
+						|	|	  | eth0 |	   |	|	  | eth0 |	   |	|	  | eth0 |	   |	|
+						|	+------------------+	+------------------+	+------------------+	|
+						|			 ^						  ^						  ^				|
+						|			 ↓						  ↓						  ↓				|
+						|		  +------+				  +------+				  +------+			|
+						|	+-----| veth |----------------| veth |----------------| veth |-----+	|
+						|	|	  +------+				  +------+				  +------+	   |	|
+						|	|						  docker0(bridge)						   |	|
+						|	+------------------------------------------------------------------+	|
+						|									  ^										|
+						|									  ↓ ipv4 ip_forward						|
+						|								  +-------+									|
+						|			Host				  | ens33 |									|
+						|								  +-------+									|
+						+---------------------------------------------------------------------------+
+				c. 代码：
+					(1) docker run -d --name mytomcat03 -p 8081:8080 lixl/tomcat:9.0
+						(A) 查看宿主机网络
+							ip addr
+							201: veth6f504b3@if200
+						(B) 进入容器，查看容器网络
+							docker exec -it mytomcat03 bash
+							ip addr
+							200: eth0@if201
+						
+					(2) docker run -d --name mytomcat04 -p 8082:8080 lixl/tomcat:9.0
+						(A) 查看宿主机网络
+							ip addr
+							203: veth2eacfa8@if202
+						(B) 进入容器，查看容器网络
+							docker exec -it mytomcat03 bash
+							ip addr
+							202: eth0@if203
+					(3) 两两匹配验证成功
+			B. host
+				a. 是什么；直接使用宿主机的 IP 地址与外界进行通信，不再需要额外进行NAT 转换。
+				b. 说明：容器将不会获得一个独立的Network Namespace， 而是和宿主机共用一个Network Namespace。容器将不会虚拟出自己的网卡而是使用宿主机的IP和端口。
+				c. 代码
+					(1) 警告：
+						(A) docker run -d -p 8083:8080 --network host --name mytomcat02 lixl/tomcat:9.0
+						(B) 警告：WARNING: Published ports are discarded when using host network mode
+						(C) 问题：docker 启动时总是遇见标题中的警告
+						(D) 原因：docker 启动时指定 --network=host 或 -net=host，如果还指定了 -p 映射端口，那这个时候就会有此警告，并且通过-p设置的参数将不会起到任何作用，端口号会以主机端口号为主，
+						重复时则递增。
+						(E) 解决：解决的办法就是使用docker的其他网络模式，例如--network=bridge，这样就可以解决问题，或者直接无视
+					(2) 正确：docker run -d --network host --name mytomcat02 lixl/tomcat:9.0
+				d. 好处：容器共享宿主机网络IP，这样的好处是外部主机与容器可以直接通信。
+			C. none
+				a. 是什么
+					(1) 禁用网络功能，只有 lo 标识(就是127.0.0.1表示本地回环)
+					(2) 在none模式下，并不为Docker容器进行任何网络配置。 
+					(3) 也就是说，这个Docker容器没有网卡、IP、路由等信息，只有一个lo，需要我们自己为Docker容器添加网卡、配置IP等
+				b. 案例
+					(1) docker run -d -p 8084:8080 --network none --name mytomcat05 lixl/tomcat:9.0
+					(2) 使用 docker ps 查看容器，没有端口信息
+					(3) 使用 docker inspect mytomcat05 | tail -n 20 查看容器内部，没有 IP 和 网关信息
+					(4) docker exec -it mytomcat05 bash 进入容器内部，使用 ip addr 查看网络，只有 lo 标识
+			D. container
+				a. container⽹络模式：新建的容器和已经存在的一个容器共享一个网络 ip 配置而不是和宿主机共享。新创建的容器不会创建自己的网卡，配置自己的IP，而是和一个指定的容器共享IP、端口范围等。同样，
+				两个容器除了网络方面，其他的如文件系统、进程列表等还是隔离的。
+						+---------------------------------------------------------------------------+
+						|	+------------------+							+------------------+	|
+						|	| Docker Container |							| 				   |	|
+						|	|	  +------+	   |			+-------------- | Docker Container |	|
+						|	|	  | eth0 | <---+------------+				|	  			   |	|
+						|	+------------------+							+------------------+	|
+						|			 ↑						  						  				|
+						|			 +------------------------↓						  				|
+						|		  						  +------+				  					|
+						|	+-----------------------------| veth |-----------------------------+	|
+						|	|	  						  +------+				  			   |	|
+						|	|						  docker0(bridge)						   |	|
+						|	+------------------------------------------------------------------+	|
+						|									  ^										|
+						|									  ↓ ipv4 ip_forward						|
+						|								  +-------+									|
+						|			Host				  | ens33 |									|
+						|								  +-------+									|
+						+---------------------------------------------------------------------------+
+				b. 错误案例
+					(1) 启动容器 mytomcat06
+						docker run -d --name mytomcat06 -p 8085:8080 lixl/tomcat:9.0
+					(2) 启动容器 mytomcat07，指定该容器与容器 mytomcat06 共享 IP 和 端口
+						docker run -d --name mytomcat07 -p 8086:8080 --network container:mytomcat07 lixl/tomcat:9.0
+					(3) 报以下错误
+						docker: Error response from daemon: conflicting options: port publishing and the container type network mode.
+					(4) 运行结果：相当于 mytomcat07 和 mytomcat06 公用同一个ip同一个端口，导致端口冲突
+				c. 正确案例
+					(1) Alpine操作系统是一个面向安全的轻型 Linux发行版，Alpine Linux 是一款独立的、非商业的通用 Linux 发行版，专为追求安全性、简单性和资源效率的用户而设计。 可能很多人没听说过这个
+					Linux 发行版本。但是因为他小，简单，安全而著称，所以作为基础镜像是非常好的一个选择，镜像非常小巧，所以特别适合容器打包。
+					(2) 启动容器 alpine1
+						docker run -it --name alpine1  alpine /bin/sh
+					(3) 启动容器 alpine2，指定容器 alpine2 与 容器 alpine1 共享 IP 和 端口
+						docker run -it --network container:alpine1 --name alpine2 alpine /bin/sh
+					(4) 查看容器 alpine1 ip
+						ip addr 
+						206: eth0@if207
+					(5) 查看容器 alpine2 ip
+						206: eth0@if207
+					(6) 运行结果，共用搭桥验证成功
+					(7) 此时关闭alpine1，再看看alpine2 的IP，发现只有 lo 标识
+			E. 自定义网络
+				a. before
+					(1) 案例
+						(A) 启动容器 mytomcat03 
+							 docker run -d --name mytomcat03 -p 8081:8080 lixl/tomcat:9.0
+						(B) 启动容器 mytomcat04
+							docker run -d --name mytomcat04 -p 8082:8080 lixl/tomcat:9.0
+						(C) 上述成功启动并用docker exec进入各自容器实例内部
+							docker exec -it mytomcat03 bash
+							docker exec -it mytomcat04 bash
+							查看两个容器的 IP
+							ip addr
+							200: eth0@if201：inet 172.17.0.4
+							202: eth0@if203：inet 172.17.0.5
+					(2) 问题
+						(A) 按照 IP 进行互 ping，能互 ping 成功
+							容器 mytomcat03 ping 容器 mytomcat04 的 IP：ping 172.17.0.5
+							容器 mytomcat04 ping 容器 mytomcat03 的 IP：ping 172.17.0.4
+						(B) 使用 服务名进行互 ping，结果 互 ping 失败
+							容器 mytomcat03 ping 容器 mytomcat04 的 服务名：ping mytomcat04
+							ping: mytomcat04: Name or service not known
+							容器 mytomcat04 ping 容器 mytomcat03 的 服务名：ping mytomcat03
+							ping: mytomcat03: Name or service not known
+				b. after
+					(1) 案例
+						(A) 自定义桥接网络,自定义网络默认使用的是桥接网络bridge
+						(B) 新建自定义网络
+							docker network create mybridge
+						(C) 新建容器加入上一步新建的自定义网络
+							docker run -d -p 8087:8080 --name mytomcat07 --network mybridge lixl/tomcat:9.0
+							docker run -d -p 8088:8080 --name mytomcat08 --network mybridge lixl/tomcat:9.0
+						(D) 进入容器内部
+							docker exec -it mytomcat07 bash
+							查看网络 ip addr
+							209: eth0@if21
+							inet 172.18.0.2
+							docker exec -it mytomcat08 bash
+							查看网络 ip addr
+							211: eth0@if212
+							inet 172.18.0.3
+						(E) 互 ping 服务名
+							容器 mytomcat07 ping 容器 mytomcat08：ping mytomcat08
+							容器 mytomcat08 ping 容器 mytomcat07：ping mytomcat07
+						(F) 结论：自定义网络，服务名和 IP 都能 ping 成功
+					(2) 问题结论：自定义网络本身就维护好了主机名和ip的对应关系（ip和域名都能通）
+五、Docker-compose容器编排
+	1. 是什么
+		① Docker-Compose是Docker官方的开源项目，负责实现对Docker容器集群的快速编排。
+		② Compose 是 Docker 公司推出的一个工具软件，可以管理多个 Docker 容器组成一个应用。你需要定义一个 YAML 格式的配置文件docker-compose.yml，写好多个容器之间的调用关系。然后，
+		只要一个命令，就能同时启动/关闭这些容器
+	2. 能干嘛
+		① docker 建议我们每一个容器中只运行一个服务,因为 docker 容器本身占用资源极少，所以最好是将每个服务单独的分割开来。但是这样我们又面临了一个问题
+		② 如果需要同时部署好多个服务，每个服务单独写 Dockerfile 然后在构建镜像,构建容器。所以 docker 官方提供了 docker-compose 多服务部署的工具
+		③ 例如要实现一个Web微服务项目，除了Web服务容器本身，往往还需要再加上后端的数据库 mysql 服务容器，redis 服务器，注册中心 eureka，甚至还包括负载均衡容器等等
+		④ Compose 允许用户通过一个单独的 docker-compose.yml 模板文件（YAML 格式）来定义一组相关联的应用容器为一个项目（project）。
+		⑤ 可以很容易地用一个配置文件定义一个多容器的应用，然后使用一条指令安装这个应用的所有依赖，完成构建。Docker-Compose 解决了容器与容器之间如何管理编排的问题。
+	3. compose 下载安装步骤
+		① 官网：https://docs.docker.com/compose/compose-file/compose-file-v3/
+		② 官网下载：https://docs.docker.com/compose/install/
+		③ 安装步骤
+			A. 下载 Docker-compose
+				curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+			B. 赋予 docker-compose 用户读写权限
+				chmod +x docker-compose
+			C. 查看 Docker-compose 是否安装成功
+				docker-compose --version
+		④ 卸载步骤
+			rm -f /usr/local/bin/docker-compose
+	4. Compose核心概念
+		① 一文件：docker-compose.yml
+		② 两要素
+			A. 服务（service）：一个个应用容器实例，比如订单微服务、库存微服务、mysql容器、nginx容器或者redis容器
+			B. 工程（project）：由一组关联的应用容器组成的一个完整业务单元，在 docker-compose.yml 文件中定义。
+	5. Compose使用的三个步骤
+		① 编写Dockerfile定义各个微服务应用并构建出对应的镜像文件
+		② 使用 docker-compose.yml 定义一个完整业务单元，安排好整体应用中的各个容器服务。
+		③ 最后，执行docker-compose up命令 来启动并运行整个应用程序，完成一键部署上线
+	6. Compose常用命令
+		① docker-compose -h：查看帮助
+		② docker-compose up：启动所有docker-compose服务
+		③ docker-compose up -d：启动所有docker-compose服务并后台运行
+		④ docker-compose down：停止并删除容器、网络、卷、镜像。
+		⑤ docker-compose exec yml里面的服务id：进入容器实例内部  docker-compose exec docker-compose.yml文件中写的服务id /bin/bash
+		⑥ docker-compose ps：展示当前docker-compose编排过的运行的所有容器
+		⑦ docker-compose top：展示当前docker-compose编排过的容器进程
+		⑧ docker-compose logs  yml里面的服务id：查看容器输出日志
+		⑨ docker-compose config：检查配置
+		⑩ docker-compose config -q：检查配置，有问题才有输出
+		①① docker-compose restart：重启服务
+		①② docker-compose start：启动服务
+		①③ docker-compose stop：停止服务
+	7. Compose编排微服务
+		① 微服务工程docker_boot
+			A. SQL建表建库
+CREATE TABLE t_user(
+	id INT(10) NOT NULL AUTO_INCREMENT,
+	username VARCHAR(50) NOT NULL COMMENT '用户名',
+	`password` VARCHAR(50) NOT NULL COMMENT '密码',
+	sex TINYINT(4) NOT NULL DEFAULT 0 COMMENT '性别，0：女；1：男',
+	deleted TINYINT(4) NOT NULL DEFAULT 0 COMMENT '删除标志，默认0不删除，1删除',
+	create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+	update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+	PRIMARY KEY(id)
+) ENGINE=INNODB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COMMENT='用户表'
+			B. 一键生成说明
+				a. 新建 IDEA 项目 docker_boot
+					(1) 删除 src 源码目录
+					(2) 该 pom.xml
+						<parent>
+							<groupId>org.springframework.boot</groupId>
+							<artifactId>spring-boot-starter-parent</artifactId>
+							<version>2.5.6</version>
+						</parent>
+
+						<properties>
+							<mysql.version>5.1.47</mysql.version>
+							<tk.mybatis.version>4.1.5</tk.mybatis.version>
+						</properties>
+
+						<dependencies>
+							<dependency>
+								<groupId>tk.mybatis</groupId>
+								<artifactId>mapper</artifactId>
+								<version>${tk.mybatis.version}</version>
+							</dependency>
+						</dependencies>
+				b. 新建模块 mybatis-generator，用于自动生成代码
+					(1) 该 pom.xml
+						<build>
+							<plugins>
+								<plugin>
+									<groupId>org.springframework.boot</groupId>
+									<artifactId>spring-boot-maven-plugin</artifactId>
+								</plugin>
+								<plugin>
+									<groupId>org.mybatis.generator</groupId>
+									<artifactId>mybatis-generator-maven-plugin</artifactId>
+									<version>1.3.2</version>
+									<configuration>
+										<configurationFile>${basedir}/src/main/resources/generatorConfig.xml</configurationFile>
+										<overwrite>true</overwrite>
+										<verbose>true</verbose>
+									</configuration>
+									<dependencies>
+										<dependency>
+											<groupId>mysql</groupId>
+											<artifactId>mysql-connector-java</artifactId>
+											<version>5.1.47</version>
+										</dependency>
+
+										<dependency>
+											<groupId>tk.mybatis</groupId>
+											<artifactId>mapper</artifactId>
+											<version>4.1.5</version>
+										</dependency>
+									</dependencies>
+								</plugin>
+							</plugins>
+						</build>
+					(2) 在 src/main/resource 目录下新建 config.properties 文件
+						package.name=com.li.docker
+
+						db.driverClass=com.mysql.jdbc.Driver
+						db.url=jdbc:mysql://192.168.230.48:3308/db01
+						db.user=root
+						db.password=2648
+					(3) 在 src/main/resource 目录下新建 generatorConfig.xml 文件
+						<?xml version="1.0" encoding="UTF-8"?>
+						<!DOCTYPE generatorConfiguration PUBLIC "-//mybatis.org//DTD MyBatis Generator Configuration 1.0//EN"
+								"http://mybatis.org/dtd/mybatis-generator-config_1_0.dtd">
+						<generatorConfiguration>
+							<!-- 可以用于加载配置项或者配置文件，在整个配置文件中就可以使用${propertyKey}的方式来引用配置项 -->
+							<properties resource="config.properties"/>
+							<!-- 在 MBG 工作的时候，需要额外加载的依赖包 location 属性指明加载 jar/zip 包的全路径 -->
+							<!--<classPathEntry location="${driver.location}"/>-->
+
+							<!-- context:生成一组对象的环境 -->
+							<context id="mysql" defaultModelType="flat" targetRuntime="MyBatis3Simple">
+								<property name="beginningDelimiter" value="`"/>
+								<property name="endingDelimiter" value="`"/>
+
+								<!-- 使用tk.mybatis 插件自动生成代码 -->
+								<plugin type="tk.mybatis.mapper.generator.MapperPlugin">
+									<property name="mappers" value="tk.mybatis.mapper.common.Mapper"/>
+									<property name="caseSensitive" value="true"/>
+								</plugin>
+
+								<!-- 连接数据库 -->
+								<jdbcConnection driverClass="${db.driverClass}" connectionURL="${db.url}"
+												userId="${db.user}" password="${db.password}">
+								</jdbcConnection>
+
+								<!-- java 模型创建器 -->
+								<javaModelGenerator targetPackage="${package.name}.domain" targetProject="src/main/java"/>
+
+								<!-- 生成 SQL map 的 XML 文件生成器 -->
+								<sqlMapGenerator targetPackage="${package.name}.mapper.xml" targetProject="src/main/java"/>
+
+								<!-- 生成Mapper接口 -->
+								<javaClientGenerator targetPackage="${package.name}.mapper" targetProject="src/main/java" type="XMLMAPPER"/>
+
+								<!-- 选择一个table来生成相关文件 -->
+								<table tableName="t_user" domainObjectName="User">
+									<generatedKey column="id" sqlStatement="JDBC" />
+								</table>
+							</context>
+						</generatorConfiguration>
+				c. 运行：点击右侧 Maven -> 选择 mybatis-generator 模块 -> 点击Plugins -> 选择 mybatis-generator -> 双击mybatis-generator:generate
+			C. 微服务 docker_boot_service 
+				a. 新建模块 docker_boot_service
+				b. 改 pom
+					<properties>
+						<pagehelper.version>1.3.0</pagehelper.version>
+						<swagger2.version>2.9.2</swagger2.version>
+						<druid.version>1.1.16</druid.version>
+						<druid.springboot.version>1.1.10</druid.springboot.version>
+						<jedis.version>3.1.0</jedis.version>
+						<hutool.version>5.1.0</hutool.version>
+					</properties>
+
+					<dependencies>
+						<dependency>
+							<groupId>org.springframework.boot</groupId>
+							<artifactId>spring-boot-starter-web</artifactId>
+						</dependency>
+
+						<dependency>
+							<groupId>org.springframework.boot</groupId>
+							<artifactId>spring-boot-starter-actuator</artifactId>
+						</dependency>
+
+						<dependency>
+							<groupId>org.springframework.boot</groupId>
+							<artifactId>spring-boot-configuration-processor</artifactId>
+						</dependency>
+
+						<dependency>
+							<groupId>org.springframework.boot</groupId>
+							<artifactId>spring-boot-starter-data-redis</artifactId>
+						</dependency>
+
+						<dependency>
+							<groupId>org.springframework.boot</groupId>
+							<artifactId>spring-boot-starter-test</artifactId>
+						</dependency>
+
+						<dependency>
+							<groupId>com.github.pagehelper</groupId>
+							<artifactId>pagehelper-spring-boot-starter</artifactId>
+							<version>${pagehelper.version}</version>
+						</dependency>
+
+						<!--swagger2-->
+						<dependency>
+							<groupId>io.springfox</groupId>
+							<artifactId>springfox-swagger2</artifactId>
+							<version>${swagger2.version}</version>
+						</dependency>
+						<dependency>
+							<groupId>io.springfox</groupId>
+							<artifactId>springfox-swagger-ui</artifactId>
+							<version>${swagger2.version}</version>
+						</dependency>
+
+						<!--SpringBoot集成druid连接池-->
+						<dependency>
+							<groupId>com.alibaba</groupId>
+							<artifactId>druid-spring-boot-starter</artifactId>
+							<version>${druid.springboot.version}</version>
+						</dependency>
+						<dependency>
+							<groupId>com.alibaba</groupId>
+							<artifactId>druid</artifactId>
+							<version>${druid.version}</version>
+						</dependency>
+
+						<dependency>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+						</dependency>
+
+						<!--springCache-->
+						<dependency>
+							<groupId>org.springframework.boot</groupId>
+							<artifactId>spring-boot-starter-cache</artifactId>
+						</dependency>
+						<!--springCache连接池依赖包-->
+						<dependency>
+							<groupId>org.apache.commons</groupId>
+							<artifactId>commons-pool2</artifactId>
+						</dependency>
+						<!-- jedis -->
+						<dependency>
+							<groupId>redis.clients</groupId>
+							<artifactId>jedis</artifactId>
+							<version>${jedis.version}</version>
+						</dependency>
+
+						<dependency>
+							<groupId>cn.hutool</groupId>
+							<artifactId>hutool-all</artifactId>
+							<version>${hutool.version}</version>
+						</dependency>
+
+						<dependency>
+							<groupId>mysql</groupId>
+							<artifactId>mysql-connector-java</artifactId>
+						</dependency>
+					</dependencies>
+					
+					<build>
+						<plugins>
+							<plugin>
+								<groupId>org.springframework.boot</groupId>
+								<artifactId>spring-boot-maven-plugin</artifactId>
+								<!--加入下面两项配置-->
+								<executions>
+									<execution>
+										<goals>
+											<goal>repackage</goal>
+										</goals>
+									</execution>
+								</executions>
+								<configuration>
+									<includeSystemScope>true</includeSystemScope>
+								</configuration>
+							</plugin>
+						</plugins>
+					</build>
+				c. 写 YML 
+					server:
+					  port: 8099
+				
+					spring:
+					  datasource:
+						type: com.alibaba.druid.pool.DruidDataSource
+						driver-class-name: com.mysql.jdbc.Driver
+						url: jdbc:mysql://192.168.230.48:3307/db01?useUnicode=true&characterEncoding=utf-8&useSSL=false
+						username: root
+						password: 2648
+					  redis:
+						cluster:
+						  nodes:
+							- 192.168.230.48:6381
+							- 192.168.230.48:6382
+							- 192.168.230.48:6383
+							- 192.168.230.48:6384
+							- 192.168.230.48:6385
+							- 192.168.230.48:6386
+						lettuce:
+						  pool:
+							max-active: 8
+							max-wait: -1ms
+							max-idle: 8
+							min-idle: 0
+					  swagger2:
+						enabled: true
+					mybatis:
+					  mapper-locations: classpath:mapper/*.xml
+					  type-aliases-package: com.li.docker.domain
+				d. 主启动
+					import org.springframework.boot.SpringApplication;
+					import org.springframework.boot.autoconfigure.SpringBootApplication;
+					import tk.mybatis.spring.annotation.MapperScan;
+
+					@SpringBootApplication
+					@MapperScan("com.li.docker.mapper")
+					public class DockerBootServiceApplication {
+
+						public static void main(String[] args) {
+							SpringApplication.run(DockerBootServiceApplication.class, args);
+						}
+					}
+				e. config配置类
+					(1) RedisConfig
+						@Configuration
+						public class RedisConfig {
+
+							@Bean
+							public RedisTemplate<String, User> redisTemplate(LettuceConnectionFactory lettuceConnectionFactory) {
+								RedisTemplate<String, User> redisTemplate = new RedisTemplate<>();
+
+								redisTemplate.setConnectionFactory(lettuceConnectionFactory);
+								//设置key序列化方式string
+								redisTemplate.setKeySerializer(new StringRedisSerializer());
+								//设置value的序列化方式json
+								redisTemplate.setValueSerializer(new GenericJackson2JsonRedisSerializer());
+
+								redisTemplate.setHashKeySerializer(new StringRedisSerializer());
+								redisTemplate.setHashValueSerializer(new GenericJackson2JsonRedisSerializer());
+
+								redisTemplate.afterPropertiesSet();
+
+								return redisTemplate;
+							}
+						}
+					(2) SwaggerConfig
+						@Data
+						@Configuration
+						@ConfigurationProperties(prefix = "spring.swagger2")
+						public class SwaggerConfig {
+
+							private boolean enabled;
+
+							@Bean
+							public Docket createRestApi() {
+								return new Docket(DocumentationType.SWAGGER_2)
+										.apiInfo(apiInfo())
+										.enable(enabled)
+										.select()
+										.apis(RequestHandlerSelectors.basePackage("com.li.docker"))//你自己的package
+										.paths(PathSelectors.any())
+										.build();
+							}
+
+							public ApiInfo apiInfo() {
+								return new ApiInfoBuilder()
+										.title("docker-compose" + "\t" + new SimpleDateFormat("yyyy-MM-dd").format(new Date()))
+										.description("docker-compose")
+										.version("1.0")
+										.termsOfServiceUrl("https://www.li.com/")
+										.build();
+							}
+						}
+				f. 业务类
+					(1) 将模块 mybatis-generator 自动生成的代码包 domin 和 mapper 拷到模块 docker_boot_service
+					(2) 在 resource 中新建 mapper 目录，将 自动生成的 xml 映射文件拷到改目录
+					(3) 新建service
+						@Service
+						public class UserService {
+
+							private static final String CACHE_KEY_USER = "user:";
+
+							@Resource
+							private UserMapper userMapper;
+
+
+							@Resource
+							private RedisTemplate<String, User> redisTemplate;
+
+							@Transactional
+							public void addUser(User user) {
+								int row = userMapper.insertSelective(user);
+								if (row > 0) {
+									user = userMapper.selectByPrimaryKey(user.getId());
+									String key = CACHE_KEY_USER + user.getId();
+									redisTemplate.opsForValue().set(key, user);
+								}
+							}
+
+							public User findUserById(int id) {
+								String key = CACHE_KEY_USER + id;
+								User user = redisTemplate.opsForValue().get(key);
+								if (user == null) {
+									user = userMapper.selectByPrimaryKey(id);
+									if (user != null) {
+										redisTemplate.opsForValue().set(key, user);
+									}
+								}
+								return user;
+							}
+						}
+					(4) 新建controller
+						@RestController
+						@RequestMapping("/api")
+						@Api(value = "用户User接口")
+						public class UserController {
+
+							@Resource
+							private UserService userService;
+
+							@ApiOperation("新增用户")
+							@PostMapping("/user")
+							public void addUser(@RequestBody User user) {
+								userService.addUser(user);
+							}
+
+							@ApiOperation("根据Id查找用户")
+							@GetMapping("/user/{id}")
+							public User getOneUser(@PathVariable("id") Integer id) {
+								return userService.findUserById(id);
+							}
+						}
+				g. mvn package 命令将微服务形成新的 jar 包并上传到 Linux 服务器 /usr/local/mydata/mydocker/docker-boot 目录下
+				h. 编写Dockerfile
+					FROM centos
+					MAINTAINER LiXL<1634491328@qq.com>
+
+					ENV MYPATH /usr/local
+					WORKDIR $MYPATH 
+
+					# 安装jdk
+					# RUN yum -y install glibc.i686
+					RUN mkdir /usr/local/java
+					ADD jdk-8u261-linux-x64.tar.gz /usr/local/java/
+					ENV JAVA_HOME /usr/local/java/jdk1.8.0_261
+					ENV JRE_HOME $JAVA_HOME/jre
+					ENV CLASSPATH $JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar:$JRE_HOME/lib:$CLASSPATH
+					ENV PATH $JAVA_HOME/bin:$PATH
+
+					# 部署微服务
+					RUN mkdir /usr/local/docker-boot
+					COPY docker_boot_service-1.0-SNAPSHOT.jar /usr/local/docker-boot/
+					ENTRYPOINT ["java", "-jar", "/usr/local/docker-boot/docker_boot_service-1.0-SNAPSHOT.jar"]
+
+					EXPOSE 8099
+					CMD echo "JDK安装成功"
+					CMD echo "部署微服务成功"
+				i. 构建镜像
+					docker build -t docker-boot:1.0 .
+		② 不用Compose
+			A. 启动两个 MySQL 容器（主从）
+			B. 启动 六个 Redis 节点（集群）
+			C. 运行微服务容器
+				docker run -d --network host --name docker-boot docker-boot:1.0
+		③ swagger 测试：http://192.168.230.48:8099/swagger-ui.html#/
+			A. 测试新增用户成功
+			B. 测试查看用户成功
+		④ 通过 swagger 测试微服务部署成功，但是该方式存在问题
+			A. 先后顺序要求固定，先 mysql+redis 才能微服务访问成功
+			B. 多个 run 命令
+			C. 容器间的启停或宕机，有可能导致IP地址对应的容器实例变化，映射出错，要么生产 IP 写死(可以但是不推荐)，要么通过服务调用
+		⑤ 使用Compose
+			A. 编写docker-compose.yml 文件
+				version: "3"
+
+				networks:
+				  mybridge:
+
+				services:
+				  microService:
+					image: docker-boot:1.0
+					container_name: ms01
+					ports:
+					  - "8099:8099"
+					networks:
+					  - mybridge
+					depends_on:
+					  - mysql
+					  - redis
+
+				  mysql:
+					image: mysql:5.7.30
+					container_name: mysql3309
+					environment:
+					  MYSQL_ROOT_PASSWORD: "2648"
+					  MYSQL_ALLOW_EMPTY_PASSWORD: "no"
+					  MYSQL_DATABASE: "db01"
+					ports:
+					  - "3309:3309"
+					volumes:
+					  - /usr/local/mydata/mysql3309/log:/var/log/mysql
+					  - /usr/local/mydata/mysql3309/data:/var/lib/mysql
+					  - /usr/local/mydata/mysql3309/conf:/etc/mysql
+					networks:
+					  - mybridge
+					command: --default-authentication-plugin=mysql_native_password # 解决外部无法访问
+
+				  redis:
+					image: redis:6.0.8
+					container_name: redis6380
+					ports:
+					  - "6380:6380"
+					volumes:
+					  - /usr/local/mydata/redis6380/data:/data
+					  - /usr/local/mydata/redis6380/conf:/etc/redis
+					networks:
+					  - mybridge
+					command: redis-server /etc/redis/redis.conf
+			B. 第二次修改微服务工程docker_boot
+				a. 写YML，通过服务名访问，IP无关
+					server:
+					  port: 8099
+
+					spring:
+					  datasource:
+						type: com.alibaba.druid.pool.DruidDataSource
+						driver-class-name: com.mysql.jdbc.Driver
+						# url: jdbc:mysql://192.168.230.48:3307/db01?useUnicode=true&characterEncoding=utf-8&useSSL=false
+						url: jdbc:mysql://mysql:3309/db01?useUnicode=true&characterEncoding=utf-8&useSSL=false
+						username: root
+						password: 2648
+					  redis:
+						host: redis
+						port: 6380
+						database: 0
+					#    cluster:
+					#      nodes:
+					#        - 192.168.230.48:6381
+					#        - 192.168.230.48:6382
+					#        - 192.168.230.48:6383
+					#        - 192.168.230.48:6384
+					#        - 192.168.230.48:6385
+					#        - 192.168.230.48:6386
+						lettuce:
+						  pool:
+							max-active: 8
+							max-wait: -1ms
+							max-idle: 8
+							min-idle: 0
+
+					  swagger2:
+						enabled: true
+					mybatis:
+					  mapper-locations: classpath:mapper/*.xml
+					  type-aliases-package: com.li.docker.domain
+				b. mvn package命令将微服务形成新的 jar 包并上传到Linux服务器 /usr/local/mydata/mydocker/docker-boot 目录下
+				c. 构建镜像
+					docker build -t docker-boot:1.0 .
+			C. 新建 MySQL 配置文件 my.cnf
+				mkdir -p /usr/local/mydata/mysql3309/conf
+				vi my.cnf
+					[mysqld]
+					port=3309
+			D. 新建 Redis 配置文件 redis.conf
+				mkdir -p /usr/local/mydata/redis6380/conf
+				vi redis.conf
+					port 6380
+					appendonly yes
+					protected-mode no
+			C. 执行 docker-compose up 或者 执行 docker-compose up -d
+			D. 进入 mysql 容器实例并新建库 db01 + 新建表 t_user
+			E. 关停/启动 docker-compose.yml 的容器
+				docker-compose stop
+				docker-compose start
+六、Docker 轻量级可视化工具 Portainer
+	1. 简介
+		Portainer 是一款轻量级的应用，它提供了图形化界面，用于方便地管理Docker环境，包括单机环境和集群环境。
+	2. 安装
+		① 官网
+			A. https://www.portainer.io/
+			B. https://docs.portainer.io/v/ce-2.9/start/install/server/docker/linux
+		② 步骤
+			A. docker 命令安装
+				docker run -d -p 8000:8000 -p 9000:9000 --name portainer \
+				--restart=always -v /var/run/docker.sock:/var/run/docker.sock \
+				-v /usr/local/mydata/portainer/data:/data portainer/portainer
+			B. 第一次登录需创建admin，访问地址：xxx.xxx.xxx.xxx:9000
+			C. 设置 admin 用户和密码后首次登陆
+			D. 选择 local 选项卡后本地 docker 详细信息展示
+七、Docker 容器监控之 CAdvisor+InfluxDB+Granfana
+	1. 原生命令
+		① 操作，docker stats命令的结果
+			CONTAINER ID   NAME        CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O        PIDS
+			6a34118dbe2a   portainer   0.00%     17.29MiB / 1.777GiB   0.95%     564kB / 5.91MB    132MB / 5.28MB   11
+			0a51e0efc120   ms01        1.48%     256.3MiB / 1.777GiB   14.09%    4.18kB / 15.2kB   1.42GB / 86kB    35
+			d8a21473895a   mysql3309   0.10%     30.28MiB / 1.777GiB   1.66%     887B / 0B         412MB / 25.5MB   27
+			08215be2f2e7   redis6380   0.20%     796KiB / 1.777GiB     0.04%     2.5kB / 1.82kB    133MB / 0B       5
+		② 问题
+			A. 通过docker stats命令可以很方便的看到当前宿主机上所有容器的CPU,内存以及网络流量等数据，一般小公司够用了。。。。
+			B. 但是，docker stats统计结果只能是当前宿主机的全部容器，数据资料是实时的，没有地方存储、没有健康指标过线预警等功能
+	2. 是什么
+		① CAdvisor监控收集+InfluxDB存储数据+Granfana展示图表
+		② CAdvisor
+			A. CAdvisor 是一个容器资源监控工具，包括容器的内存、CPU、网络 IO 和磁盘 IO 等监控，同时提高了一个 web 页面用于查看容器的实时运行状态。CAdvisor 默认
+			存储 2 分钟的数据，而且只是针对单物理机。不过，CAvisor 提供了很多数据集成接口，支持 influxDB、Redis、Kafka 和 ElasticSearch 等集成，可以加上对应配置
+			将监控数据发往这些数据存储起来
+			B. CAdvisor 功能主要有两点
+				a. 展示 Host 和容器两个层次的监控数据
+				b. 展示历史变化数据
+		③ InfluxDB
+			A. InfluxDB 是用 Go 语言编写的一个开源分布式时序、事件和指标数据库，无需外部依赖
+			B. CAdvisor 默认只在本机保存最近 2 分钟的数据，为了持久化存储数据和统一收集展示监控数据，需要将数据存储到 CAdvisor 中。InfluxDB 是一个时序数据库，专门
+			用于存储相关数据，很适合存储 CAdvisor 的数据。而且，CAdvisor 本身已经提供了 InfluxDB 的集成方法，启动容器时指定配置即可
+			C. InfluxDB 的主要功能
+				a. 基于时间序列，支持与时间有关的相关函数（如：最大、最小和求和等）
+				b. 可度量性：可以实时对大量数据进行计算
+				c. 基于事件：它支持任意的事件数据
+		④ Granfana
+			A. Granfana 是一个开源的数据监控分析可视化平台，支持多种数据源配置（支持的数据源包括 InfluxDB、MySQL、ElasticSearch、OpenTSDB、Graphite）和丰富的插件及
+			模板功能，支持图表权限控制和报警
+			B. Granfana 主要特征
+				a. 灵活丰富的图形化选项
+				b. 可以混合多种风格
+				c. 支持白天和夜间模式
+				d. 多个数据源
+	3. compose容器编排
+		① 新建 cig 目录
+			mkdir -p /usr/local/mydata/mydocker/cig
+		② 新建 docker-compose.yml
+version: '3.1'
+
+volumes:
+  grafana_data: {}
+
+services:
+  influxdb:
+    image: tutum/influxdb:0.9
+    restart: always
+    environment:
+      - PRE_CREATE_DB=cadvisor
+    ports:
+      - "8083:8083"
+      - "8086:8086"
+    volumes:
+      - /usr/local/mydata/influxdb/data:/data
+
+  cadvisor:
+    image: google/cadvisor
+    links:
+      - influxdb:influxsrv
+    command: -storage_driver=influxdb -storage_driver_db=cadvisor -storage_driver_host=influxsrv:8086
+    restart: always
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+
+  grafana:
+    user: "104"
+    image: grafana/grafana
+    user: "104"
+    restart: always
+    links:
+      - influxdb:influxsrv
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - HTTP_USER=admin
+      - HTTP_PASS=admin
+      - INFLUXDB_HOST=influxsrv
+      - INFLUXDB_PORT=8086
+      - INFLUXDB_NAME=cadvisor
+      - INFLUXDB_USER=root
+      - INFLUXDB_PASS=root
+		③ 启动docker-compose文件
+			docker-compose config -q
+			docker-compose up
+		④ 查看三个服务容器是否启动
+			docker ps
+			CONTAINER ID   IMAGE                 COMMAND                  CREATED          STATUS          PORTS                                            NAMES
+			58cfd0c0fd37   grafana/grafana       "/run.sh"                10 seconds ago   Up 9 seconds    0.0.0.0:3000->3000/tcp                           cig_grafana_1
+			772263dbf02f   google/cadvisor       "/usr/bin/cadvisor -…"   10 seconds ago   Up 9 seconds    0.0.0.0:8080->8080/tcp                           cig_cadvisor_1
+			f1d300f3ba1e   tutum/influxdb:0.9    "/run.sh"                11 seconds ago   Up 10 seconds   0.0.0.0:8083->8083/tcp, 0.0.0.0:8086->8086/tcp   cig_influxdb_1
+		⑤ 测试
+			A. 浏览cAdvisor收集服务
+				http://192.168.230.48:8080/
+			B. 浏览influxdb存储服务
+				http://192.168.230.48:8083/
+			C. 浏览grafana展现服务
+				a. http://192.168.230.48:3000/，默认帐户密码（admin/admin）
+				b. 配置步骤
+					(1) 配置数据源：选择左边导航设置 -> 选择 Data sources -> 点击 Add data source -> 选择 InfluxDB
+					(2) 配置细节
+						Name：InfluxDB
+						Query Language：InfluxQL
+						URL：http://InfluxDB:8086
+						Database：cadvisor
+						User：root
+						Password：root
+						点击 Save & test 完成设置
+					(3) 配置面板panel
+						(A) 点击左边导航“+” -> 选择 Dashboard  -> 选择 Add a new panel
+						(B) 点击右侧 Time series -> 选择 Graph(old)，Title：cig01，Description：cig study，点击上边的 save
+						(C) 在弹出来的“Save dashboard as ……”中，dashboard name：cig01 点击 save 按钮
+						(D) 点击 cig01 -> 选择 Edit，在 Query 中，
+						(E) 在 A 模块的 From 中，点击 select measurement，选择 cpu_usage_total，点击 where 右边的“+”添加容器， 如：container_name=ms01，在 FORMAT AS 的 ALIAS 中输入
+						cpu使用情况监控，点击右上角 Save 按钮进行保存
+
+
+
+
+
+
+
+
+
+
+
