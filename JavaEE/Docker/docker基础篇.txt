@@ -136,13 +136,13 @@
 			L. 测试
 				docker version
 			M. 配置镜像加速,使用阿里云的镜像加速器
-				mkdir -p /etc/docker
-				
-				tee /etc/docker/daemon.json <<-'EOF'
-				{
-				"registry-mirrors": ["https://y8blvi1l.mirror.aliyuncs.com"]
-				}
-				EOF
+mkdir -p /etc/docker
+
+tee /etc/docker/daemon.json <<-'EOF'
+{
+"registry-mirrors": ["https://y8blvi1l.mirror.aliyuncs.com"]
+}
+EOF
 				
 				systemctl daemon-reload
 				systemctl restart docker
