@@ -1271,6 +1271,70 @@ stderr_logfile=/var/log/supervisor/%(program_name)s.log
 			use admin
 			db.createUser({user:"admin",pwd:"password",roles:["root"]})
 			db.auth('admin', 'password')
+十八、离线安装 Kafka
+	1. ZK的安装
+		① 下载网址：http://archive.apache.org/dist/zookeeper/
+		② 解压相应文件
+			tar -zxvf apache-zookeeper-3.8.0-bin.tar.gz -C /usr/local/
+		③ 修改zk相关配置信息
+			mv /usr/local/apache-zookeeper-3.8.0/ /usr/local/zookeeper
+			cd /usr/local/zookeeper
+			mkdir ./{data,logs}
+			cp conf/zoo_sample.cfg conf/zoo.cfg 
+			vi conf/zoo.cfg
+				dataDir=/usr/local/zookeeper/data
+				dataLogDir=/usr/local/zookeeper/logs
+		④ 启动zk
+			./bin/zkServer.sh start
+	2. kafka的安装
+		① 下载网址：https://kafka.apache.org/downloads
+		② 解压对应包
+			tar -zxvf kafka_2.12-3.1.0.tgz -C /usr/local/
+		③ 修改配置文件config/server.properties
+			mv /usr/local/kafka_2.12-3.1.0/ /usr/local/kafka
+			cd /usr/local/kafka
+			mkdir ./data/{kafka,zookeeper}
+			mkdir ./logs/{kafka,zookeeper}
+			
+			vi config/server.properties
+				log.dirs=/usr/local/kafka/logs
+			vi config/zookeeper.properties
+				dataDir=/usr/local/kafka/data/zookeeper
+				dataLogDir=/usr/local/kafka/logs/zookeeper
+	3. 启动和关闭 Kafka
+		④ 启动 zookeeper 和 kafka
+			./bin/zookeeper-server-start.sh -daemon ./config/zookeeper.properties
+			./bin/kafka-server-start.sh -daemon ./config/server.properties
+		④ 停止 kafka 和 zookeeper
+			./bin/kafka-server-stop.sh
+			./bin/zookeeper-server-stop.sh
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

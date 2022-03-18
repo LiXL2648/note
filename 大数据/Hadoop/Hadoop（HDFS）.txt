@@ -1,0 +1,422 @@
+一、HDFS 概述
+	1.  HDFS 产出背景及定义
+		① HDFS 产生背景
+			随着数据量越来越大，在一个操作系统存不下所有的数据，那么就分配到更多的操作系统管理的磁盘中，但是不方便管理和维护，
+			迫切需要一种系统来管理多台机器上的文件，这就是分布式文件管理系统。HDFS 只是分布式文件管理系统中的一种。
+		② HDFS 定义
+			A. HDFS（Hadoop Distributed File System），它是一个文件系统，用于存储文件，通过目录树来定位文件；其次，它是分布式的，
+			由很多服务器联合起来实现其功能，集群中的服务器有各自的角色。
+			B. HDFS 的使用场景：适合一次写入，多次读出的场景。一个文件经过创建、写入和关闭之后就不需要改变。
+	2. HDFS 优缺点
+		① HDFS 优点：
+			A. 高容错性
+				a. 数据自动保存多个副本。它通过增加副本的形式，提高容错性
+				b. 某一个副本丢失以后，它可以自动恢复
+			B. 适合处理大数据
+				A. 数据规模：能够处理数据规模达到GB、TB甚至PB级别的数据
+				B. 文件规模：能够处理百万规模以上的文件数量，数量相当之大
+			C. 可构建在廉价的机器上：通过多副本机制，提高可靠性
+		② HDFS 缺点：
+			A. 不适合低延时数据访问，比如毫秒级的存储数据，是做不到的
+			B. 无法高效的对大量小文件进行存储
+				a. 存储大量小文件的话，它会占用 NameNode 大量的内容来存储文件目录和块信息，这样是不可取的，因为 NameNode 的内容总是有限的
+				b. 小文件存储的寻址时间会超过读取的时间，它违反了 HDFS 的设计目标
+			C. 不支持并发写入、文件随机修改
+				a. 一个文件只能一个线程写，不允许多个线程同时写
+				b. 仅支持数据 append（追加），不支持文件的随机修改
+	3. HDFS 组成架构
+		① NameNode（nn）：就是Master，它是一个主管、管理者
+			A. 管理 HDFS 的命名空间
+			B. 配置副本策略
+			C. 管理数据块（Block）映射信息
+			D. 处理客服端读写请求
+		② DataNode：就是 Slave，NameNode下达命令，DataNode 执行实际的操作
+			A. 存储实际的数据块
+			B. 执行数据块的读/写操作
+		③ Client：就是客户端
+			A. 文件切分，文件上传的时候，Client将文件切分成一个一个的Block，然后进行上传
+			B. 与 NameNode 交互，获取文件的位置信息
+			C. 与 DataNode 交互，读取或者写入数据
+			D. Client 提供一些命令来管理 HDFS，比如 NameNode 格式化
+			E. Client 可以通过一些命令来访问 HDFS，比如对 HDFS 增删改查操作
+		④ Secondary NameNode：并非 NameNode 的热备，当 NameNode 挂掉的时候，它并不能马上替换 NameNode 并提供服务
+			A. 辅助 NameNode，分担其工作量，比如定期合并 Fsimage 和 Edits，并推送给 NameNode
+			B. 紧急情况下，可辅助恢复 NameNode
+	4. HDFS 文件块的大小
+		① HDFS 中的文件在物理上是分块存储（Block），块的大小可以通过配置参数（dfs.blocksize）来规定的，默认大小在 Hadoop2.x/3.x版本中是128M，
+		1.x版本中是64M
+			A. 集群中的 block：block1/block2/.../blockn
+			B. 如果寻址时间大约为10mx，即查找到目标block的时间为10ms
+			C. 寻址时间为传输时间的1%时，则为最佳状态。因此传输时间=10ms/0.01=1000ms=1s
+			D. 而目前磁盘的传输速率普遍为100MB/s，固态的传输速率为200~300MB
+			E. block大小=1s * 100MB/s = 100MB
+			F. 由于进制单元是1024，因此与100MB最接近的大小是128MB，因此采用默认的块大小为128MB，固态硬盘采用的块大小为256MB
+		② 思考：为什么块的大小不能设置太小，也不能设置太大
+			A. HDFS 的块设置太小，会增加寻址时间，程序一直在寻找块的开始位置
+			B. 如果块设置得太大，从磁盘传输数据得时间会明显大于定位这个块开始位置所需得时间。导致程序在处理这块数据时，会非常慢
+			C. 总结：HDFS 块得大小设置主要取决于磁盘传输速率。
+二、HDFS 的 Shell 操作（开发重点）
+	1. 基本语法
+		① hadoop fs 具体命令
+		② hdfs dfs 具体命令
+		③ 两个命令的作用完全相同
+	2. 常用的命令实操
+		① 准备工作
+			A. 启动Hadoop集群（方便后续的测试）
+			B. -help：输出这个命令参数：hadoop fs -help rm
+			C. 创建/sanguo文件夹：hadoop fs -mkdir /sanguo
+		② 上传
+			A. -moveFromLocal：从本地剪切粘贴到 HDFS
+				a. vim /opt/shuguo.txt
+				b. 输入 shuguo
+				c. hadoop fs -moveFromLocal /opt/shuguo.txt /sanguo
+			B. -copyFromLocal：从本地文件系统中拷贝文件到 HDFS 路径去
+				a. vim /opt/weiguo.txt
+				b. 输入 weiguo
+				c. hadoop fs -copyFromLocal /opt/shuguo.txt /sanguo
+			C. -put：等同于copyFromLocal，生产环境更习惯用put
+				a. vim /opt/wuguo.txt
+				b. 输入 wuguo
+				c. hadoop fs -put /opt/wuguo /sanguo
+			D. -appendToFile：追加一个文件到已经存在的文件末尾
+				a. vim /opt/liubei.txt
+				b. 输入：liubei
+				c. hadoop fs -appendToFile /opt/liubei.txt /sanguo/shuguo.txt
+		③ 下载，可以修改文件名称
+			A. -copyToLocal：从 HDFS 拷贝到本地
+				hadoop fs -copyToLocal /sanguo/shuguo.txt /opt/
+			B. -get：等同于 -copyToLocal，生产环境更习惯用 get
+				hadoop fs -get /sanguo/shuguo.txt /opt/shuguo1.txt
+		④ HDFS 直接操作
+			A. -ls：显示目录信息
+				hadoop fs -ls /sanguo
+			B. -cat：显示文件内容
+				hadoop fs -cat /sanguo/shuguo.txt
+			C. -chgrp、-chmod、-chown：与 Linux 文件系统中的用法一样，修改文件所属权限
+			D. -mkdir：创建路径
+				hadoop fs -mkdir /jinguo
+			E. -cp：从 HDFS 的一个路径拷贝到 HDFS 的另一个路径
+				fs -cp /sanguo/shuguo.txt /jinguo
+			F. -mv：在 HDFS 目录中移动文件
+				hadoop fs -mv /sanguo/weiguo.txt/ /jinguo
+			G. -tail：显示一个文件的末尾 1kb 的数据
+				hadoop fs -tail /sanguo/shuguo.txt
+			H. -rm：删除文件或文件夹
+				hadoop fs -rm /sanguo/shuguo.txt
+			I. -rm -r：递归删除目录及目录里面的内容
+				hadoop fs -rm -r /sanguo
+			J. -du：统计文件夹的大小信息
+				a. -s：统计文件夹总大小
+				b. hadoop fs -du -s -h /jinguo
+					27  81  /jinguo
+				c. hadoop fs -du -h /jinguo
+					14  42  /jinguo/shuguo.txt
+					7   21  /jinguo/weiguo.txt
+					6   18  /jinguo/wuguo.txt
+				D. 说明：27表示文件大小，81表示27*3个副本，/jinguo表示查看的目录
+			K. -setrep：设置 HDFS 中文件的副本数量。
+				a. hadoop fs -setrep 10 /jinguo/shuguo.txt
+				b. 这里设置的副本数只是记录在 NameNode 的元数据中，是否真会有这么多副本，还得看 DataNode的数量。因为目前只有3台设备，最多也就3个副本，
+				只有节点数增加到10台，副本数才能达到10。
+三、HDFS 的 API 操作
+	1. 客户端环境准备
+		① 将 Hadoop 依赖包 hadoop-3.1.0 拷贝到 非中文路径：D:\OpenSource\Hadoop\hadoop-3.1.0
+		② 配置 HADOOP_HOME 环境变量
+		③ 验证 Hadoop 环境变量是否正常，双击 winutils.exe，如果报“由于找不到MSVCR120.dll，无法继续执行代码。重新安装程序可能会解决此问题”错误。说明缺
+		少微软运行库（正版系统往往有这个问题）。
+		④ 在 IDEA 中创建一个 Maven 工程 hadoop-client，并导入相应的依赖坐标
+			<dependencies>
+				<dependency>
+					<groupId>org.apache.hadoop</groupId>
+					<artifactId>hadoop-client</artifactId>
+					<version>3.1.3</version>
+				</dependency>
+
+				<dependency>
+					<groupId>junit</groupId>
+					<artifactId>junit</artifactId>
+					<version>4.12</version>
+					<scope>test</scope>
+				</dependency>
+
+				<dependency>
+					<groupId>org.slf4j</groupId>
+					<artifactId>slf4j-log4j12</artifactId>
+					<version>1.7.29</version>
+				</dependency>
+			</dependencies>
+		⑤ 在项目的 src/main/resources目录下，新建一个文件，命名为“log4j.properties”，在文件中填入
+			log4j.rootLogger=INFO, stdout
+			log4j.appender.stdout=org.apache.log4j.ConsoleAppender
+			log4j.appender.stdout.layout=org.apache.log4j.PatternLayout
+			log4j.appender.stdout.layout.ConversionPattern=%d %p [%C] - %m%n
+			log4j.appender.logfile=org.apache.log4j.FileAppender
+			log4j.appender.logfile.File=target/spring.log
+			log4j.appender.logfile.layout=org.apache.log4j.PatternLayout
+			log4j.appender.logfile.layout.ConversionPattern=%d %p [%C] - %m%n
+		⑥ 创建包名：com.li.hadoopclient
+		⑦ 创建类：HadoopClient
+			import org.apache.hadoop.conf.Configuration;
+			import org.apache.hadoop.fs.FileSystem;
+			import org.apache.hadoop.fs.Path;
+			import org.junit.After;
+			import org.junit.Before;
+			import org.junit.Test;
+
+			import java.net.URI;
+
+			public class HadoopClient {
+
+				private FileSystem fs;
+
+				@Before
+				public void init() throws Exception {
+					// 连接集群的的NameNode地址
+					URI uri = new URI("hdfs://hadoop101:8020");
+					// 创建一个配置文件
+					Configuration conf = new Configuration();
+					// 获取客户端对象
+					String user = "root";
+					fs = FileSystem.get(uri, conf, user);
+				}
+
+				@After
+				public void close() throws Exception {
+					// 关闭资源
+					fs.close();
+				}	
+			}
+	2. HDFS的API案例实操
+		① HDFS 创建文件目录
+			@Test
+			public void testMkdir() throws Exception {
+				// 创建文件夹
+				fs.mkdirs(new Path("/xiyouji/huaguoshan1"));
+			}
+		② HDFS文件上传
+			A. 编写源代码
+				/**
+				 * 上传文件
+				 * delSrc: 是否删除源文件
+				 * overwrite：是否覆盖目标文件
+				 * src：源文件
+				 * dst：目标文件
+				 */
+				@Test
+				public void testCopyFromLocalFile() throws Exception {
+					fs.copyFromLocalFile(false, true, new Path("C:/Users/Li/Desktop/sunwukong.txt"), new Path("hdfs://hadoop101/xiyouji/huaguoshan"));
+				}
+			B. 将 hdfs-site.xml 拷贝到项目的 resources 资源目录下
+				<?xml version="1.0" encoding="UTF-8"?>
+				<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+				<configuration>
+					<property>
+						<name>dfs.replication</name>
+						 <value>1</value>
+					</property>
+				</configuration>
+			C. 参数优先级，参数优先级排序：客户端代码中设置的值 > ClassPath下的用户自定义配置文件 > 然后是服务器的自定义配置（xxx-site.xml） > 服务器
+			的默认配置（xxx-default.xml）
+		③ 文件下载
+			/**
+			 * 文件下载
+			 * delSrc：源文件是否删除
+			 * src：源文件路径
+			 * dst：目标地址路径
+			 * useRawLocalFileSystem：开启本地校验，false，开启，true，不开启。
+			 */
+			@Test
+			public void testgeCopyToLocalFilet() throws Exception {
+				fs.copyToLocalFile(false, new Path("hdfs://hadoop101/xiyouji/huaguoshan1/sunwukong.txt"), new Path("C:/Users/Li/Desktop/sunwukong1.txt"), true);
+			}
+		④ HDFS删除文件和目录
+			/**
+			 * 递归删除文件
+			 * path：文件路径
+			 * b：是否递归删除
+			 */
+			@Test
+			public void testDelete() throws Exception {
+				fs.delete(new Path("hdfs://hadoop101/xiyouji/huaguoshan1"), true);
+			}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

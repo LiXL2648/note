@@ -1,0 +1,29 @@
+1. 自增变量
+	public static void main(String[] args) {
+		int i = 1;
+		i = i++;
+		int j = i++;
+		int k = i + ++i * i++;
+		System.out.println(i);
+		System.out.println(j);
+		System.out.println(k);
+    }
+	
+2. 编写一个单例设计模式 Singleton 实例，采用懒汉式进行创建，要求线程安全（关键字：synchronized）
+	public class Singleton {
+
+		private static Singleton instance;
+
+		private Singleton(){}
+
+		public static Singleton getInstance() {
+			if (instance == null) {
+				synchronized (Singleton.class) {
+					if (instance == null) {
+						instance = new Singleton();
+					}
+				}
+			}
+			return instance;
+		}
+	}
