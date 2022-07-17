@@ -1,0 +1,842 @@
+十四、Kubernetes-部署性能监控平台
+	1. 方案一：
+		① 概述：开源软件 cAdvisor（Container Advisor）用于监控所在节点的容器运行状态，当前已经被默认集成到 kubelet 组件内，默认使用 tcp 4194 端口。在大规模容器集群中，一般使用
+		Heapster + Influxdb + Grafana 平台实现集群性能数据采集，存储与展示。
+		② 环境准备
+			A. 基础环境：Kubernetes + Heapster + Influxdb + Grafana
+			B. 原理
+											+------------+
+											| Kubernetes |							+-------------------+
+											|   Master   |							|	+----------+	|	  +--------------+
+											+------------+							|	|  Grafana | ---+---> | 客户端浏览器 |
+												  |									|	+----------+	|	  +--------------+
+												  ↓ 获取 node 列表					|		 ↑			|
+											+------------+							|	+----------+	|
+											|  Heapster  | -------------------------+-> | Influxdb |	|
+											+------------+							|	+----------+	|
+												  ↑									+-------------------+
+												  |
+							+---------------------+---------------------+
+							|											|
+				+-----------------------+					+-----------------------+
+				|	+--------------+	|					|	+--------------+	|
+				|	|   kubelet    |	|					|	|   kubelet    |	|
+				|	|	   ↓	   |	|					|	|	   ↓	   |	|
+				|	| +----------+ |	|					|	| +----------+ |	|
+				|   | | cAdvisor | |	|					|   | | cAdvisor | |	|
+				|	| +----------+ |	|					|	| +----------+ |	|
+				|	+--------------+	|					|	+--------------+	|
+				|		 Node1			|					|		 Node2			|
+				+-----------------------+					+-----------------------+
+				a. Heapster：集群中各 node 节点的 cAdvisor 的数据采集汇聚系统，通过调用 node 上 kubelet 的 api，再通过 kubelet 调用 cAdvisor 的 api 来采集所在节点上所有容器的性能
+				数据。Heapster 对性能数据进行聚合，并将结果保存到后端存储系统，Heapster支持多种后端存储系统，如 memory，Influxdb等。
+				b. Influxdb：分布式时序数据库（每条记录有带时间戳属性），主要用于实时数据采集，时间跟踪记录，存储时间图表，原始数据等。Influxdb 提供 rest api 用于数据的存储鱼查询。
+				c. Grafana：通过 dashboard 将 Influxdb中的时序数据展现成图表或曲线等形式，便于查看集群运行状态
+				d. Heapster、Influxdb、Grafana 均以 Pod 的形式启动与运行。
+	2. 方案二：
+		① 集群资源监控
+			A. 监控指标
+				a. 集群监控：节点利用率、节点数、运行的 POds
+				b. Pod 监控：容器指标、应用程序
+			B. 监控平台
+				a. 基础环境：prometheus + Grafana
+				b. prometheus：定时抓取被监控节点的状态的数据，包括资源利用率、Pod 数量等。有以下特点：
+					(1) 开源
+					(2) 监控、报警
+					(3) 时间序列
+					(4) 作为数据库使用
+					(5) 以 HTTP 协议周期性抓取被监控组件状态
+					(6) 不需要复杂的集成过程，使用 http 接口接入就可以
+				c. Grafana：通过 dashboard 将 prometheus 中的时序数据展现成图表或曲线等形式，便于查看集群运行状态。有以下特点：
+					(1) 开源的数据分析和可视化工具
+					(2) 支持多种数据源
+			C. 原理
+											+------------+
+											|   Grafana  |
+											+------------+
+												  ↑
+											+------------+
+											| prometheus |
+											+------------+
+												  ↑	
+							+---------------------+---------------------+
+							|											|
+					+---------------+							+---------------+
+					|	+-------+	|							|	+-------+	|
+					|	| 容器1 |   |							|	| 容器1 |   |
+					|	+-------+	|							|	+-------+	|
+					|	+-------+	|							|	+-------+	|
+					|   | 容器2 |	|							|   | 容器2 |	|
+					|	+-------+	|							|	+-------+	|
+					|	  Node1		|							|	  Node2		|
+					+---------------+							+---------------+
+		② 搭建监控平台
+			A. 部署 prometheus
+				a. 部署守护进程
+					(1) 新建 node-exporter.yaml 文件
+						---
+						apiVersion: apps/v1
+						kind: DaemonSet
+						metadata:
+						  name: node-exporter
+						  namespace: kube-system
+						  labels:
+							k8s-app: node-exporter
+						spec:
+						  selector:
+							matchLabels:
+							  k8s-app: node-exporter
+						  template:
+							metadata:
+							  labels:
+								k8s-app: node-exporter
+							spec:
+							  containers:
+							  - image: prom/node-exporter
+								name: node-exporter
+								ports:
+								- containerPort: 9100
+								  protocol: TCP
+								  name: http
+						---
+						apiVersion: v1
+						kind: Service
+						metadata:
+						  labels:
+							k8s-app: node-exporter
+						  name: node-exporter
+						  namespace: kube-system
+						spec:
+						  ports:
+						  - name: http
+							port: 9100
+							nodePort: 31672
+							protocol: TCP
+						  type: NodePort
+						  selector:
+							k8s-app: node-exporter
+					(2) 执行 node-exporter.yaml 文件
+						kubectl create -f node-exporter.yaml
+				b. 部署 prometheus
+					(1) 新建 rbac-setup.yaml
+						apiVersion: rbac.authorization.k8s.io/v1
+						kind: ClusterRole
+						metadata:
+						  name: prometheus
+						rules:
+						- apiGroups: [""]
+						  resources:
+						  - nodes
+						  - nodes/proxy
+						  - services
+						  - endpoints
+						  - pods
+						  verbs: ["get", "list", "watch"]
+						- apiGroups:
+						  - extensions
+						  resources:
+						  - ingresses
+						  verbs: ["get", "list", "watch"]
+						- nonResourceURLs: ["/metrics"]
+						  verbs: ["get"]
+						---
+						apiVersion: v1
+						kind: ServiceAccount
+						metadata:
+						  name: prometheus
+						  namespace: kube-system
+						---
+						apiVersion: rbac.authorization.k8s.io/v1
+						kind: ClusterRoleBinding
+						metadata:
+						  name: prometheus
+						roleRef:
+						  apiGroup: rbac.authorization.k8s.io
+						  kind: ClusterRole
+						  name: prometheus
+						subjects:
+						- kind: ServiceAccount
+						  name: prometheus
+						  namespace: kube-system
+					(2) 执行 rbac-setup.yaml
+						kubectl create -f rbac-setup.yaml
+					(3) 新建 configmap.yaml
+						apiVersion: v1
+						kind: ConfigMap
+						metadata:
+						  name: prometheus-config
+						  namespace: kube-system
+						data:
+						  prometheus.yml: |
+							global:
+							  scrape_interval:     15s
+							  evaluation_interval: 15s
+							scrape_configs:
+
+							- job_name: 'kubernetes-apiservers'
+							  kubernetes_sd_configs:
+							  - role: endpoints
+							  scheme: https
+							  tls_config:
+								ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+							  bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+							  relabel_configs:
+							  - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+								action: keep
+								regex: default;kubernetes;https
+
+							- job_name: 'kubernetes-nodes'
+							  kubernetes_sd_configs:
+							  - role: node
+							  scheme: https
+							  tls_config:
+								ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+							  bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+							  relabel_configs:
+							  - action: labelmap
+								regex: __meta_kubernetes_node_label_(.+)
+							  - target_label: __address__
+								replacement: kubernetes.default.svc:443
+							  - source_labels: [__meta_kubernetes_node_name]
+								regex: (.+)
+								target_label: __metrics_path__
+								replacement: /api/v1/nodes/${1}/proxy/metrics
+
+							- job_name: 'kubernetes-cadvisor'
+							  kubernetes_sd_configs:
+							  - role: node
+							  scheme: https
+							  tls_config:
+								ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+							  bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+							  relabel_configs:
+							  - action: labelmap
+								regex: __meta_kubernetes_node_label_(.+)
+							  - target_label: __address__
+								replacement: kubernetes.default.svc:443
+							  - source_labels: [__meta_kubernetes_node_name]
+								regex: (.+)
+								target_label: __metrics_path__
+								replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+
+							- job_name: 'kubernetes-service-endpoints'
+							  kubernetes_sd_configs:
+							  - role: endpoints
+							  relabel_configs:
+							  - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+								action: keep
+								regex: true
+							  - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scheme]
+								action: replace
+								target_label: __scheme__
+								regex: (https?)
+							  - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+								action: replace
+								target_label: __metrics_path__
+								regex: (.+)
+							  - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port]
+								action: replace
+								target_label: __address__
+								regex: ([^:]+)(?::\d+)?;(\d+)
+								replacement: $1:$2
+							  - action: labelmap
+								regex: __meta_kubernetes_service_label_(.+)
+							  - source_labels: [__meta_kubernetes_namespace]
+								action: replace
+								target_label: kubernetes_namespace
+							  - source_labels: [__meta_kubernetes_service_name]
+								action: replace
+								target_label: kubernetes_name
+
+							- job_name: 'kubernetes-services'
+							  kubernetes_sd_configs:
+							  - role: service
+							  metrics_path: /probe
+							  params:
+								module: [http_2xx]
+							  relabel_configs:
+							  - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_probe]
+								action: keep
+								regex: true
+							  - source_labels: [__address__]
+								target_label: __param_target
+							  - target_label: __address__
+								replacement: blackbox-exporter.example.com:9115
+							  - source_labels: [__param_target]
+								target_label: instance
+							  - action: labelmap
+								regex: __meta_kubernetes_service_label_(.+)
+							  - source_labels: [__meta_kubernetes_namespace]
+								target_label: kubernetes_namespace
+							  - source_labels: [__meta_kubernetes_service_name]
+								target_label: kubernetes_name
+
+							- job_name: 'kubernetes-ingresses'
+							  kubernetes_sd_configs:
+							  - role: ingress
+							  relabel_configs:
+							  - source_labels: [__meta_kubernetes_ingress_annotation_prometheus_io_probe]
+								action: keep
+								regex: true
+							  - source_labels: [__meta_kubernetes_ingress_scheme,__address__,__meta_kubernetes_ingress_path]
+								regex: (.+);(.+);(.+)
+								replacement: ${1}://${2}${3}
+								target_label: __param_target
+							  - target_label: __address__
+								replacement: blackbox-exporter.example.com:9115
+							  - source_labels: [__param_target]
+								target_label: instance
+							  - action: labelmap
+								regex: __meta_kubernetes_ingress_label_(.+)
+							  - source_labels: [__meta_kubernetes_namespace]
+								target_label: kubernetes_namespace
+							  - source_labels: [__meta_kubernetes_ingress_name]
+								target_label: kubernetes_name
+
+							- job_name: 'kubernetes-pods'
+							  kubernetes_sd_configs:
+							  - role: pod
+							  relabel_configs:
+							  - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+								action: keep
+								regex: true
+							  - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+								action: replace
+								target_label: __metrics_path__
+								regex: (.+)
+							  - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+								action: replace
+								regex: ([^:]+)(?::\d+)?;(\d+)
+								replacement: $1:$2
+								target_label: __address__
+							  - action: labelmap
+								regex: __meta_kubernetes_pod_label_(.+)
+							  - source_labels: [__meta_kubernetes_namespace]
+								action: replace
+								target_label: kubernetes_namespace
+							  - source_labels: [__meta_kubernetes_pod_name]
+								action: replace
+								target_label: kubernetes_pod_name
+					(4) 执行 configmap.yaml
+						kubectl create -f configmap.yaml
+					(5) 新建 prometheus.deploy.yml
+						---
+						apiVersion: apps/v1
+						kind: Deployment
+						metadata:
+						  labels:
+							name: prometheus-deployment
+						  name: prometheus
+						  namespace: kube-system
+						spec:
+						  replicas: 1
+						  selector:
+							matchLabels:
+							  app: prometheus
+						  template:
+							metadata:
+							  labels:
+								app: prometheus
+							spec:
+							  containers:
+							  - image: prom/prometheus:v2.0.0
+								name: prometheus
+								command:
+								- "/bin/prometheus"
+								args:
+								- "--config.file=/etc/prometheus/prometheus.yml"
+								- "--storage.tsdb.path=/prometheus"
+								- "--storage.tsdb.retention=24h"
+								ports:
+								- containerPort: 9090
+								  protocol: TCP
+								volumeMounts:
+								- mountPath: "/prometheus"
+								  name: data
+								- mountPath: "/etc/prometheus"
+								  name: config-volume
+								resources:
+								  requests:
+									cpu: 100m
+									memory: 100Mi
+								  limits:
+									cpu: 500m
+									memory: 2500Mi
+							  serviceAccountName: prometheus
+							  volumes:
+							  - name: data
+								emptyDir: {}
+							  - name: config-volume
+								configMap:
+								  name: prometheus-config
+					(6) 执行 prometheus.deploy.yml
+						kubectl create -f prometheus.deploy.yml
+					(7) 创建 prometheus.svc.yml
+						---
+						kind: Service
+						apiVersion: v1
+						metadata:
+						  labels:
+							app: prometheus
+						  name: prometheus
+						  namespace: kube-system
+						spec:
+						  type: NodePort
+						  ports:
+						  - port: 9090
+							targetPort: 9090
+							nodePort: 30003
+						  selector:
+							app: prometheus
+					(8) 执行 prometheus.svc.yml
+						kubectl create -f prometheus.svc.yml
+					(9) 查看 pods,svc
+						kubectl get pods,svc -n kube-system
+				c. 部署 grafana
+					(1) 创建 grafana-deploy.yaml 文件
+						apiVersion: apps/v1
+						kind: Deployment
+						metadata:
+						  name: grafana-core
+						  namespace: kube-system
+						  labels:
+							app: grafana
+							component: core
+						spec:
+						  replicas: 1
+						  selector:
+							matchLabels:
+							  app: grafana
+							  component: core
+						  template:
+							metadata:
+							  labels:
+								app: grafana
+								component: core
+							spec:
+							  containers:
+							  - image: grafana/grafana:4.2.0
+								name: grafana-core
+								imagePullPolicy: IfNotPresent
+								# env:
+								resources:
+								  # keep request = limit to keep this container in guaranteed class
+								  limits:
+									cpu: 100m
+									memory: 100Mi
+								  requests:
+									cpu: 100m
+									memory: 100Mi
+								env:
+								  # The following env variables set up basic auth twith the default admin user and admin password.
+								  - name: GF_AUTH_BASIC_ENABLED
+									value: "true"
+								  - name: GF_AUTH_ANONYMOUS_ENABLED
+									value: "false"
+								  # - name: GF_AUTH_ANONYMOUS_ORG_ROLE
+								  #   value: Admin
+								  # does not really work, because of template variables in exported dashboards:
+								  # - name: GF_DASHBOARDS_JSON_ENABLED
+								  #   value: "true"
+								readinessProbe:
+								  httpGet:
+									path: /login
+									port: 3000
+								  # initialDelaySeconds: 30
+								  # timeoutSeconds: 1
+								volumeMounts:
+								- name: grafana-persistent-storage
+								  mountPath: /var
+							  volumes:
+							  - name: grafana-persistent-storage
+								emptyDir: {}
+					(2) 执行 grafana-deploy.yaml
+						kubectl create -f grafana-deploy.yaml
+					(3) 创建 grafana-svc.yam 文件
+						apiVersion: v1
+						kind: Service
+						metadata:
+						  name: grafana
+						  namespace: kube-system
+						  labels:
+							app: grafana
+							component: core
+						spec:
+						  type: NodePort
+						  ports:
+							- port: 3000
+						  selector:
+							app: grafana
+							component: core
+					(4) 执行 grafana-svc.yam
+						kubectl create -f grafana-svc.yaml
+					(5) 创建 grafana-ing.yaml 文件
+						apiVersion: extensions/v1beta1
+						kind: Ingress
+						metadata:
+						   name: grafana
+						   namespace: kube-system
+						spec:
+						   rules:
+						   - host: k8s.grafana
+							 http:
+							   paths:
+							   - path: /
+								 backend:
+								  serviceName: grafana
+								  servicePort: 3000
+					(6) 执行 grafana-ing.yaml
+						kubectl create -f grafana-ing.yaml
+					(7) 查看 pods,svc
+						kubectl get pods,svc -n kube-system
+				d. 打开 Grafana，配置数据源
+					(1) 访问 Grafana
+						http://hadoop102:32308/
+					(2) 默认账号密码为 admin
+					(3) 配置数据源，使用 Prometheus
+						点击左上角设置按钮，选择 Data Sources，点击 +Add data source，输入数据源库名称：pgmonitordb，选择数据源类型：Prometheus
+						输入 url：http://10.109.106.241:9090，Prometheus 数据源 IP 需要通过查看 svc，选择对应的 CLUSTER-IP，设置完点击 add 进行添加
+				e. 设置显示模板
+					(1) 点击左上角设置按钮，选择 Dashboards，选择 Import
+					(2) 在Grafana.net Dashboard中输入 315，点击 Load 进行加载
+					(3) 在 Prometheus 中选择 自定义数据源 pgmonitordb，点击 Import
+十五、Kubernetes-高可用集群搭建
+	1. 概述
+		① Kubernetes 作为容器集群系统，通过健康检查+重启策略实现了 Pod 故障自我修复能力，通过调度算法实现将 Pod 分布式部署，监控其预期副本数，并根据 Node 失效自动在正
+		常 Node 启动 Pod，实现了应用层的高可用性。
+		② 针对 Kubernetes 集群，高可用性还应包含以下两个层面的考虑：Etcd 数据库的高可用性 和 Kubernetes Master 组件的高可用性。而 Etcd 已经采用 3 个 节点组成集群高可
+		用，故以下将对 Master 节点高可用进行说明和实施
+		③ Master 节点扮演着总控中心的角色，通过不断与工作节点上的 Kubelet 和 kube-proxy 进行通信来维护整个集群的健康工作状态。如果 Master 节点故障，将无法使用 kubelet
+		工具或者 API 进行集群管理
+		④ Master 节点主要有三个服务，kube-apiserver、kube-controller-manager 和 kube-scheduler，其中 kube-controller-manager 和 kube-scheduler 组件自身通过选择机制已经
+		实现了高可用，所以 Master 高可用主要针对 kube-apiserver 组件，而该组件是以 HTTP API 提供服务，因此高可用与 web 服务器类似，增加负载均衡器对其负载均衡即可。
+		⑤ 多 Master 架构图：
+					+-------------+			+-------------+			+-------------+			
+					| worker node |			| worker node |			| worker node |
+					+-------------+			+-------------+			+-------------+
+						   |					   |					   |
+						   +-----------------------+-----------------------+
+												   ↓
+												+-----+
+												| VIP |
+												+-----+
+												   |	
+						+--------------------------+--------------------------+
+						↓													  ↓						  
+			+---------------------------+						+---------------------------+
+			|			Master1			|						|			Master2			|
+			|	+--------------------+	|						|	+--------------------+	|
+			|	| 	  keepalived	 |	|						|	| 	  keepalived	 |	|
+			|	+--------------------+	|						|	+--------------------+	|
+			|	+--------------------+	|						|	+--------------------+	|
+			|	|		haproxy		 |	|						|	|		haproxy		 |	|
+			|	+--------------------+	|						|	+--------------------+	|
+			|	+--------------------+	|						|	+--------------------+	|
+			|	| 	   apiserver     |	|						|	| 	   apiserver     |	|
+			|	+--------------------+	|						|	+--------------------+	|
+			|	+--------------------+	|						|	+--------------------+	|
+			|	| controller-manager |	|						|	| controller-manager |	|
+			|	+--------------------+	|						|	+--------------------+	|
+			|	+--------------------+	|						|	+--------------------+	|
+			|	|	   scheduler	 |	|						|	|	   scheduler	 |	|
+			|	+--------------------+	|						|	+--------------------+	|
+			+---------------------------+						+---------------------------+
+	2. 	高可用集群搭建
+		① 安装要求参考 kubernetes 安装部署中的 2.3
+		② 将虚拟机进行拷贝，新增三台虚拟机，并修改虚拟机的网络为 192.168.26.104、192.168.26.105，192.168.26.106
+		③ 每个 Master 节点上部署 keepalived
+			A. 安装相关包和 keepalived
+				yum install -y conntrack-tools libseccomp libtool-ltdl
+				yum install -y keepalived
+			B. master1节点配置
+				cat > /etc/keepalived/keepalived.conf <<EOF 
+				! Configuration File for keepalived
+
+				global_defs {
+				   router_id k8s
+				}
+
+				vrrp_script check_haproxy {
+					script "killall -0 haproxy"
+					interval 3
+					weight -2
+					fall 10
+					rise 2
+				}
+
+				vrrp_instance VI_1 {
+					state MASTER 
+					interface ens33 
+					virtual_router_id 51
+					priority 250
+					advert_int 1
+					authentication {
+						auth_type PASS
+						auth_pass ceb1b3ec013d66163d6ab
+					}
+					virtual_ipaddress {
+						192.168.26.111
+					}
+					track_script {
+						check_haproxy
+					}
+
+				}
+				EOF
+			C. master2节点配置
+				cat > /etc/keepalived/keepalived.conf <<EOF 
+				! Configuration File for keepalived
+
+				global_defs {
+				   router_id k8s
+				}
+
+				vrrp_script check_haproxy {
+					script "killall -0 haproxy"
+					interval 3
+					weight -2
+					fall 10
+					rise 2
+				}
+
+				vrrp_instance VI_1 {
+					state BACKUP 
+					interface ens33 
+					virtual_router_id 51
+					priority 200
+					advert_int 1
+					authentication {
+						auth_type PASS
+						auth_pass ceb1b3ec013d66163d6ab
+					}
+					virtual_ipaddress {
+						192.168.26.111
+					}
+					track_script {
+						check_haproxy
+					}
+
+				}
+				EOF
+			D. 启动和检查，在两台master节点都执行
+				a. 启动keepalived
+					systemctl start keepalived
+				b. 设置开机启动
+					systemctl enable keepalived
+				c. 查看启动状态
+					systemctl status keepalived
+				d. 启动后查看master1的网卡信息
+					ip a s ens33
+		④ 部署 haproxy
+			A. 安装 haproxy
+				yum install -y haproxy
+			B. 配置，两台master节点的配置均相同，配置中声明了后端代理的两个master节点服务器，指定了haproxy运行的端口为16443等，因此16443端口为集群的入口
+				cat > /etc/haproxy/haproxy.cfg << EOF
+				#---------------------------------------------------------------------
+				# Global settings
+				#---------------------------------------------------------------------
+				global
+					# to have these messages end up in /var/log/haproxy.log you will
+					# need to:
+					# 1) configure syslog to accept network log events.  This is done
+					#    by adding the '-r' option to the SYSLOGD_OPTIONS in
+					#    /etc/sysconfig/syslog
+					# 2) configure local2 events to go to the /var/log/haproxy.log
+					#   file. A line like the following can be added to
+					#   /etc/sysconfig/syslog
+					#
+					#    local2.*                       /var/log/haproxy.log
+					#
+					log         127.0.0.1 local2
+					
+					chroot      /var/lib/haproxy
+					pidfile     /var/run/haproxy.pid
+					maxconn     4000
+					user        haproxy
+					group       haproxy
+					daemon 
+					   
+					# turn on stats unix socket
+					stats socket /var/lib/haproxy/stats
+				#---------------------------------------------------------------------
+				# common defaults that all the 'listen' and 'backend' sections will
+				# use if not designated in their block
+				#---------------------------------------------------------------------  
+				defaults
+					mode                    http
+					log                     global
+					option                  httplog
+					option                  dontlognull
+					option http-server-close
+					option forwardfor       except 127.0.0.0/8
+					option                  redispatch
+					retries                 3
+					timeout http-request    10s
+					timeout queue           1m
+					timeout connect         10s
+					timeout client          1m
+					timeout server          1m
+					timeout http-keep-alive 10s
+					timeout check           10s
+					maxconn                 3000
+				#---------------------------------------------------------------------
+				# kubernetes apiserver frontend which proxys to the backends
+				#--------------------------------------------------------------------- 
+				frontend kubernetes-apiserver
+					mode                 tcp
+					bind                 *:16443
+					option               tcplog
+					default_backend      kubernetes-apiserver    
+				#---------------------------------------------------------------------
+				# round robin balancing between the various backends
+				#---------------------------------------------------------------------
+				backend kubernetes-apiserver
+					mode        tcp
+					balance     roundrobin
+					server      master01.k8s.io   192.168.26.104:6443 check
+					server      master02.k8s.io   192.168.26.105:6443 check
+				#---------------------------------------------------------------------
+				# collection haproxy statistics message
+				#---------------------------------------------------------------------
+				listen stats
+					bind                 *:1080
+					stats auth           admin:awesomePassword
+					stats refresh        5s
+					stats realm          HAProxy\ Statistics
+					stats uri            /admin?stats
+				EOF
+			C. 启动和检查，两台master都启动
+				a. 设置开机启动
+					systemctl enable haproxy
+				b. 开启haproxy
+					systemctl start haproxy
+				c. 查看启动状态
+					systemctl status haproxy
+				d. 检查端口
+					netstat -lntup|grep haproxy
+		⑤ 添加 master 节点
+			A. 新增一台虚拟机，并修改虚拟机的网络为 192.168.26.104，主机名 hadoop104
+			B. 安装kubeadm，kubelet和kubectl
+				yum install -y kubelet-1.18.0 kubeadm-1.18.0 kubectl-1.18.0
+			C. 设置 kubelet 开机自启
+				systemctl enable kubelet
+			D. 在当前唯一的 master 节点上运行如下命令
+				a. kubeadm init phase upload-certs --upload-certs
+					Using certificate key:
+					cacf2b3c5c7002641241bdd29940ef72364b58f3d272323914844fc7709df888
+				b. kubeadm token create --print-join-command
+					kubeadm join 192.168.26.101:6443 --token vgp75n.lyjd3683omxq3tlo --discovery-token-ca-cert-hash sha256:c3cc3d6c42ec7b431bb94b655e04432d064ad9ea3a49dddb0b507ef5fedc67f6
+				c. 将得到的 token 和 key 进行拼接，得到如下命令
+					kubeadm join 192.168.26.101:6443 --token vgp75n.lyjd3683omxq3tlo \
+					--discovery-token-ca-cert-hash sha256:c3cc3d6c42ec7b431bb94b655e04432d064ad9ea3a49dddb0b507ef5fedc67f6 \
+					--control-plane --certificate-key  cacf2b3c5c7002641241bdd29940ef72364b58f3d272323914844fc7709df888
+			E. 在 Master 节点添加 controlPlaneEndpoint
+				a. 查看 kubeadm-config.yaml
+					kubectl -n kube-system get cm kubeadm-config -oyaml
+					发现没有 controlPlaneEndpoint
+				b. 添加controlPlaneEndpoint
+					kubectl -n kube-system edit cm kubeadm-config
+					大概在这么个位置：
+					kind: ClusterConfiguration
+					kubernetesVersion: v1.18.0
+					controlPlaneEndpoint: 192.168.26.101:6443
+			
+			F. 在新加入的 master 节点执行命令
+				kubeadm join 192.168.26.101:6443 --token vgp75n.lyjd3683omxq3tlo \
+				--discovery-token-ca-cert-hash sha256:c3cc3d6c42ec7b431bb94b655e04432d064ad9ea3a49dddb0b507ef5fedc67f6 \
+				--control-plane --certificate-key  cacf2b3c5c7002641241bdd29940ef72364b58f3d272323914844fc7709df888
+			G. 在新加入的 Master 节点执行以下命令
+				mkdir -p $HOME/.kube
+				sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+				sudo chown $(id -u):$(id -g) $HOME/.kube/config
+			H. 检查状态`
+				kubectl get node
+				kubectl get pods --all-namespaces
+			I. 注意事项： 新加入的 Master 节点执行 kubeadm join 时，要加上--control-plane --certificate-key ，不然就会添加为node节点而不是master
+		⑥ 测试kubernetes集群	
+			A. 在Kubernetes集群中创建一个pod：
+				kubectl create deployment nginx --image=nginx
+				kubectl expose deployment nginx --port=80 --type=NodePort --target-port=80 --name=nginx
+			B. 查看 pod 和 svc
+				kubectl get pods,svc
+				NAME                        READY   STATUS    RESTARTS   AGE
+				pod/nginx-f89759699-wlsrb   1/1     Running   0          42s
+
+				NAME                 TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE
+				service/kubernetes   ClusterIP   10.96.0.1        <none>        443/TCP        18m
+				service/nginx        NodePort    10.108.220.233   <none>        80:31570/TCP   28s
+			C. 浏览器访问
+				http://192.168.26.111:31570/
+十六、kubernetes 集群部署项目
+	1. 容器交付流程
+		① 开发代码阶段
+			A. 编写代码
+			B. 测试
+			C. 编写 Dokcerfile
+		② 持续交付/集成
+			A. 代码编译打包
+			B. 制作镜像
+			C. 上传镜像仓库
+		③ 应用部署
+			A. 环境准备
+			B. Pod
+			C. Service
+			D. Ingress
+		④ 运维
+			A. 监控
+			B. 故障排查
+			C. 升级优化
+	2. K8s 部署 Java 项目流程（细节过程）
+		① 制作镜像
+		② 推送镜像仓库
+		③ 控制器部署镜像
+		④ 对外暴露应用
+		⑤ 运维
+	3. k8s 集群部署 Java 项目
+		① 准备 Java 项目，进行打包（jar）
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

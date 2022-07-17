@@ -342,15 +342,54 @@
 					(3) 基于 Taint 驱逐
 				c. 具体演示
 					(1) 查看节点污点情况
-						kubectl describe node k8s-m1 | grep Taint
-						# 污点值有三个：
-						# NoSchedule：一定不被调度
-						# PreferNoSchedule：尽量不被调度
-						# NoExecute：不会调度，并且会驱逐 Node 已有 Pod
+						(A) kubectl describe node k8s-m1 | grep Taint
+						(B) 污点值有三个：
+							(a) NoSchedule：一定不被调度
+							(b) PreferNoSchedule：尽量不被调度
+							(c) NoExecute：不会调度，并且会驱逐 Node 已有 Pod
+						(C) Master 默认污点是 NoSchedule，而 Node 节点默认是无污点
 					(2) 为节点添加污点
 						kubectl taint node k8s-m1 env_role=yes:NoSchedule
 					(3) 删除污点
 						kubectl taint node k8s-m1 env_role=yes:NoSchedule-
+				d. 示例演示
+					(1) 创建一个 Pod
+						kubectl create deployment nginx --image=nginx
+					(2) 查看 Pod 详情，发现新创建的 Pod 分配到 hadoop103 中
+						kubectl get pods -o wide
+						NAME                    READY   STATUS    RESTARTS   AGE    IP           NODE        NOMINATED NODE   READINESS GATES
+						web-5dcb957ccc-zwhl4    1/1     Running   0          111s   10.244.2.4   hadoop103   <none>           <none>
+					(3) 一次性创建五个 pod
+						kubectl scale deployment web --replicas=5
+					(4) 再次查看 Pod 详情，发现新创建的 Pod 均匀调度到 hadoop102 和 hadoop103 中
+						web-5dcb957ccc-488px    1/1     Running   0          82s     10.244.2.6   hadoop103   <none>           <none>
+						web-5dcb957ccc-bppsq    1/1     Running   0          82s     10.244.2.5   hadoop103   <none>           <none>
+						web-5dcb957ccc-pp6tx    1/1     Running   0          82s     10.244.1.3   hadoop102   <none>           <none>
+						web-5dcb957ccc-z68dq    1/1     Running   0          82s     10.244.1.4   hadoop102   <none>           <none>
+						web-5dcb957ccc-zwhl4    1/1     Running   0          5m42s   10.244.2.4   hadoop103   <none>           <none>
+					(5) 删除所有 Pod
+						kubectl delete deployment web
+					(6) 为 hadoop102 添加污点
+						kubectl taint node hadoop102 env_role=yes:NoSchedule
+					(7) 查看 hadoop102 污点
+						kubectl describe node hadoop102 | grep Taint
+						Taints:             env_role=yes:NoSchedule
+					(8) 再创建 Pod，并查看详情，再创建多个 Pod，并查看详情，发现所有 Pod 都被创建在 hadoop103 中，而 hadoop102 不会被创建
+						kubectl create deployment web --image=nginx
+						kubectl get pods -o wide
+						kubectl scale deployment web --replicas=5
+						kubectl get pods -o wide
+						web-5dcb957ccc-j5mjb    1/1     Running   0          103s   10.244.2.7    hadoop103   <none>           <none>
+						web-5dcb957ccc-mhfjd    1/1     Running   0          48s    10.244.2.9    hadoop103   <none>           <none>
+						web-5dcb957ccc-scqbf    1/1     Running   0          48s    10.244.2.11   hadoop103   <none>           <none>
+						web-5dcb957ccc-tv2rq    1/1     Running   0          48s    10.244.2.8    hadoop103   <none>           <none>
+						web-5dcb957ccc-zlfhv    1/1     Running   0          48s    10.244.2.10   hadoop103   <none>           <none>
+					(9) 删除所有 Pod，并删除 hadoop102 的污点
+						kubectl delete deployment web
+						kubectl taint node hadoop102 env_role=yes:NoSchedule-
+					(10) 最后查看所有 Pod 和 hadoop102 的污点
+						kubectl get pods -o wide
+						kubectl describe node hadoop102 | grep Taint
 				d. 污点容忍：设置污点容忍后，即时是污点为NoSchedule，也有可能被调度，示例：
 					apiVersion: v1
 					kind: Pod
@@ -365,3 +404,1276 @@
 					  containers:
 					    - name: webdemo
 						  image: nginx
+七、Kubenetes 核心技术-Controller 控制器
+	1. 简介
+		① 什么是 Controller：Controller 又叫工作负责，在集群上管理和运行容器
+		② Pod 和 Controller 之间的关系：Pod 是通过 Controller 实现应用的运维，比如伸缩、滚动升级等
+		③ Pod 和 Controller 之间如何建立关系：通过 selector 和 label 标签建立关系
+		④ deployment 控制器的应用场景
+			A. 部署无状态应用
+			B. 管理 Pod 和 ReplicaSet
+			C. 部署，滚动升级等功能
+			D. 部署 Web 服务、微服务
+	2. 使用 deployment 部署无状态应用（yaml 方式部署）
+		① 使用命令方式部署
+			A. 创建一个 Pod
+				kubectl create deployment nginx --image=nginx
+			B. 对外发布（暴露端口号）
+				kubectl expose deployment nginx --port=80 --type=NodePort --target-port=80 --name=nginx1
+		② 使用 yaml 方式部署
+			A. 查看 Pod 的 yaml 文件
+				kubectl create deployment nginx --image=nginx --dry-run -o yaml
+				metadata:
+				  creationTimestamp: null
+				  labels:
+					app: nginx
+				  name: nginx
+				spec:
+				  replicas: 1
+				  selector:#selector
+					matchLabels:
+					  app: nginx
+				  strategy: {}
+				  template:
+					metadata:
+					  creationTimestamp: null
+					  labels:#label 标签
+						app: nginx
+					spec:
+					  containers:
+					  - image: nginx
+						name: nginx
+						resources: {}
+				status: {}
+			B. 下载 Pod 的 yaml 文件
+				kubectl create deployment nginx --image=nginx --dry-run -o yaml > nginx.yaml
+			C. 通过 yaml 文件创建 Pod
+				kubectl apply -f nginx.yaml
+			D. 查看 创建的 Pod
+				kubectl  get pods
+				NAME                    READY   STATUS    RESTARTS   AGE
+				nginx-f89759699-kxlld   1/1     Running   0          62s
+			E. 对外发布（暴露端口号），下载对应的 yaml 文件
+				kubectl expose deployment nginx --port=80 --type=NodePort --target-port=80 --name=nginx1 -o yaml > nginx1.yaml
+					apiVersion: v1
+					kind: Service
+					metadata:
+					  creationTimestamp: "2022-03-25T16:49:40Z"
+					  labels:
+						app: nginx
+					  managedFields:
+					  - apiVersion: v1
+						fieldsType: FieldsV1
+						fieldsV1:
+						  f:metadata:
+							f:labels:
+							  .: {}
+							  f:app: {}
+						  f:spec:
+							f:externalTrafficPolicy: {}
+							f:ports:
+							  .: {}
+							  k:{"port":80,"protocol":"TCP"}:
+								.: {}
+								f:port: {}
+								f:protocol: {}
+								f:targetPort: {}
+							f:selector:
+							  .: {}
+							  f:app: {}
+							f:sessionAffinity: {}
+							f:type: {}
+						manager: kubectl
+						operation: Update
+						time: "2022-03-25T16:49:40Z"
+					  name: nginx1
+					  namespace: default
+					  resourceVersion: "24911"
+					  selfLink: /api/v1/namespaces/default/services/nginx1
+					  uid: 196981cb-a9f6-4bd3-9ee3-00d2be273633
+					spec:
+					  clusterIP: 10.101.81.155
+					  externalTrafficPolicy: Cluster
+					  ports:
+					  - nodePort: 30244
+						port: 80
+						protocol: TCP
+						targetPort: 80
+					  selector:
+						app: nginx
+					  sessionAffinity: None
+					  type: NodePort
+					status:
+					  loadBalancer: {}
+			F. 完成对外发布
+				kubectl apply -f nginx1.yaml
+			G. 查看 Pod
+				kubectl  get pod,svc
+			H. 使用浏览器访问 hadoop102 或 hadoop103 部署的应用
+				http://hadoop102:30244/
+				http://hadoop103:30244/
+	3. 升级回滚和弹性伸缩
+		① 升级回滚
+			A. 删除旧 Pod 
+				kubectl delete deployment nginx
+			B. 修改 Pod 的 yaml
+				vi nginx.yaml		
+				apiVersion: apps/v1
+				kind: Deployment
+				metadata:
+				  creationTimestamp: null
+				  labels:
+					app: nginx
+				  name: nginx
+				spec:
+				  replicas: 2 # 节点的副本数
+				  selector:
+					matchLabels:
+					  app: nginx
+				  strategy: {}
+				  template:
+					metadata:
+					  creationTimestamp: null
+					  labels:
+						app: nginx
+					spec:
+					  containers:
+					  - image: nginx:1.14 # 指定镜像的版本
+						name: nginx
+						resources: {}
+				status: {}
+			C. 创建 Pod，并进行查看
+				kubectl apply -f nginx.yaml
+				kubectl get pods
+				NAME                     READY   STATUS    RESTARTS   AGE
+				nginx-7b76bcc675-d2n2k   1/1     Running   0          47s
+				nginx-7b76bcc675-w2kwj   1/1     Running   0          47s
+			D. 升级 Pod，并查看 Pod，更新的过程是：由于正在下载新的 Pod 需要时间，因此旧的 Pod 仍在提供服务，等待新的 Pod 下载完成后会替换掉旧的 Pod，
+			其他副本更新的过程是一样的。保证了 Pod 更新的过程中服务不中断
+				kubectl set image deployment nginx nginx=nginx:1.15
+				kubectl get pods
+				NAME                     READY   STATUS              RESTARTS   AGE
+				nginx-7b76bcc675-d2n2k   1/1     Running             0          2m51s
+				nginx-7b76bcc675-w2kwj   1/1     Running             0          2m51s
+				nginx-7d79cb6c68-s8d9k   0/1     ContainerCreating   0          6s
+			E. 查看升级的状态，结果显示为成功
+				kubectl rollout status deployment nginx
+				deployment "nginx" successfully rolled out
+			F. 查看历史版本
+				kubectl rollout history deployment nginx
+				deployment.apps/nginx 
+				REVISION  CHANGE-CAUSE
+				1         <none>
+				2         <none>
+			G. 回滚到上一个版本
+				kubectl rollout undo deployment nginx
+				deployment.apps/nginx rolled back
+			H. 回滚到指定版本
+				kubectl rollout undo deployment nginx --to-revision=2
+		② 弹性伸缩
+			A. 查看 Pod
+				kubectl get pods
+				NAME                     READY   STATUS    RESTARTS   AGE
+				nginx-7d79cb6c68-c8xbp   1/1     Running   0          2m27s
+				nginx-7d79cb6c68-ffwm7   1/1     Running   0          2m28s
+			B. 增加 Pod 副本的数量
+				kubectl scale deployment nginx --replicas=5
+				deployment.apps/nginx scaled
+			C. 再次查看 Pod，副本数增加到 5 个
+				kubectl get pods
+				nginx-7d79cb6c68-c8xbp   1/1     Running   0          3m58s
+				nginx-7d79cb6c68-ffwm7   1/1     Running   0          3m59s
+				nginx-7d79cb6c68-ldhb7   1/1     Running   0          33s
+				nginx-7d79cb6c68-ljdcn   1/1     Running   0          33s
+				nginx-7d79cb6c68-sdgqd   1/1     Running   0          33s
+	4. 有状态和无状态的区别
+		① 无状态
+			A. 认为 Pod 都是一样的
+			B. 没有顺序要求
+			C. 不用考虑在哪个 Node 运行
+			D. 随意进行伸缩和扩展
+		② 有状态
+			A. 上面因素都需要考虑到
+			B. 让每个 Pod 独立的，保持 Pod 启动顺序和唯一性
+				a. 唯一的网络标识，持久存储
+				b. 有序，比如 MySQL 主从
+	5. 部署有状态的应用
+		① 使用 Statefulset 进行部署
+			A. 有状态的应用是无头 Service，即ClusterIp: none
+			B. 准备 state.yaml
+				apiVersion: v1
+				kind: Service
+				metadata:
+				  name: nginx2
+				  labels:
+					app: nginx
+				spec:
+				  ports:
+				  - port: 80
+					name: web
+				  clusterIP: None
+				  selector:
+					app: nginx
+
+				---
+
+				apiVersion: apps/v1
+				kind: StatefulSet
+				metadata:
+				  name: nginx-statefulset
+				  namespace: default
+				spec:
+				  serviceName: nginx2
+				  replicas: 3
+				  selector:
+					matchLabels:
+					  app: nginx
+				  template:
+					metadata:
+					  labels:
+						app: nginx
+					spec:
+					  containers:
+					  - name: nginx
+						image: nginx:latest
+						ports:
+						- containerPort: 80
+			C. 执行 yaml 文件
+				kubectl apply -f sts.yaml
+			D. 查看 Pod 和 Service，三个 Pod 都是唯一名称，而且 Service 也是无头的
+				kubectl get pods,svc
+				
+				NAME                         READY   STATUS              RESTARTS   AGE
+				pod/nginx-statefulset-0      1/1     Running             0          8s
+				pod/nginx-statefulset-1      1/1     Running             0          5s
+				pod/nginx-statefulset-2      0/1     ContainerCreating   0          1s
+
+				NAME                 TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+				service/nginx        ClusterIP   10.102.211.96   <none>        80/TCP         5h43m
+				service/nginx1       NodePort    10.104.153.39   <none>        80:30759/TCP   5h33m
+				service/nginx2       ClusterIP   None            <none>        80/TCP         8s
+			E. Statefulset 的唯一表示：主机名 + 按照一定规则生产域名
+				a. 每个 Pod 有唯一的主机名
+				b. 唯一域名
+					(1) 格式：主机名称.service名称.名称空间.svc.cluster.local
+					(2) 举例：nginx-statefulset-0 的 唯一域名：nginx-statefulset-0.nginx2.default.svc.cluster.local
+		② 部署守护进程 DaemonSet，让每个 Node 节点创建数据采集工具
+			A. 在每个 node 上运行同一个 Pod，新加入的 Node 也会同样运行同一个 Pod
+			B. 删除所有 Pod 和 svc
+				kubectl delete statefulset --all
+				kubectl delete deployment nginx
+				kubectl delete svc nginx
+			C. 准备 ds.yaml
+				apiVersion: apps/v1
+				kind: DaemonSet
+				metadata:
+				  name: ds-test
+				  labels:
+					app: filebeat
+				spec:
+				  selector:
+					matchLabels:
+					  app: filebeat
+				  template:
+					metadata:
+					  labels:
+						app: filebeat
+					spec:
+					  containers:
+					  - name: logs
+						image: nginx
+						ports:
+						- containerPort: 80
+						volumeMounts:
+						- name: varlog
+						  mountPath: /tmp/log
+					  volumes:
+					  - name: varlog
+						hostPath:
+						  path: /var/log
+			D. 执行 yaml 文件
+				kubectl apply -f ds.yaml
+			E. 查看 pod，每个节点都创建了该 Pod
+				kubectl get pods -o wide
+				NAME            READY   STATUS    RESTARTS   AGE   IP            NODE        NOMINATED NODE   READINESS GATES
+				ds-test-dxbr4   1/1     Running   0          65s   10.244.1.16   hadoop102   <none>           <none>
+				ds-test-jwwvn   1/1     Running   0          65s   10.244.2.20   hadoop103   <none>           <none>
+			F. 进入 Pod 内部，在 /tmp/log 中进行日志采集
+				kubectl exec -it ds-test-dxbr4 bas
+			G. 退出 Pod
+				exit
+		③ Job：一次性任务
+			A. 创建 job.yaml，计算圆周率
+				apiVersion: batch/v1
+				kind: Job
+				metadata:
+				  name: pi
+				spec:
+				  template:
+					spec:
+					  containers:
+					  - name: pi
+						image: perl
+						command: ["perl",  "-Mbignum=bpi", "-wle", "print bpi(2000)"]
+					  restartPolicy: Never
+			B. 执行 yaml
+				kubectl apply -f job.yaml
+			C. 在 hadoop102 查看镜像的下载进度
+				docker pull perl
+			D. 创建完成后，查看 Pod，发现该 Pod 的状态为 Completed，由于该 Pod 是一次性任务，因此创建完成后，其状态就为完成。
+				kubectl get pods -o wide
+				NAME            READY   STATUS      RESTARTS   AGE     IP            NODE        NOMINATED NODE   READINESS GATES
+				pi-r5xf8        0/1     Completed   0          4m26s   10.244.1.17   hadoop102   <none>           <none>
+			E. 查看 Pod 运行的日志
+				logs pi-r5xf8
+			F. 删除 Pod
+				kubectl logs pi-r5xf8
+		④ CronJob：定时任务
+			A. 创建 cronjob.yaml
+				apiVersion: batch/v1beta1
+				kind: CronJob
+				metadata:
+				  name: hello
+				spec:
+				  schedule: "*/30 * * * *"
+				  jobTemplate:
+					spec:
+					  template:
+						spec:
+						  containers:
+						  - name: hello
+							image: busybox
+							args:
+							- /bin/sh
+							- -c
+							- date; echo Hello from the Kubernetes cluster
+						  restartPolicy: OnFailure
+			B. 执行 yaml
+				kubectl apply -f cronjob.yaml
+			C. 查看 cronjob
+				kubectl get cronjobs
+			D. 查看 Pod 日志
+				backoffLimit: 4 # 失败重试次数，默认是6
+八、kubernetes 核心技术-Service
+	1. Service 概述
+		① 在访问应用的过程中，首先先访问的其实是 Service，然后 Service 建立 Pod 的关系，通过 Controller 建立 Pod，而通过 Service 访问 Pod 及其应用
+		② Service 存在的意义
+			A. 防止 Pod 失联，其实利用的是 Service 的服务发现
+			B. 定义一组 Pod 的访问策略（负载均衡）
+		③ Pod 和 Service 的关系
+			A. 根据 Label 和 Selector 标签建立关联
+			B. 通过 Service 实现 Pod 的负载均衡
+			C. Sevice 对外暴露 虚拟 Ip（vip）进行服务注册和发现
+	2. Service 三种类型
+		① ClusterIP：集群内部使用，示例
+			A. 删除所有 Pod
+				kubectl delete deployment nginx
+			B. 删除 Service 
+				kubectl delete service/nginx
+			B. 使用 yaml 创建 Pod
+				kubectl apply -f nginx.yaml
+			C. 查看 Pod
+				kubectl get pods,svc
+				NAME                         READY   STATUS    RESTARTS   AGE
+				pod/nginx-7b76bcc675-pvn22   1/1     Running   0          2s
+				pod/nginx-7b76bcc675-w2k6t   1/1     Running   0          2s
+
+				NAME                 TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+				service/kubernetes   ClusterIP   10.96.0.1    <none>        443/TCP   4d18h
+			D. 暴露端口，使用 ClusterIP，并导出文件
+				apiVersion: v1
+				kind: Service
+				metadata:
+				  creationTimestamp: null
+				  labels:
+					app: nginx
+				  name: nginx
+				spec:
+				  ports:
+				  - port: 80
+					protocol: TCP
+					targetPort: 80
+				  selector:
+					app: nginx
+				  type: ClusterIP # 默认，不需要写
+				status:
+				  loadBalancer: {}
+			E. 执行 yaml，并查看 Pod
+				kubectl apply -f service.yaml 
+				
+				kubectl get pods,svc
+				NAME                         READY   STATUS    RESTARTS   AGE
+				pod/nginx-7b76bcc675-pvn22   1/1     Running   0          13m
+				pod/nginx-7b76bcc675-w2k6t   1/1     Running   0          13m
+
+				NAME                 TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE
+				service/kubernetes   ClusterIP   10.96.0.1       <none>        443/TCP   4d18h
+				service/nginx        ClusterIP   10.102.211.96   <none>        80/TCP    10s
+			F. 使用的 Service 类型正是 ClusterIP，只能在集群中使用，使用其他节点访问
+				curl 10.102.211.96
+		② NodePort：对外访问应用使用
+			A. 修改 yaml，将Servie 类型换成 NodePort
+				cp service.yaml service1.yaml
+				vi service1.yaml
+				apiVersion: v1
+				kind: Service
+				metadata:
+				  creationTimestamp: null
+				  labels:
+					app: nginx
+				  name: nginx1 # 换个名字
+				spec:
+				  ports:
+				  - port: 80
+					protocol: TCP
+					targetPort: 80
+				  selector:
+					app: nginx
+				  type: NodePort # 使用 NodePort 类型
+				status:
+				  loadBalancer: {}
+			B. 执行 yaml，并查看 Service
+				kubectl apply -f service1.yaml
+				kubectl get svc
+				NAME         TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+				kubernetes   ClusterIP   10.96.0.1       <none>        443/TCP        4d18h
+				nginx        ClusterIP   10.102.211.96   <none>        80/TCP         9m51s
+				nginx1       NodePort    10.104.153.39   <none>        80:30759/TCP   12s
+			C. 使用 浏览器访问
+				http://hadoop102:30759/
+		③ LoadBalancer：对外访问应用，针对公有云的使用
+			A. node 内网部署应用，外网一般不能访问得到，因此需要用一台可以进行外网访问的机器，安装 nginx 进行方向代理，手动把可以访问的节点添加到 nginx 里面
+			B. 使用 LoadBalancer，连接负载均衡控制器，即可访问到节点
+九、kubernetes 核心技术-配置管理 Secret
+	1. Secret 存在意义
+		① Secret 解决了密码、token、密钥等敏感数据的配置问题，而不是把这些敏感数据暴露到镜像或者 Pod Spec 中。Secret 可以以 Volume 或者环境变量的方式使用
+		② 加密数据存在 etcd 里面
+	2. 使用场景
+		① 创建 secret 加密数据
+			A. 创建 secret.yaml
+				apiVersion: v1
+				kind: Secret
+				metadata:
+				  name: mysecret
+				type: Opaque
+				data:
+				  username: YWRtaW4=
+				  password: MWYyZDFlMmU2N2Rm
+			B. 执行 yaml
+				kubectl apply -f secret.yaml
+			C. 查看
+				kubectl get secret
+				NAME                  TYPE                                  DATA   AGE
+				default-token-sn5wb   kubernetes.io/service-account-token   3      5d17h
+				mysecret              Opaque                                2      25s
+		② 以变量形式挂载到 Pod 容器中
+			A. 创建 secret-var.yaml
+				apiVersion: v1
+				kind: Pod
+				metadata:
+				  name: mypod
+				spec:
+				  containers:
+				  - name: nginx
+					image: nginx
+					env:
+					  - name: SECRET_USERNAME
+						valueFrom:
+						  secretKeyRef:
+							name: mysecret
+							key: username
+					  - name: SECRET_PASSWORD
+						valueFrom:
+						  secretKeyRef:
+							name: mysecret
+							key: password
+			B. 执行 yaml
+				kubectl apply -f secret-var.yaml
+			C. 查看
+				kubectl get pods
+				NAME    READY   STATUS    RESTARTS   AGE
+				mypod   1/1     Running   0          15m
+			D. 进入 mypod
+				kubectl exec -it mypod bash
+			E. 查看创建的变量
+				echo $SECRET_USERNAME
+				admin
+				echo $SECRET_PASSWORD
+				1f2d1e2e67df
+		③ 以 volume 形式挂载到 Pod 容器中
+			A. 创建 secret-vol.yaml
+				apiVersion: v1
+				kind: Pod
+				metadata:
+				  name: mypod1
+				spec:
+				  containers:
+				  - name: nginx
+					image: nginx
+					volumeMounts:
+					- name: foo
+					  mountPath: "/etc/foo"
+					  readOnly: true
+				  volumes:
+				  - name: foo
+					secret:
+					  secretName: mysecret
+			B. 执行 yaml
+				kubectl apply -f secret-vol.yaml
+			C. 查看 Pod
+				kubectl get pods
+				NAME     READY   STATUS    RESTARTS   AGE
+				mypod1   1/1     Running   0          7s
+			D. 进入 Pod 
+				kubectl exec -it mypod1 bash
+				cd /etc/foo
+				ls
+				password  username
+十、kubernetes 核心技术-集群安全机制 RBAC
+	1. 概述
+		① 访问 k8s 集群的时候，需要经过三个步骤完成具体操作
+			A. 认证
+				a. 传输安全：对外不暴露 8080 端口，只能内部访问，对外使用端口 6443
+				b. 客户端身份认证常用方式：
+					(1) https 证书认证，基于 CA 证书认证
+					(2) 基于 http token 认证，通过 token 识别用户
+					(3) http 基本认证，用户名+密码认证，安全性较低
+			B. 授权（鉴权）
+				a. 基于 RBAC 进行鉴权操作
+				b. 基于角色访问控制
+			C. 准入控制：就是准入控制器的列表，如果列表有请求内容，则通过，否则拒绝。
+		② 进行访问的时候，过程中需要经过 apiserver，apiserver 做统一协调，比如门卫。访问过程中需要证书、token 或者用户名+密码，如果访问 pod，需要serviceAccount
+	2. RBAC 
+		① 基本概念：
+			A. RBAC（Role-Based Access Control，基于角色的访问控制）在 k8s v1.5 中引入，在 v1.6 版本时升级为 Beta 版本，并成为 kubeadm 安装方式下的默认选项，相
+			对于其他访问控制方式，新的 RBAC 具有如下优势：
+				a. 对集群中的资源和非资源权限均有完整的覆盖
+				b. 整个 RBAC 完全由几个 API 对象完成，同其他 API 对象一样，可用 kubectl 或 API 进行操作
+				c. 可以在运行时进行调整，无需重启 API Server
+			B. 要使用 RBAC 授权模式，需要在 API Server 的启动参数上加入 --authorization-mode=RBAC
+		② RBAC 原理和用法
+			A. RBAC 的 API 资源对象说明
+				a. RBAC 引入了 4 个新的顶级资源对象：Role、ClusterRole、RoleBinding、ClusterRoleBinding。同其他 API 资源对象一样，用户可以使用 kubectl 或者 API
+				调用等方式操作这些资源
+				b. 角色（Role）：
+					(1) 一个角色就是一组权限的集合，这里的权限都是许可形式的，不存在拒绝的规则。在一个命令空间里，可以用角色来定义一个角色，如果是集群级别的，就
+					需要使用 ClusterRole了。角色只能对命名空间内的资源进行授权
+					(2) 面的例子中定义的角色具备读取 Pod 的权限：
+						kind: Role
+						apiVersion: rbac.authorization.k8s.io/v1
+						metadata:
+						  namespace: default
+						  name: pod-reader
+						rules:
+						  - apiGroups: [""] # 空字符串表示核心 API 群
+						  resource: ["pods"]
+						  verbs: ["get", "watch", "list"]
+					(2) rules 中的参数说明
+						(A) apiGroups：支持的 API 组列表，例如：batch/v1、extensions:v1、apps/v1 等
+						(B) resource：支持的资源对象列表，例如：pods、deployments、jobs 等
+						(C) verbs：对资源的操作方法列表，例如：get、watch、list、delete、replace 等
+				c. 集群角色（ClusterRole）
+					(1) 集群角色除了具有和角色一致的命名空间内资源的管理能力，因其集群级别的范围，还可以用于以下除了特殊元素的授权
+						(A) 集群范围的资源，例如 Node
+						(B) 非资源型的路径，例如 /healthz
+						(C) 包含全部命名空间的资源，例如 pods
+					(2) 下面的集群角色可以让用户有权访问任意一个或者所有命名空间的 secrets：
+						kind: ClusterRole
+						apiVersion: rbac.authorization.k8s.io/v1
+						metadata:
+						  # name: secret-reader
+						  # ClusterRole 不受限于命名空间，所以省略了 namespace name 的定义
+						rules:
+						  - apiGroups: [""]
+						  resources: ["secrets"]
+						  verbs: ["get", "watch", "list"]
+				d. 角色绑定（RoleBinding）和集群角色绑定（ClusterRoleBinding）
+					(1) 角色绑定或集群绑定用来把一个角色绑定到一个目标上，绑定目标可以是 User、Group 或者 Service Account。使用 RoleBinding 为某个命名空间授权，
+					ClusterRoleBinding 为集群范围内授权
+					(2) RoleBinding 可以引用 Role 进行授权，下列中的 RoleBinding 将在 default 命名空间中把 pod-reader 角色授予用户 jane，可以让 Jane 用户读取
+					default 命名空间的 Pod
+						kind: RoleBinding
+						apiVersion: rbac.authorization.k8s.io/v1
+						metadata:
+						  name: read-pods
+						  namespace: default
+						subjects:
+						  - kind: User
+						    name: jane
+						    apiGroup: rbac.authorization.k8s.io
+						roleRef:
+						  kind: Role
+						  name: pod-reader
+						  apiGroup: rbac.authorization.k8s.io
+					(3) RoleBinding 也可以引用 ClusterRole，对属于同一命名空间内 ClusterRole 定义的资源主体进行授权。一种常见的做法是集群管理员为集群范围预先定
+					好一组角色（ClusterRole），然后在多个命名空间中重复使用这些 ClusterRole。
+					(4) 使用 RoleBinding 绑定集群角色 secret-reader，使 dave 只能读取 deployment 命名空间 中的 secret
+						kind: RoleBinding
+						apiVersion: rbac.authorization.k8s.io/v1
+						metadata:
+						  name: read-secrets
+						  namespace: development
+						subjects:
+						  - kind: User
+						    name: dave
+						    apiGroup: rbac.authorization.k8s.io
+						roleRef:
+						  kind: ClusterRole
+						  name: secret-reader
+						  apiGroup: rbac.authorization.k8s.io
+					(5) 集群角色绑定中的角色只能是集群角色，用于进行集群级别或者对所有命名空间都生效授权。允许 manager 组的用户读取任意 namespace 中的 secret
+						kind: ClusterRoleBinding
+						apiVersion: rbac.authorization.k8s.io/v1
+						metadata:
+						  name: read-secrets-global
+						subjects:
+						  - kind: Group
+						    name: manager
+						    apiGroup: rbac.authorization.k8s.io
+						roleRef:
+						  kind: ClusterRole
+						  name: secret-reader
+						  apiGroup: rbac.authorization.k8s.io
+			B. 对资源的引用方式
+				a. 多数资源可以用其名称的字符串来表达，也就是 Endpoint 中的 URL 相对路径，例如 pods。然后，某些 Kubernetes API 包含下级资源，例如 Pod 的日志（
+				logs）。Pod 日志的 Endpoint 是 GET /api/v1/namespaces/{namespaces}/pods/{name}/log
+				b. Pod 是一个命名空间内的资源，log 就是一个下级资源。要在一个 RBAC 角色中体现，则需要用斜线/来分割资源和下级资源。若想授权让某个主体同时能够读
+				取 Pod 和 Pod log，则可以配置 resource 为一个数组
+					kind: Role
+					apiVersion: rbac.authorization.k8s.io/v1
+					metadata:
+					  namespace: default
+					  name: pod-and-pod-logs-reader
+					rules:
+					  - apiGroups: [""]
+						resources: ["pods", "pods/log"]
+						verbs: ["get", "list"]
+	3. RBAC 实现鉴权
+		① 创建命名空间
+			A. 查看命名空间
+			kubectl get ns
+			B. 创建命名空间
+			kubectl create ns roledemo
+		② 在新创建的命名空间创建 pod
+			kubectl run nginx --image=nginx -n roledemo
+		③ 查看命名空间中创建的 pod
+			kubectl get pods -n roledemo
+		④ 创建角色
+			A. 创建 rbac-role.yaml 文件
+				kind: Role
+				apiVersion: rbac.authorization.k8s.io/v1
+				metadata:
+				  namespace: roledemo
+				  name: pod-reader
+				rules:
+				- apiGroups: [""] # "" indicates the core API group
+				  resources: ["pods"]
+				  verbs: ["get", "watch", "list"]
+			B. 执行 yaml
+				kubectl apply -f rbac-role.yaml
+			C. 查看当前命名空间中的角色
+				kubectl get role -n roledemo
+		⑤ 创建角色绑定
+			A. 创建 rbac-rolebinding.yaml
+				kind: RoleBinding
+				apiVersion: rbac.authorization.k8s.io/v1
+				metadata:
+				  name: read-pods
+				  namespace: roledemo
+				subjects:
+				- kind: User
+				  name: lixl # Name is case sensitive
+				  apiGroup: rbac.authorization.k8s.io
+				roleRef:
+				  kind: Role #this must be Role or ClusterRole
+				  name: pod-reader # this must match the name of the Role or ClusterRole you wish to bind to
+				  apiGroup: rbac.authorization.k8s.io
+			B. 执行 yaml
+				kubectl apply -f rbac-rolebinding.yaml
+			C. 查看指定命名空间下的角色和角色绑定
+				kubectl get role,rolebinding -n roledemo
+		⑥ 使用证书识别身份
+			A. 自签证书颁发机构（CA）
+				cat > ca-config.json<< EOF
+				{
+					"signing": {
+						"default": {
+							"expiry": "87600h"
+						},
+						"profiles": {
+							"kubernetes": {
+								"expiry": "87600h",
+								"usages": [
+									"signing",
+									"key encipherment",
+									"server auth",
+									"client auth"
+								]
+							}
+						}
+					}
+				}
+				EOF
+
+				cat > ca-csr.json<< EOF
+				{
+					"CN": "kubernetes",
+					"key": {
+						"algo": "rsa",
+						"size": 2048
+					},
+					"names": [
+						{
+							"C": "CN",
+							"L": "Beijing",
+							"ST": "Beijing",
+							"O": "k8s",
+							"OU": "System"
+						}
+					]
+				}
+				EOF
+			B. 生成证书
+				cfssl gencert -initca ca-csr.json | cfssljson -bare ca -
+			C. 创建一个脚本文件 rbac-user.sh
+				cat > lixl-csr.json <<EOF
+				{
+				  "CN": "lixl",
+				  "hosts": [],
+				  "key": {
+					"algo": "rsa",
+					"size": 2048
+				  },
+				  "names": [
+					{
+					  "C": "CN",
+					  "L": "BeiJing",
+					  "ST": "BeiJing"
+					}
+				  ]
+				}
+				EOF
+
+				cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes lixl-csr.json | cfssljson -bare lixl
+
+				kubectl config set-cluster kubernetes \
+				  --certificate-authority=ca.pem \
+				  --embed-certs=true \
+				  --server=https://192.168.26.101:6443 \
+				  --kubeconfig=lixl-kubeconfig
+
+				kubectl config set-credentials lixl \
+				  --client-key=lixl-key.pem \
+				  --client-certificate=lixl.pem \
+				  --embed-certs=true \
+				  --kubeconfig=lixl-kubeconfig
+
+				kubectl config set-context default \
+				  --cluster=kubernetes \
+				  --user=lixl \
+				  --kubeconfig=lixl-kubeconfig
+
+				kubectl config use-context default --kubeconfig=lixl-kubeconfig
+			D. 执行脚本
+				bash rbac-user.sh
+			E. 测试
+				a. 查看 pods
+					kubectl get pods -n roledemo
+					NAME    READY   STATUS    RESTARTS   AGE
+					nginx   1/1     Running   0          18h
+				b. 查看 svc
+					kubectl get svc -n roledemo
+					No resources found in roledemo namespace.
+十一、kubernetes 核心技术-Ingress
+	1. 简介
+		① NodePort 缺陷
+			A. 使用 Service 中的 NodePort 把端口号对外暴露，通过 IP + 端口号进行访问
+			B. 在每个节点上都会暴露该端口，在访问时，使用任何节点的 IP + 端口都能实习访问该 Pod，这就意味着每个端口只能使用一次，一个端口对应一个应用
+			C. 在实际应用中，访问服务都是使用域名，根据不同域名跳转到不同端口服务中
+		② 使用 Ingress 可以进行改进
+	2. Ingress 和 Pod 的关系
+		① Pod 和 Ingress 通过 Service 关联
+		② Ingress 作为统一入口，由 Service 关联一组 Pod
+	3. Ingress 的 工作流程
+		① Ingress 作为一个统一的入口，在实际的访问中使用域名，比如有一组域名，要分散到不同的应用或者项目中，一个域名对应一个 Service，进而发现一组 Pods。
+		② Ingress 扮演的是实现负载均衡
+	4. Ingress 的使用
+		① 部署 Ingress Controller
+			A. 创建 nginx 应用
+				a. 创建 nginx 应用
+					kubectl create deployment web --image=nginx
+				b. 对外暴露端口
+					kubectl expose deployment web --port=80 --target-port=80 --type=NodePort
+				c. 查看 Pod
+					kubectl get svc,pods
+			B. 部署 Ingress Controller
+				a. 创建 ingress-controller.yaml
+				b. 执行 yaml
+					kubectl apply -f ingress-controller.yaml
+				c. 查看 ingress-controller 的状态
+					kubectl get pods -n ingress-nginx
+		② 创建 Ingress 规则
+			A. 创建 ingress-http.yaml
+				apiVersion: networking.k8s.io/v1beta1
+				kind: Ingress
+				metadata:
+				  name: example-ingress
+				spec:
+				  rules:
+				  - host: example.ingredemo.com
+					http:
+					  paths:
+					  - path: /
+						backend:
+						  serviceName: web
+						  servicePort: 80
+			B. 执行 yaml
+				kubectl apply -f ingress-http.yaml
+			C. 查看 ingress-controller 在哪个节点上
+				kubectl get pods -n ingress-nginx -o wide
+		③ 在 Windows 系统 hosts 文件中添加域名访问规则
+			A. 打开 hosts 文件
+				C:\Windows\System32\drivers\etc
+			B. 添加域名，注意 IP 是 ingress-controller 所在的节点
+				192.168.26.103 example.ingredemo.com
+		④ 通过浏览器访问域名
+			example.ingredemo.com
+十二、kubernetes 核心技术-Helm
+	1. Helm 引入
+		k8s 上的应用对象，都是由特定的资源描述组成，包括 deployment、service 等，都保存各自文件中或者集中写到一个配置文件。然后 kubectl apply -f 部署。如果应用只由
+		一个或者几个这样的服务组成，上面部署方式足够了，而对于一个复杂的应用，会有很多类似上面的资源描述文件，例如微服务架构应用，组成应用的服务可能多达十个，几十个。
+		如果有更新或回滚应用的需求，可能要修改和维护所涉及的大量资源文件，而这种组织和管理应用的方式就显得力不从心了，且由于缺少对发布的应用版本管理和控制，使Kubernetes
+		上的应用维护和更新等面临诸多挑战，主要面临以下问题：
+		① 如何将这些服务作为一个整体管理
+		② 这些资源文件如何高校复用
+		③ 不支持应用级别的版本管理
+	2. Helm 介绍
+		① Helm 是一个 Kubernetes 的包管理工具，就像 Linux 下的包管理器，如 yum/apt 等，可以很方便的将之前打包好的 yaml 文件部署到 Kubernetes 上。
+		② Helm 有 3 个重要概念
+			A. Helm：一个命令行客户端工具，主要用于 Kubernetes 应用 chart 的创建、打包、发布和管理。
+			B. Chart：应用描述，一系列用于描述 k8s 资源相关文件的集合。
+			C. Release：基于 Chart 的部署实体，一个 chart 被 Helm 运行后将会产生对应的一个 release，将在 k8s 中创建出真实运行的资源对象。
+	3. Helm v3 变化
+		① 2019 年 11 月 13 日，Helm 团队发布 Helm v3 的第一个稳定版本
+		② 该版本主要变化 -- 架构变化：
+			A. 最明显的变化是 Tiller 的删除
+										  +-------------------------------------------------------------+
+										  |											   +------------+	|
+				+-------------+   gRPC	  |	+--------+		  +----------------+	   | deployment |	|
+				| Helm Client | --------> |	| Tiller | -----> | kube-apiserver | ----> | service    |	|		|
+				+-------------+			  |	+--------+		  +----------------+	   | Ingress    |	|		|	V2
+						|				  |											   | …… 		|	|		|
+						↓				  |						Kubenetes			   +------------+	|		|
+				  +------------+		  +-------------------------------------------------------------+		|
+				  | Chart.yaml |																				|
+				  +------------+																				|
+																												|
+														   +--------------------------------------------+		|
+														   |							 +------------+	|		|
+				+-------------+   	  +------------+	   |	+----------------+	     | deployment |	|		|
+				| Helm Client | ----> | kubeconfig | ----> |	| kube-apiserver | ----> | service    |	|		↓	V3
+				+-------------+		  +------------+	   |	+----------------+	     | Ingress    |	|
+						|				  				   |							 | …… 		  |	|
+						↓				  				   |			Kubenetes		 +------------+	|
+				  +------------+		  				   +--------------------------------------------+
+				  | Chart.yaml |
+				  +------------+
+			B. Release 名称可以在不同命名空间重用
+			C. 支持将 Chart 推送至 Docker 镜像仓库中
+			D. 使用 JSONSchema 验证 chart values
+			E. 其他
+	4. Helm 客户端
+		① 部署 helm 客户端
+			A. helm 官网：https://helm.sh/
+			B. Helm 客户端下载地址：https://github.com/helm/helm/releases
+			C. 将下载得到的安装包上传到 hadoop101，并进行解压
+				tar -zxvf helm-v3.9.0-linux-amd64.tar.gz
+			D. 将解压后得到的 helm 移动到 /usr/bin/ 目录下即可
+			E. helm 	常用命令
+				+----------------------------------------------------------------------------------------------------+
+				| 命令		 | 描述																					 |
+				+------------+---------------------------------------------------------------------------------------+
+				| create 	 | 创建一个 chart 并指定名字															 |
+				+------------+---------------------------------------------------------------------------------------+
+				| dependency | 管理 chart 依赖																		 |
+				+------------+---------------------------------------------------------------------------------------+
+				| get 		 | 下载一个 release，可用子命令：all、hooks、manifest、notes、valus						 |
+				+------------+---------------------------------------------------------------------------------------+
+				| history    | 获取 release 历史																	 |
+				+------------+---------------------------------------------------------------------------------------+
+				| install    | 安装一个 chart														  				 |
+				+------------+---------------------------------------------------------------------------------------+
+				| list		 | 列出 release																			 |
+				+------------+---------------------------------------------------------------------------------------+
+				| package    | 将 chart 目录打包到 chart 存档文件中													 |
+				+------------+---------------------------------------------------------------------------------------+
+				| pull 	     | 从远程仓库中下载 chart 并解压到本地													 |
+				+------------+---------------------------------------------------------------------------------------+
+				| repo		 | 添加、列出、移除、更新和索引 chart 仓库。可用子命令：add、index、list、remove、update |
+				+------------+---------------------------------------------------------------------------------------+
+				| rollback	 | 从之前版本回滚																		 |
+				+------------+---------------------------------------------------------------------------------------+
+				| search 	 | 根据关键字搜索 chart。可用子命令：hub、repo											 |
+				+------------+---------------------------------------------------------------------------------------+
+				| show 		 | 查看 chart 详细信息。可用子命令：all、chart、readme、values							 |
+				+------------+---------------------------------------------------------------------------------------+
+				| status	 | 显示已命名版本的状态																	 |
+				+------------+---------------------------------------------------------------------------------------+
+				| template	 | 本地呈现模板																			 |
+				+------------+---------------------------------------------------------------------------------------+
+				| uninstall  | 卸载一个 release																		 |
+				+------------+---------------------------------------------------------------------------------------+
+				| upgrade	 | 更新一个 release																	 	 |
+				+------------+---------------------------------------------------------------------------------------+
+				| version    | 查看 helm 客户端版本																	 |
+				+------------+---------------------------------------------------------------------------------------+
+		② 配置国内 chart 仓库
+			A. 仓库
+				a. 微软仓库（http://mirror.azure.cn/kubernetes/charts/）这个仓库推荐，基本上官网有的 chart 这里都有。
+				b. 阿里云仓库（https://kubernetes.oss-cn-hangzhou.aliyuncs.com/charts）
+				c. 官方仓库（https://hub.kubeapps.com/charts/incubator）官方 chart 仓库，国内有点不好使。
+			B. 添加存储库
+				helm repo add stable http://mirror.azure.cn/kubernetes/charts
+				helm repo add aliyun https://kubernetes.oss-cn-hangzhou.aliyuncs.com/charts
+				helm repo update
+			C. 查看配置的存储库
+				helm repo list
+				helm search repo stable
+			D. 删除存储库
+				helm repo remove aliyun
+	5. helm 基本使用
+		① 主要命令
+			A. chart install
+			B. chart upgrade
+			C. chart rollback
+		② 使用 chart 部署一个应用
+			A. 查找 chart
+				helm search repo weave
+				NAME              	CHART VERSION	APP VERSION	DESCRIPTION                                       
+				aliyun/weave-cloud	0.1.2        	           	Weave Cloud is a add-on to Kubernetes which pro...
+				aliyun/weave-scope	0.9.2        	1.6.5      	A Helm chart for the Weave Scope cluster visual...
+				stable/weave-cloud	0.3.9        	1.4.0      	DEPRECATED - Weave Cloud is a add-on to Kuberne...
+				stable/weave-scope	1.1.12       	1.12.0     	DEPRECATED - A Helm chart for the Weave Scope c...
+			B. 安装
+				helm install ui stable/weave-scope
+			C. 查看发布状态
+				helm list
+				NAME	NAMESPACE	REVISION	UPDATED                                	STATUS  	CHART             	APP VERSION
+				ui  	default  	1       	2022-05-25 16:53:30.316264212 +0800 CST	deployed	weave-scope-1.1.12	1.12.0
+			D. 查看安装的 chart 
+				helm status ui
+				NAME: ui
+				LAST DEPLOYED: Wed May 25 16:53:30 2022
+				NAMESPACE: default
+				STATUS: deployed
+				REVISION: 1
+				NOTES:
+				You should now be able to access the Scope frontend in your web browser, by
+				using kubectl port-forward:
+			E. 查看 pod
+				kubectl get pods
+				NAME                                            READY   STATUS    RESTARTS   AGE
+				weave-scope-agent-ui-78smb                      1/1     Running   0          4m26s
+				weave-scope-agent-ui-94nz5                      1/1     Running   0          4m26s
+				weave-scope-agent-ui-r6zns                      1/1     Running   0          4m26s
+				weave-scope-cluster-agent-ui-7498b8d4f4-sjr72   1/1     Running   0          4m26s
+				weave-scope-frontend-ui-649c7dcd5d-ggwwl        1/1     Running   0          4m26s
+			F. 查看 svc
+				kubectl get svc
+				NAME             TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+				kubernetes       ClusterIP   10.96.0.1       <none>        443/TCP        64d
+				ui-weave-scope   ClusterIP   10.104.23.80    <none>        80/TCP         7m20s
+				web              NodePort    10.109.74.245   <none>        80:32688/TCP   9d
+			G. 修该 service 的 yaml 文件，将 type 改为 NodePort
+				kubectl edit svc ui-weave-scope
+				service/ui-weave-scope edited
+			H. 再次查看 svc
+				kubectl get svc
+				NAME             TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+				kubernetes       ClusterIP   10.96.0.1       <none>        443/TCP        64d
+				ui-weave-scope   NodePort    10.104.23.80    <none>        80:31549/TCP   13m
+				web              NodePort    10.109.74.245   <none>        80:32688/TCP   9d
+	6. 自定义chart
+		① 自定义选项是因为并不是所有的 chart 都能按照默认配置运行成功，可能会需要一些环境依赖，例如 PV。
+		② 所以我们需要自定义 chart 配置选项，安装过程中有两种方法可以传递配置数据：
+			A. --values（或-f）：指定带有覆盖的 YAML 文件。这可以多次指定，最右边的文件优先
+ 			B. --set：在命令行上指定替代。如果两者都用，--set 优先级高
+		③ 使用命令创建 chart
+			helm create chart名称，创建完成会生成一个 mychart 目录，在该目录下有以下文件或者目录
+			A. Chart.yaml：当前 chart 属性配置信息
+			B. templates：编写 yaml 文件存放的目录，删除其他文件，创建两个文件
+				a. deployment.yaml：部署 pod 和应用
+				b. service.yaml：对外暴露端口
+			C. values.yaml：可使用全局变量
+		④ 构建一个 Helm Chart
+			A. 创建 chart
+				helm create mychart
+			B. 进入 mychart/templates/
+				cd mychart/templates/
+			C. 创建 deployment.yaml
+				kubectl create deployment web1 --image=nginx --dry-run -o yaml > deployment.yaml
+			D. 创建 pod
+				kubectl apply -f deployment.yaml
+			E. 创建 service.yaml
+				kubectl expose deployment web1 --port=80 --target-port=80 --type=NodePort --dry-run -o yaml > service.yaml
+			F. 删除 pod
+				kubectl delete -f deployment.yaml
+			G. 安装 chart
+				helm install web1 mychart/
+			H. 查看 pods 和 svc
+				kubectl get pods,svc
+			I. 应用升级
+				helm upgrade web1 mychart/
+	7. chart 模板
+		① 在 values.yaml 中定义变量和值
+			replicas: 1
+			image: nginx
+			tag: latest
+			label: nginx
+			port: 80
+		② 在 templates 的 yaml 文件使用 values.yaml 定义变量
+			A. 通过表达式形式使用全局变量
+				{{ .Values.变量名}}
+				{{ .Release.Name}}：动态生成 pod 的名字
+			B. 修改 deployment.yaml
+				apiVersion: apps/v1
+				kind: Deployment
+				metadata:
+				  name: {{ .Release.Name}}
+				spec:
+				  replicas: {{ .Values.replicas}}
+				  selector:
+					matchLabels:
+					  app: {{ .Values.label}}
+				  strategy: {}
+				  template:
+					metadata:
+					  creationTimestamp: null
+					  labels:
+						app: {{ .Values.label}}
+					spec:
+					  containers:
+					  - image: {{ .Values.image}}
+						name: nginx
+						resources: {}
+				status: {}
+			C. service.yaml
+				apiVersion: v1
+				kind: Service
+				metadata:
+				  name: {{ .Release.Name}}-svc
+				spec:
+				  ports:
+				  - port: {{ .Values.port}}
+					protocol: TCP
+					targetPort: 80
+				  selector:
+					app: {{ .Values.label}}
+				  type: NodePort
+				status:
+				  loadBalancer: {}
+			D. 试安装
+				helm install --dry-run web2 mychart/
+			E. 安装 
+				helm install  web2 mychart/
+			F. 查看
+				kubectl get pods,svc
+十三、kubernetes 核心技术-持久化存储
+	1. nfs：
+		① 简介：NFS 类型 volume。允许一块现有的网络硬盘在同一个 pod 内的容器间共享
+		② 实现 nfs 网络存储
+			A. 找一台服务器，安装 nfs
+				yum install -y nfs-utils
+			B. 设置挂载目录
+				vi /etc/exports
+				/data/nfs *(rw,no_root_squash)
+			C. 创建挂载目录
+				mkdir -p /data/nfs
+			D. 在 k8s node 节点安装 nfs
+				yum install -y nfs-utils
+			F. 在 nfs 服务器中启动 nfs
+				systemctl start nfs
+				systemctl enable nfs
+			G. 在 k8s 集群部署应用，使用 nfs 网络存储
+				a. 在 hadoop101 /root 目录下新建 pv 文件夹
+					mkdir /root/pv
+				b. 在 /root/pv/目录下，新建 nfs-nginx.yaml
+					apiVersion: apps/v1
+					kind: Deployment
+					metadata:
+					  name: nginx-dep1
+					spec:
+					  replicas: 1
+					  selector:
+						matchLabels:
+						  app: nginx
+					  template:
+						metadata:
+						  labels:
+							app: nginx
+						spec:
+						  containers:
+						  - name: nginx
+							image: nginx
+							volumeMounts:
+							- name: wwwroot
+							  mountPath: /usr/share/nginx/html
+							ports:
+							- containerPort: 80
+						  volumes:
+							- name: wwwroot
+							  nfs:
+								server: 192.168.26.48
+								path: /data/nfs
+				c. 执行 nfs-nginx.yaml
+					kubectl apply -f nfs-nginx.yaml
+				d. 查看日志
+					kubectl describe pod nginx-dep1
+				e. 进入 pod 
+					kubectl exec -it nginx-dep1-7b89fd6fbb-cwh6g bash
+				f. 进入 pod 的 /usr/share/nginx/html/ 目录，查看目录下的文件
+					cd /usr/share/nginx/html
+					ls
+				g. 在 nfs 服务器的 /data/nfs/ 目录下新建 index.html
+					vi /data/nfs/index.html
+					hello nfs
+				h. 回到 hadoop101 pod 的 /usr/share/nginx/html/ 目录，查看目录下的文件
+					ls
+					index.html
+				i. 退出 pod
+					exit
+				j. 暴露端口
+					kubectl expose deployment nginx-dep1 --port=80 --target-port=80 --type=NodePort
+				k. 查看 pods 和 svc
+					kubectl get pods,svc
+				l. 使用浏览器访问
+					http://hadoop103:32588/
+
+	2. PV 和 PVC
+		① 基本概念：
+			A. 管理存储是管理计算的一个明显问题，该 PersistentVolume 子系统为用户和管理员提供了一个 API，用于抽象如何根据消费方式提供存储的详细信息。为此，引入了两个新的
+			API 资源：PersistentVolume 和 PersistentVolumeClaim
+			B. PersistentVolume（PV）是集群中由管理员配置的一段网络存储。它是集群中的资源，就像节点是集群资源一样。PV 是容量插件，如 Volumns，但其生命周期独立于使用 PV 的
+			任务单个 pod。此 API 对象捕获存储实现的详细信息，包括 NFS，iSCSI 或特定与云提供程序的存储系统。
+			C. PersistentVolumeClaim（PVC）是由用户进行存储的请求。它类似于 pod，Pod 消耗节点资源，PVC 消耗 PV 资源。Pod 可以请求特定级别的资源（CUP和内存）。声明可以请求
+			特定大小和访问模式（例如：可以一次性读/写或者多次读/写）。
+			D. 虽然 PersistentVolumeClaim 允许用户使用抽象存储资源，但是 PersistentVolume 对于不同的问题，用户通常需要具有不同属性（例如性能）。集群管理员需要提供各种
+			PersistentVolume 不同的方式，而不仅仅是大小和访问模式，而不会让用户了解这些卷的实现方式。对于这些需求，由 StorageClass 资源。
+			E. StorageClass 为管理员提供了一种描述他们提供的存储“类”的方法，不同的类可能映射到服务质量级别，或备份策略，或者由集群管理员确定的任何策略。Kubernetes 本身对
+			于什么类别代表是不言而喻的。这个概念有时在其他存储系统中成为“配置文件”。
+			F. PVC 和 PV 是一一对应的。
+		② 实现流程
+			A. 定义 PVC，创建 pvc.yaml
+				apiVersion: apps/v1
+				kind: Deployment
+				metadata:
+				  name: nginx-dep2
+				spec:
+				  replicas: 3
+				  selector:
+					matchLabels:
+					  app: nginx
+				  template:
+					metadata:
+					  labels:
+						app: nginx
+					spec:
+					  containers:
+					  - name: nginx
+						image: nginx
+						volumeMounts:
+						- name: wwwroot
+						  mountPath: /usr/share/nginx/html
+						ports:
+						- containerPort: 80
+					  volumes:
+					  - name: wwwroot
+						persistentVolumeClaim:
+						  claimName: my-pvc
+
+				---
+
+				apiVersion: v1
+				kind: PersistentVolumeClaim
+				metadata:
+				  name: my-pvc
+				spec:
+				  accessModes:
+					- ReadWriteMany
+				  resources:
+					requests:
+					  storage: 5Gi
+			B. 执行 pvc.yaml
+				kubectl apply -f pvc.yaml
+			C. 定义 pv.yaml
+				apiVersion: v1
+				kind: PersistentVolume
+				metadata:
+				  name: my-pv
+				spec:
+				  capacity:
+					storage: 5Gi
+				  accessModes:
+					- ReadWriteMany
+				  nfs:
+					path: /data/nfs
+					server: 192.168.26.48
+			D. 执行 pv.yaml
+				kubectl apply -f pv.yaml
+			E. 查看 PV 和 PVC
+				kubectl get pv,pvc
+			F．查看 Pod
+				kubectl get pv,pvc
+			G. 进入 Pod
+				kubectl exec -it nginx-dep2-58b7bf955f-2zrbd bash
+			H. 查看 /usr/share/nginx/html/ 目录
+				ls /usr/share/nginx/html/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

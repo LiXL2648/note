@@ -125,24 +125,28 @@
 			EOF
 		③ 安装 kubeadm，kubelet 和 kubectl
 			yum install -y kubelet-1.18.0 kubeadm-1.18.0 kubectl-1.18.0
+		④ 设置 kubelet 开机自启
+			systemctl enable kubelet
 		④ 将虚拟机进行拷贝，新增两台虚拟机，并修改虚拟机的网络为 192.168.230.11、192.168.230.12，主机名 k8s-node1、k8s-node2
 	8. 部署 Kubernetes Master
 		① 在 192.168.230.10（k8s-master）执行，由于默认拉取镜像地址 k8s.gcr.io 国内无法访问，这里指定阿里云镜像仓库地址。
-			kubeadm init --apiserver-advertise-address=192.168.230.10 --image-repository registry.aliyuncs.com/google_containers --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
+			kubeadm init --apiserver-advertise-address=192.168.26.101 --image-repository registry.aliyuncs.com/google_containers --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
 		② 使用 kubectl 工具
 			mkdir -p $HOME/.kube
 			sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 			sudo chown $(id -u):$(id -g) $HOME/.kube/config
 			kubectl get nodes
+				NAME        STATUS     ROLES    AGE   VERSION
+				hadoop101   NotReady   master   74s   v1.18.0
 	9. 安装 Pod 网络插件（CNI），由于以下镜像地址为国外网站提供，无法下载
 		kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
 		访问 https://github.com/flannel-io/flannel/blob/master/Documentation/kube-flannel.yml，将 kube-flannel.yml 保存到本地，上传到 k8s-master
-		然后执行 kubectl apply -f kube-flannel.yml
+		然后执行 kubectl apply -f kube-flannel.yml，此时hadoop101的状态仍是 NotReady，等待片刻后，状态切换为 Ready 后再执行下一步。
 	10. 加入 Kubernetes Node
 		在 192.168.230.11（k8s-node1）和执行 192.168.230.12（k8s-node2）执行向集群添加新节点执行在 kubeadm init 输出的 kubeadm join 命令：
-		kubeadm join 192.168.230.10:6443 --token 79lmre.u38fj2jxrjl6ws29 --discovery-token-ca-cert-hash sha256:0e5ef864890023735ce7130c81d1dfd7debd9aa091810dc85b3d0dd0409bdad8
+		kubeadm join 192.168.230.10:6443 --token 79lmre.u38fj2jxrjl6ws29 --discovery-token-ca-cert-hash sha256:0e5ef864890023735ce7130c81d1dfd7debd9aa091810dc85b3d0dd0409bdad8，
 	11. 测试 kubernetes 集群
-		① 在 k8s-master 执行 kubectl get pods -n kube-system
+		① 等待片刻后，在 k8s-master 执行 kubectl get pods -n kube-system，状态为以下。
 			NAME                                 READY   STATUS    RESTARTS   AGE
 			coredns-7ff77c879f-tmlsr             1/1     Running   0          19h
 			coredns-7ff77c879f-zdwnt             1/1     Running   0          19h
