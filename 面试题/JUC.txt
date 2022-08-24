@@ -1,0 +1,39 @@
+一、自定义线程池
+	1. 示例代码：
+		ThreadPoolExecutor pool = new ThreadPoolExecutor(5, 100, 
+						1, TimeUnit.SECONDS, 
+						new LinkedBlockingDeque<>(10000), Executors.defaultThreadFactory(), 
+						new ThreadPoolExecutor.AbortPolicy());
+	2. 七大参数
+		① corePoolSize：核心线程数（一直存在，除非 allowCoreTHreadTimeOut），线程池创建好以后就准备就绪的线程数量，等待接受异步任务去执行
+		② maximumPoolSize：最大线程数量，控制资源
+		③ keepAliveTime：存活时间，如果当前正在运行的线程数量大于核心数据，释放空间的线程。只要线程空闲的时间大于 keepAliveTime，就释放（
+		maximumPoolSize - corePoolSize 个线程）
+		④ unit：存活时间的时间单位
+		⑤ BlockingQueue<Runnable> workQueue：阻塞队列，如果任务很多，就会将目前多的任务放在队列里，只要有线程空闲，就会去队列里面取出新的
+		任务继续执行
+		⑥ ThreadFactory threadFactory：线程的的创建工厂
+		⑦ RejectedExecutionHandler handler：如果队列满了，按照指定的拒绝策略拒绝执行任务
+	3. 工作顺序
+		① 线程池创建好，准备 corePoolSize 数量的核心线程，准备接收任务
+			A. 如果任务数量大于核心线程的数量，就会将其余的任务放入阻塞队列中，空闲的核心线程就会去阻塞队列中获取任务执行
+			B. 如果阻塞队列满了，就会直接开启新的线程去执行，最大只能开到 maximumPoolSize 指定的数量
+			C. 如果开启了 maximumPoolSize 个线程，而阻塞队列仍然满了，就使用指定的拒绝策略拒绝执行任务
+			D. 如果开启了 maximumPoolSize 个线程完成执行任务后，在指定的时间以后，释放除核心线程数以为的线程
+		② LinkedBlockingDeque<>() 默认的任务数是 Integer 的最大值，严重时，可能引起内存溢出，如果指定最大可以保存的任务数量
+		③ RejectedExecutionHandler 有以下拒绝策略：
+			A. DiscardOldestPolicy：丢弃最老的任务，如果有新的任务进来，则抛弃最老的任务
+			B. CallerRunsPolicy：直接调用线程的 run() 方法执行任务，即 当前线程池已经开启了最大数量的线程，已经无法再开启线程，因此直接调用
+			Runnable 的 run() 方法执行任务。
+			C. AbortPolicy：新进来的任务直接丢弃，并抛出异常
+			D. DiscardPolicy：新进来的任务直接丢弃，不抛出异常
+	4. 面试：一个线程池，core 7，max 20，queue：50，100 个任务如何进行分配
+		① 由于线程池创建完会立即准备 7 个线程，因此 100 个任务进来，首先 7 个任务会立即被执行
+		② 剩下的 50 个任务会放入到队列中，由于队列已经满了，则此时线程池会创建 13 个线程去执行任务。剩下的 30 个任务会被直接丢弃，并抛出异常
+		③ 当有线程空闲时，会自动去队列中继续执行任务
+		④ 当队列中的任务执行完成，在指定的时间后，会释放除核心数量的线程外的其余线程，释放资源。
+	5. 其他创建线程池的方法：
+		① Executors.newCachedThreadPool()：核心线程数量为0，则所有线程都是可以回收的
+		② Executors.newFixedThreadPool()：固定大小的线程池，即核心线程数等于最大线程数，所有线程都是不可回收的
+		③ Executors.newScheduledThreadPool()：定时任务的线程池
+		④ Executors.newSingleThreadExecutor()：单线程的线程池，从队列中获取任务，挨个执行	
