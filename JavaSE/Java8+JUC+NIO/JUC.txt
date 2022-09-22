@@ -525,6 +525,57 @@
 					}
 				}
 			}
+	5. 锁中断代码
+		public class InterruptiblyLockDemo {
+
+			public static void main(String[] args) {
+				ReentrantLock lock1 = new ReentrantLock();
+				ReentrantLock lock2 = new ReentrantLock();
+				Thread thread1 = new Thread(() -> {
+
+					try {
+						lock1.lockInterruptibly();
+						TimeUnit.SECONDS.sleep(3L);
+						lock2.lockInterruptibly();
+						System.out.println(Thread.currentThread().getName() + "执行成功");
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					} finally {
+						if (lock1.isHeldByCurrentThread()) {
+							lock1.unlock();
+						}
+						if (lock2.isHeldByCurrentThread()) {
+							lock2.unlock();
+						}
+					}
+				}, "A");
+				Thread thread2 = new Thread(() -> {
+					try {
+						lock2.lockInterruptibly();
+						TimeUnit.SECONDS.sleep(3L);
+						lock1.lockInterruptibly();
+						System.out.println(Thread.currentThread().getName() + "执行成功");
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					} finally {
+						if (lock2.isHeldByCurrentThread()) {
+							lock2.unlock();
+						}
+						if (lock1.isHeldByCurrentThread()) {
+							lock1.unlock();
+						}
+					}
+				}, "A");
+				thread1.start();
+				thread2.start();
+				try {
+					TimeUnit.SECONDS.sleep(5L);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				thread2.interrupt();
+			}
+		}
 六、Condition
 	1. Condition 控制线程通信
 		① Condition 接口描述了可能会与锁有关联的条件变量。这些变量在用法上与使用 Object.wait() 访问的隐式监视器类似，但提供
