@@ -1,0 +1,229 @@
+介绍一下常用的集合类，哪些是有序的，哪些是无序的
+HashMap 是如何寻址的，哈希碰撞后是如何存储数据的，JKD8 后什么时候变成红黑树、说下红黑树的原理，红黑树有什么好处
+ConCurrentHashMap 怎么实现线程安全，一个里面会有几段 segment，JKD8 后有什么优化，分段锁有什么坏处
+
+List
+ArrayList
+LinkedList
+Vector
+CopyOnWriteArrayList
+
+
+Set
+HashSet
+LinkedHashSet
+TreeSet
+CopyOnWriteArray
+
+Map
+HashMap
+LinkedHashMap
+HashTable
+TreeMap
+ConCurrentHashMap
+一、List
+	1. ArrayList、LinkedList 和 Vector 三者的异同
+		① 相同点：三个类都实现了 List 接口，存储数据的特点相同：存储有序、可重复的数据，ArrayList 和 Vector 底层都是维护一个动态数组，替换原有的数组
+		② 不同点：
+			A. ArrayList：作为 List 接口的主要实现类，线程不安全、效率高，底层使用数组（Object[] elementData）存储
+			B. LinkedList: 作为频繁插入、删除操作，使用此类的效率比 ArrayList 高，底层使用的是双向链表
+			C. Vector：作为 List 接口的古老实现类，线程安全、效率低，底层使用数组（Object[] elementData）存储
+
+二、Map
+	1. HashMap 的底层实现原理
+		① 在 JDK7 中
+			A. 在调用构造器进程实例化时，底层创建了长度是 16 的一维数组 Entry[] table
+			B. 在执行 put 添加元素时，首先调用 key 所在类的 hashCode() 方法计算 key 的哈希值，经过某种算法计算以后，得到在 Entry 数组中的存放位置。
+			C. 如果此位置上的数据为空，此时调用 put 方法成功添加元素。如果此位置上的数据不为空（意味着此位置上存在一个或者多个数据（以链表的形式存在）），
+			比较当前 key 和已经存在的多个 key 的哈希值
+			D. 如果 key 的哈希值和已经存在的 多个 key 的哈希值都不相同，则成功添加元素，如果 key 的哈希值和已经存在的某个 key 的哈希值相同，则调用 key 所在
+			类的 equals() 方法，再次进行比较
+			E. 如果 equals() 方法返回 false，则成功添加元素，如果 equals() 返回 true，则使用当前 value 值替换相同 key 的 value 值
+			F. 在 hashCode 相同情况下，对于 JDK7 来说，此时的元素和之前的数据以链表的方式存储。
+			G. 在不断的添加过程中，会涉及到扩容问题，默认的扩容的容量为原来的 2 倍，并将原有的数据复制过来
+		② 在 JDK8 中
+			A. 底层创建的数组是在调用 put 方法保存元素而在调用构造器进程实例化时，而且默认长度也是16，而且维护的是一个 Node[] 的数组
+			B. HashMap 的底层结构是数组、链表和红黑树，而 JDK7 中底层只有 数组和链表
+			C. 当数组的某一个索引位置上的元素以链表形式存在的元素个数大于 8，且数组的长度大于 64，此时该索引位置上的所有数组使用红黑树存储
+		③ HashMap 源码中的重要常量
+			A. default_initial_capacity：HashMap 的默认容量大小， 16
+			B. maximum_capacity：HashMap 的最大支持容量，2^30
+			C. default_load_factor：HashMap 的默认加载因子，0.75f
+			D. treeify_threshold：Bucket 中链表长度大于该默认值，转化为红黑树
+			E. untreeify_threshold：Bucket 中红黑树存储的 Node 小于该默认值，转化为链表
+			F. min_treeify_capacity：Bucket 中的 Node 被树化时最小的 Hash 表容量。（当 Bucket 中的 Node 的数量达到需要变成红黑树时，若 Hash 表容量小于
+			min_treeify_capacity 时，此时应执行 resize 扩容操作，这个 min_treeify_capacity 的值至少是 treeify_threshold 的 4 倍）
+			G. table：存储元素的数组，总是 2 的 n 次幂
+			H. entrySet：存储具体元素的集
+			I. size：HashMap 中存储键值对的数量
+			J. modCount：扩容的临界值，等于 容量 * 填充因子
+			K. loadFactor：填充因子
+	2. 多个实现类的对比
+		① HashMap：作为 Map 的主要实现类，线程不安全、效率高，存储的 key 或者 value 允许为 null
+		② LinkedHashMap：继承了 HashMap，保证在遍历 Map 元素时，可以按照添加的顺序实现遍历。原因是在原有的 HashMap 底层结构基础上，添加了一对指针，指向
+		前一个和后一个元素，对于频繁的遍历操作，此类的执行效率高于 HashMap
+		③ TreeMap：保证按照添加的 key-value 对进行排序，实现排序遍历，此时考虑 key 的自然排序和定制排序，底层使用红黑树
+		④ Hashtable：作为古老的实现类，线程安全，效率低。存储的 key 和 value 都不允许为 null
+	3. HashMap、ConcurrentHashMap 与 Hashtable 之间的对比
+        ① HashMap、ConcurrentHashMap与Hashtable 底层都是 hash 表
+        ① Hashtable 是效率低线程安全的，当多个线程访问时，Hashtable 会在全局上加锁，即并行操作转换成串行操作，当一个线程完成访问后，下一个线程
+        才能开始访问，造成效率非常低，即便是考虑线程安全的问题，也不会选择Hashtable。对于复合操作（比如：若存在，则删除）可能也存在线程不安全等
+        ① HashMap 是效率高线程不安全的
+        ③ ConcurrentHashMap 介于 HashMap 与 Hashtable 之间，采用了“锁分段”机制。ConcurrentHashMap 存在一个分段级别 concurrentLevel，默认是16，
+        即把 ConcurrentHashMap 分成了16段，每一段都是一个独立的 hash 表（segment）并且持有独立的锁，而一个 hash 表 也分成了16段，每一段都是一个
+        独立的链表。当多个线程访问 ConcurrentHashMap，能够并行访问每一个 ConcurrentHashMap 段，因此ConcurrentHashMap线程安全而且效率高。Java 8
+        以后取消了 ConcurrentHashMap 的锁分段机制，改成 CAS 算法，即无锁状态。
+	4. 面试题
+		① HashMap的底层数据结构是什么？
+			A. 在JDK1.7中和JDK1.8中有所区别
+			B. 在JDK1.7中，由”数组+链表“组成，数组是HashMap的主体，链表则是主要为了解决哈希冲突而存在的。
+			C. 在JDK1.8中，有“数组+链表+红黑树”组成。当链表过长，则会严重影响HashMap的性能，红黑树搜索时间复杂度是O(logn)，而链表是O(n)。因此，
+			JDK1.8对数据结构做了进一步的优化，引入了红黑树，链表和红黑树在达到一定条件会进行转换：当链表超过8且数组长度(数据总量)超过64才会转为红黑树
+			将链表转换成红黑树前会判断，如果当前数组的长度小于64，那么会选择先进行数组扩容，而不是转换为红黑树，以减少搜索时间。
+		② 说一下HashMap的特点
+			A. hashmap存取是无序的
+			B. 键和值位置都可以是null，但是键位置只能是一个null
+			C. 键位置是唯一的，底层的数据结构是控制键的
+			D. jdk1.8前数据结构是：链表+数组jdk1.8之后是：数组+链表+红黑树
+			E. 阈值（边界值）>8并且数组长度大于64，才将链表转换成红黑树，变成红黑树的目的是提高搜索速度，高效查询
+		③ 解决hash冲突的办法有哪些?HashMap用的哪种？
+			A. 解决Hash冲突方法有：开放定址法、再哈希法、链地址法（HashMap中常见的拉链法）、简历公共溢出区。HashMap中采用的是链地址法。
+				a. 开放定址法也称为再散列法，基本思想就是，如果p=H(key)出现冲突时，则以p为基础，再次hash，p1=H(p)，如果p1再次出现冲突，则以p1为基础，以此类推，
+				直到找到一个不冲突的哈希地址pi。因此开放定址法所需要的hash表的长度要大于等于所需要存放的元素，而且因为存在再次hash，所以只能在删除的节点上做标记，
+				而不能真正删除节点
+				b. 再哈希法（双重散列，多重散列），提供多个不同的hash函数，R1=H1(key1)发生冲突时，再计算R2=H2（key1），直到没有冲突为止。这样做虽然不易产生堆集，
+				但增加了计算的时间。
+				c. 链地址法（拉链法），将哈希值相同的元素构成一个同义词的单链表，并将单链表的头指针存放在哈希表的第i个单元中，查找、插入和删除主要在同义词链表中进行，
+				链表法适用于经常进行插入和删除的情况。
+				d. 建立公共溢出区，将哈希表分为公共表和溢出表，当溢出发生时，将所有溢出数据统一放到溢出区
+			B. 注意开放定址法和再哈希法的区别是开放定址法只能使用同一种hash函数进行再次hash，再哈希法可以调用多种不同的hash函数进行再次hash
+		④ 为什么要在数组长度大于64之后，链表才会进化为红黑树
+			A. 在数组比较小时如果出现红黑树结构，反而会降低效率，而红黑树需要进行左旋右旋，变色，这些操作来保持平衡，同时数组长度小于64时，搜索时间相对要快些，
+			总之是为了加快搜索速度，提高性能
+			B. JDK1.8以前HashMap的实现是数组+链表，即使哈希函数取得再好，也很难达到元素百分百均匀分布。当HashMap中有大量的元素都存放在同一个桶中时，这个桶下有一条长长
+			的链表，此时HashMap就相当于单链表，假如单链表有n个元素，遍历的时间复杂度就从O（1）退化成O（n），完全失去了它的优势，为了解决此种情况，JDK1.8中引入了红黑树
+			（查找的时间复杂度为O（logn））来优化这种问题
+		⑤ 为什么加载因子设置为0.75，初始化临界值是12
+			A. HashMap中的threshold是HashMap所能容纳键值对的最大值。计算公式为length*LoadFactory。也就是说，在数组定义好长度之后，负载因子越大，所能容纳的键值对个数也越大
+			B. oadFactory越趋近于1，那么数组中存放的数据（entry也就越来越多），数据也就越密集，也就会有更多的链表长度处于更长的数值，我们的查询效率就会越低，据，产生hash
+			冲突的概率也会更高
+			C. 默认的loadFactory是0.75，loadFactory越小，越趋近于0，数组中个存放的数据(entry)也就越少，表现得更加稀疏
+			D. loadfactory设置为0.75是经过多重计算检验得到的可靠值，可以最大程度的减少rehash的次数，避免过多的性能消耗
+		⑥ 哈希表底层采用何种算法计算hash值？还有哪些算法可以计算出hash值？
+			A. hashCode方法是Object中的方法，所有的类都可以对其进行使用，首先底层通过调用hashCode方法生成初始hash值h1，然后将h1无符号右移16位得到h2，之后将h1与h2进行按位异
+			或（^）运算得到最终hash值h3，之后将h3与(length-1)进行按位与（&）运算得到hash表索引
+			B. 其他可以计算出hash值的算法有
+				平方取中法
+				取余数
+				伪随机数法
+		⑦ 当两个对象的hashCode相等时会怎样
+			B. hashCode相等产生hash碰撞，hashCode相等会调用equals方法比较内容是否相等，内容如果相等则会进行覆盖，内容如果不等则会连接到链表后方，链表长度超过8且数组长度超过64，
+			会转变成红黑树节点
+		⑧ 何时发生哈希碰撞和什么是哈希碰撞，如何解决哈希碰撞？
+			A. 只要两个元素的key计算的hash码值相同就会发生hash碰撞，jdk8之前使用链表解决哈希碰撞，jdk8之后使用链表+红黑树解决哈希碰撞
+		⑨ HashMap的扩容方式
+			A. HashMap在容量超过负载因子所定义的容量之后，就会扩容。java里的数组是无法自己扩容的，将HashMap的大小扩大为原来数组的两倍
+			B. 扩容之后原位置的节点只有两种调整保持原位置不动（新bit位为0时），散列原索引+扩容大小的位置去（新bit位为1时）
+		⑩  一般用什么作为HashMap的key？
+			A. 一般用Integer、String这种不可变类当HashMap当key
+			B. 因为String是不可变的，当创建字符串时，它的hashcode被缓存下来，不需要再次计算，相对于其他对象更快
+			C. 因为获取对象的时候要用到equals()和hashCode()方法，那么键对象正确的重写这两个方法是非常重要的，这些类很规范的重写了hashCode()以及equals()方法
+		⑩① 为什么Map桶中节点个数超过8才转为红黑树？
+			A. 树节点占用空间是普通Node的两倍，如果链表节点不够多却转换成红黑树，无疑会耗费大量的空间资源，并且在随机hash算法下的所有bin节点分布频率遵从泊松分布，
+			链表长度达到8的概率只有0.00000006，几乎是不可能事件，所以8的计算是经过重重科学考量的
+			B. 从平均查找长度来看，红黑树的平均查找长度是logn，如果长度为8，则logn=3，而链表的平均查找长度为n/4，长度为8时，n/2=4，所以阈值8能大大提高搜索速度
+			C. 当长度为6时红黑树退化为链表是因为logn=log6约等于2.6，而n/2=6/2=3，两者相差不大，而红黑树节点占用更多的内存空间，所以此时转换最为友好
+		⑩② HashMap为什么线程不安全？
+			A. 多线程下扩容死循环。JDK1.7中的HashMap使用头插法插入元素，在多线程的环境下，扩容的时候有可能导致环形链表的出现，形成死循环。因此JDK1.8使用尾插法插入元素，
+			在扩容时会保持链表元素原本的顺序，不会出现环形链表的问题
+			B. 多线程的put可能导致元素的丢失。多线程同时执行put操作，如果计算出来的索引位置是相同的，那会造成前一个key被后一个key覆盖，从而导致元素的丢失。此问题在JDK1.7和JDK1.8中都存在
+			C. put和get并发时，可能导致get为null。线程1执行put时，因为元素个数超出threshold而导致rehash，线程2此时执行get，有可能导致这个问题，此问题在JDK1.7和JDK1.8中都存在
+		③ 计算hash值时为什么要让低16bit和高16bit进行异或处理
+			A . 我们计算索引需要将hashCode值与length-1进行按位与运算，如果数组长度很小，比如16，这样的值和hashCode做异或实际上只有hashCode值的后4位在进行运算，hash值
+三、Set
+	1. 添加元素的过程
+		① 向 HashSet 中添加一个元素，首先调用该元素所在类的 hashCode() 方法，计算出该元素的哈希值，此哈希值通过哈希算法计算出在 HashSet 底层数组
+		中存放的位置（即为：索引位置），判断数组此位置上是否已经又元素了
+		② 若索引位置没有其他元素，则成功添加，若有其他元素（以链表的形式存在多个元素），则比较两个元素的 hash 值
+		③ 若两个元素的 hash 值不相同，则成功添加，若相同，则需要调用该元素所在类的 equals() 方法，比较两个元素
+		④ 若 equals() 方法返回 false，说明两个元素不相同，则成功添加，若返回 true，则说明两个元素相同，则添加失败
+		⑤ 对于索引位置相同的元素而言，新的元素与其他元素以链表的形式存储的。在 JDK7 中，将新的元素放入数组，并指向原来的元素。JDK8 则相反
+	2. HashSet、LinkedHashSet、TreeSet 三者的异同
+		① 相同点：三个类都实现了 Set 接口，存储无序、不可重复的元素
+		② 不同点：
+			A. HashSet：作为 Set 接口的主要实现类，线程不安全，可以存储 Null 值
+			B. LinkedHashSet：HashSet 的子类，遍历其内部数据时，可以按照添加的顺序遍历。LinkedHashSet插入性能略低于HashSet，但在迭代访问set里的全部元素时具有极好的性能
+			C. TreeSet：向TreeSet中添加元素必须是同一个类的，可以按照添加进集合中的元素的指定顺序遍历
+	3. 两种排序方式
+		① 自然排序（实现 Comparable 接口）
+			A. 要求自定义类需要实现Comparable接口，重写compareTo(Object obj)方法，并确认按照自定义类的哪个属性排列。
+			B. 向TreeSet中添加元素时，首先按照compareTo()方法进行比较，一旦返回0，默认两个对象相同，无法添加到set集合中。
+			C. 因此在自然排序中，比较两个对象是否相同的标准为：compareTo 方法返回 0，不再是 hashCode 和 equals 方法
+		② 定制排序
+			A. 创建一个实现comparetor接口的类对象，重写comparetor的compare()方法，在此compare()方法中，指明按照自定义类的哪个属性进行排序
+			B. 将此对象作为新参传递给TreeSet的构造器中
+		③ 代码：
+			public class TreeSetDemo {
+				public static void main(String[] args) {
+					TreeSet<TreeObj> set = new TreeSet<>();
+					set.add(new TreeObj("LiXL", 48));
+					set.add(new TreeObj("LiXL", 5));
+					set.add(new TreeObj("YuCX", 29));
+					set.add(new TreeObj("KeYD", 26));
+
+					Iterator<TreeObj> iterator = set.iterator();
+					while (iterator.hasNext()) {
+						System.out.println(iterator.next());
+					}
+
+					System.out.println("***********************");
+					
+					// 定制排序
+					Comparator<TreeObj> comparator = (treeObj1, treeObj12) -> {
+						int compare = -treeObj1.name.compareTo(treeObj12.name);
+						if (compare != 0) {
+							return compare;
+						} else {
+							return -Integer.compare(treeObj1.num, treeObj12.num);
+						}
+					};
+					TreeSet<TreeObj> set1 = new TreeSet<>(comparator);
+					set1.add(new TreeObj("LiXL", 48));
+					set1.add(new TreeObj("LiXL", 5));
+					set1.add(new TreeObj("YuCX", 29));
+					set1.add(new TreeObj("KeYD", 26));
+					Iterator<TreeObj> iterator1 = set1.iterator();
+					while (iterator1.hasNext()) {
+						System.out.println(iterator1.next());
+					}
+				}
+			}
+
+			class TreeObj implements Comparable<TreeObj> {
+				String name;
+				int num;
+
+				public TreeObj(String name, int num) {
+					this.name = name;
+					this.num = num;
+				}
+
+				// 自然排序
+				@Override
+				public int compareTo(TreeObj o) {
+					int compare = this.name.compareTo(o.name);
+					if (compare != 0) {
+						return compare;
+					} else {
+						return Integer.compare(this.num, o.num);
+					}
+				}
+
+				@Override
+				public String toString() {
+					return "TreeObj{" +
+							"name='" + name + '\'' +
+							", num=" + num +
+							'}';
+				}
+			}

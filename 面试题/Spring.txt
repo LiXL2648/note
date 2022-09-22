@@ -1,0 +1,554 @@
+一、Spring 的循环依赖
+	1. 面试题
+		① 解释 Spring 中的三级缓存
+		② 三级缓存分别是什么？三个 Map 有什么异同
+		③ 什么是循环依赖？一般说的 Spring 容器是什么
+		④ 如何检测是否存在循环依赖，实际开发中见过循环依赖的异常吗？
+		⑤ 多例的情况下，循环依赖问题为什么无法解决
+	2. 什么是循环依赖？
+		① 多个 Bean 之间相互依赖，形成一个闭环。比如：A 依赖 B，B 依赖 C，C 依赖 A
+		② 通常来说，如果问 Spring 容器内部如何解决循环依赖，一定是指默认的单例 Bean 中，属性互相引用的场景
+	3. 两种注入方式对循环依赖的影响
+		① 循环依赖官网说明：https://docs.spring.io/spring-framework/docs/current/reference/html/core.html#beans-dependency-resolution
+		② 结论：AB 循环依赖问题只要 A 的注入方式是 setter 且 Singleton，就不会有循环依赖问题
+	4. Spring 容器循环依赖报错演示 BeanCurrentlyInCreationException
+		① 循环依赖现象在 Spring 容器中注入依赖的对象，有 2 种情况
+			A. 构造器方式注入依赖
+			B. 以 Set 方式注入依赖
+		② 结论：
+			A. 默认的单例（Singleton）的场景是支持循环依赖的，不会报错
+			B. 原型（Prototype）的场景是不支持循环依赖的，会报错
+			C. Spring 内部通过三级缓存解决循环依赖--DefaultSingletonBeanRegistry
+
+				a. 只有单例的 Bean 会通过三级缓存提前暴露来解决循环依赖的问题，而非单例的 Bean，每次从容器中获取都是一个新的对象，都会重新创建，所以非单例的 Bean 是没有
+				缓存的，不会将其放到三级缓存中。
+				b. 第一级缓存（也叫单例池，Map<String, Object> singletonObjects = new ConcurrentHashMap(256)）：存放已经经历了完整生命周期的 Bean 对象（存放已经初始化好的 Bean）
+				c. 第二级缓存（Map<String, Object> earlySingletonObjects = new ConcurrentHashMap(16)）：存放早期暴露出来的 Bean 对象，Bean 的生命周期未结束（属性还未填充完）（
+				存放的是已经实例化，但还未初始化的 bean ）
+				d. 第三季缓存（Map<String, ObjectFactory<?>> singletonFactories = new HashMap(16)）：存放可以生成 Bean 的工厂。（存放的是 FactoryBean）。假如 A 类实现了 
+				FactoryBean，那么依赖注入的时候不是 A 类，而是 A 类产生的 Bean
+	5. 循环依赖 Debug
+		① 实例化/初始化
+			A. 实例化：内存中申请一块内存空间
+			B. 初始化属性填充：完成属性的各种赋值
+		② 三大 Map 和四大方法
+			A. 三大 Map： SingletonObjects、earlySingletonObjects、singletonFactories
+			B. 四大方法：getSingleton、doCreateBean、populateBean、addSingleton
+			C. 四大方法介绍：获取一级缓存中的 Bean 实例，如果没有，则进行创建并进行属性填充，最后再加入到一级缓存中
+		③ A/B 两对象在三级缓存中恶的迁移说明
+			A. A 创建过程中需要 B，于是 A 将自己放到 三级缓存中，去实例化 B
+			B. B 实例化的时候发现需要 A，于是 B 先到一级缓存中查找 A，若没有，再到二级缓存中查找，若还是没有，再到三级缓存中查找，若找到 A，则把三级缓存中的 A 放到二级缓存中，
+			并删除三级缓存中的 A
+			C. B 顺利初始化完毕，并放到一级缓存中（此时 B 里面的 A 依然是创建中的状态），然后接着创建 A，此时 B 已经创建结束，A 直接从一级缓存中拿到 B，完成创建，并放到一级缓
+			存中。
+	6. 总结 Spring 是如何解决循环依赖
+		① 解释
+			A. Spring 创建 Bean 主要分为两个步骤，创建原始 Bean 对象，接着去填充对象属性进行初始化
+			B. 每次创建 Bean 之前，都会从缓存中查找有没有该 Bean，因为是单例，只能有一个
+			C. 当创建 BeanA 的原始对象后，并把它放到三级缓存中，接下来就该填充对象属性了，这时候发现依赖了 BeanB，接着就去创建 BeanB，同样的流程，创建 BeanB 填充属性时，又发现
+			它依赖了 BeanA，又是同样的流程
+			D. 不同的是：这时可以在三级缓存中查到刚放进去的原始对象 BeanA，所以不需要继续创建，用它注入 BeanB，完成 BeanB 的创建
+			E. 既然 BeanB 创建好了，所以 BeanA 就可以完成填充属性的步骤了，接着二执行剩下的逻辑，闭环完成
+				protected Object getSingleton(String beanName, boolean allowEarlyReference) {
+					// 从 singletonObject 获取实例，singletonObject 中的实例都是准备好的Bean实例，可以直接使用
+					Object singletonObject = this.singletonObjects.get(beanName);
+					// isSingletonCurrentlyInCreation(beanName)，判断当前实例是否在创建中
+					if (singletonObject == null && this.isSingletonCurrentlyInCreation(beanName)) {
+						singletonObject = this.earlySingletonObjects.get(beanName);
+						if (singletonObject == null && allowEarlyReference) {
+							synchronized(this.singletonObjects) {
+								singletonObject = this.singletonObjects.get(beanName);
+								// 一级缓存没有，就去二级缓存查找
+								if (singletonObject == null) {
+									singletonObject = this.earlySingletonObjects.get(beanName);
+									// 二级缓存没有，就去三级缓存中查找
+									if (singletonObject == null) {
+										ObjectFactory<?> singletonFactory = (ObjectFactory)this.singletonFactories.get(beanName);
+										// 三级缓存中存在，则将 Bean 移到二级缓存
+										if (singletonFactory != null) {
+											singletonObject = singletonFactory.getObject();
+											this.earlySingletonObjects.put(beanName, singletonObject);
+											this.singletonFactories.remove(beanName);
+										}
+									}
+								}
+							}
+						}
+					}
+
+					return singletonObject;
+				}
+			F. Spring 解决循环依赖依靠的是的“中间态”这个概念，而这个中间态指的是已经实例化但还没有初始化的状态，实例化的过程又是通过构造器创建的，如果 A 还没有创建好就无法提前曝光，
+			所以构造器的循环依赖无法解决
+			G. Spring 为了解决单例的循环依赖问题，使用了三级缓存
+				一级缓存（singletonObjects）为单例池
+				二级缓存（earlySingletonObjects）
+				三级缓存为提前曝光对象工厂（singletonFactories）
+		② Debug 的步骤--Spring 解决循环依赖过程
+							   创建 BeanA													  创建 BeanB
+			+----------------------------------------------+				+----------------------------------------------+
+			| 		   	  	 getBean(beanA)		   	       |		+----->	| 		   	  	 getBean(beanB)		   	       |
+			+----------------------------------------------+		|		+----------------------------------------------+
+								  ↓									|							  ↓
+			+----------------------------------------------+		|		+----------------------------------------------+
+			| 		     	doGetBean(beanA)			   |		|		| 		     	doGetBean(beanB)			   |
+			+----------------------------------------------+		|		+----------------------------------------------+
+			尝试从各级缓存中获取  ↓  Bean							|							  ↓											  BeanB 获取 BeanA的早期引用
+			+----------------------------------------------+		|		+----------------------------------------------+				+-----------------------------+
+			|       	getSingleton(beanA) == null    	   |		|		|       	getSingleton(beanB) == null    	   |		+---->	| 		getBean(beanA)		  |
+			+----------------------------------------------+		|		+----------------------------------------------+		|		+-----------------------------+
+			  开始创建Bean 实例	  ↓									|							  ↓									|					  ↓
+			+----------------------------------------------+		|		+----------------------------------------------+		|		+-----------------------------+
+			| 	 getSingleton(beanA, singletonFactory) 	   |		|		| 	 getSingleton(beanB, singletonFactory) 	   |		|		| 	    doGetBean(beanA)	  |
+			+----------------------------------------------+		|		+----------------------------------------------+		|		+-----------------------------+
+								  ↓									|							  ↓									|					  |
+			+----------------------------------------------+	属性填充时 	+----------------------------------------------+		|					  | 由于第一步已经
+			| 		  	   createBean(beanA)			   |	发现依赖 B	| 		  	   createBean(beanB)			   |		|					  | 添加了缓存，所以
+			+----------------------------------------------+		|		+----------------------------------------------+		|					  | 这里不为空，并将
+								  ↓									|							  ↓									|					  ↓ 三级缓存移到二级
+			+----------------------------------------------+		|		+----------------------------------------------+	属性填充时	+-----------------------------+
+			| 		   	  doCreateBean(beanA)			   |		|		| 		   	  doCreateBean(beanB)			   |	发现依赖 B	| 	   getSingleton(beanA)	  |
+			+----------------------------------------------+		|		+----------------------------------------------+  		|		+-----------------------------+
+				 创建 Bean 对象	  ↓									|							  ↓							  		|					  |
+			+----------------------------------------------+		|		+----------------------------------------------+		|					  |				  
+			| 	  		createBeanInstance(beanA)		   |		|		| 	  		createBeanInstance(beanB)		   |		|					  |
+			+----------------------------------------------+		|		+----------------------------------------------+		|					  |
+				添加到三级缓存    ↓									|							  ↓									|			 		  |
+			+----------------------------------------------+		|		+----------------------------------------------+		|			 返回 BeanA 的原始对象
+			| addSingletonFactory(beanA, singletonFactory) |		|		| addSingletonFactory(beanB, singletonFactory) |		|					  |
+			+----------------------------------------------+		|		+----------------------------------------------+		|					  |
+					属性注入	  ↓									|							  ↓									|					  |
+			+----------------------------------------------+		|		+----------------------------------------------+		|					  |
+			| 		  	   populateBean(beanA)			   | -------+		| 		  	   populateBean(beanB)			   | -------+					  |
+			+----------------------------------------------+ <------+		+----------------------------------------------+ <----------------------------+
+								  |	最后完成 A 的初始化				|							  |
+					初始化 Bean	  ↓									|							  ↓
+			+----------------------------------------------+		|		+----------------------------------------------+
+			|			initializeBean(beanA)			   |		|		|			initializeBean(beanA)			   |
+			+----------------------------------------------+		|		+----------------------------------------------+
+								  ↓							  BeanB 完成						  ↓
+			+----------------------------------------------+  实例化和初	+----------------------------------------------+
+			|	  addSingleton(beanA, SingletenObject)	   |      始化		|	  addSingleton(beanA, SingletenObject)	   |
+			+----------------------------------------------+		|		+----------------------------------------------+
+								  ↓									|							  ↓
+			+----------------------------------------------+		|		+----------------------------------------------+
+			| 			getObjectBeanInstance()			   |		+------	| 			getObjectBeanInstance()			   |
+			+----------------------------------------------+				+----------------------------------------------+
+			A. 调用 doGetBean() 方法，想要获取 BeanA，于是调用 getSingleton() 方法从缓存中查找 BeanA
+			B. 在 getSingleton() 方法中，从一级缓存中查找，没有，返回 null
+			C. doGetBean() 方法中获取到的 BeanA 为 null，于是走对于的处理逻辑，调用 getSingleton() 的重载方法（参数为 ObjectFactory）
+			D. 在 getSingleton() 方法中，先将 beanA_name 添加到一个集合中，用于标记该 Bean 正在创建中。然后调用匿名内部类的 createBean 方法
+			E. 进入 AbstractAutowireCapableBeanFactory#doCreateBean，先反调用构造器创建出 BeanA 的实例，然后判断：是否为单例、是否允许提前暴露引用（对于单例一般为 true）、是否
+			正在创建中（即是否在第四步的集合中）。判断为 true，将 Bean 添加到三级缓存中
+			F. 对 BeanA 进行属性填充，此时检测到 BeanA 依赖与 BeanB，于是开始查找 BeanB
+			G. 调用 doGetBean() 方法，和上面的 BeanA 的过程一样，到缓存中查找 BeanB，没有则创建，然后给 BeanB 填充属性
+			H. 此时 BeanB 依赖与 BeanA，调用 getSingleton() 获取 A，依次从一级、二级和三级缓存中查找，此时从三级缓存中获取到 BeanA 的创建工厂，通过创建工厂获取到 SingletenObject，
+			此时这个 SingletenObject 指向的就是上面 doCreateBean() 方法中实例化的 BeanA
+			I. 这样 BeanB 就获取到了 BeanA 的依赖，于是 BeanB 顺利完成实例化，并将 BeanA 从三级缓存移到到二级缓存中
+			随后BeanA 继续他的属性填充工作，此时也获取到了 BeanB，BeanA 也随之完成了创建，回到 getSingleton() 方法中继续向下执行，将 BeanA 从二级缓存移到到一级缓存中。
+
+		
+二、Spring IOC
+	1. 理解
+		① IOC 的全称叫做控制反转，原来的对象都是由使用者直接创建，有了 Spring 之后，所有对象都是交给 IOC 容器去管理
+		② DI 全称是依赖注入，把对象注入到另一个对象的属性中，使用注解 @Autowired，@Resource 完成属性值的注入
+		③ Spring IOC 是一个容器，使用 Map 来存储通过 XML 或者是注解的方式定义的一些 Bean 对像，在 Spring 中一般使用三级缓存解决对象创建的过程，其中 singletonObjects 用来
+		存放完成初始化的对象，对象的整个生命周期从创建到使用再到销毁全部都是由容器来管理的
+	2. Spring IOC 实现原理
+		① 开始循环创建对象，因为容器中的 Bean 默认都是单例的，所以优先通过 getBean，doGetBean 从容器中查找，如果容器中找不到的话
+		② 先通过 createBeanFactory 创建出一个 Bean 工厂（DefaultListableBeanFactory）
+		③ 通过 CreateBean、doCreateBean 方法，以反射的方式创建对象，一般情况下使用的是无参构造器（getDeclaredConstructor，newInstance）
+		④ 进行对象的属性填充 populateBean
+		⑤ 进行其他初始化操作 initializeBean
+	3. Bean 的生命周期
+		① 通过反射的方式生成对象，实例化 Bean
+		② 填充 Bean 的属性，调用 populateBean 方法（如果是循环依赖问题，则使用三级缓存进行填充）
+		③ 调用 aware 接口的相关方法：invokeAwareMethod（完成 BeanName、BeanFactory、BeanClassLoader 对象的属性设置）
+		④ 调用 BeanPostProcessor 中的前置处理方法，使用比较多的有（ApplicationPostProcessor，设置 ApplicationContext、Environment、ResoureceLocader 等对象）
+		⑤ 调用 invokeInitMethod 方法，判断是否实现了 initializingBean 接口，如果有，则调用 afterPropertiesSet 方法，没有就不调用
+		⑥ 调用 BeanPostProcessor 的后置处理方法
+		⑦ 获取到完成的对象，可以通过 getBean 的方式来进行对象的获取
+		⑧ 销毁创建流程：判断是否实现了 DisableBean 接口，调用 destroyMethod 方法
+	4. Spring 中使用的设计模式
+		① 单例模式：Bean 的创建默认都是单例的
+		② 工厂模式：BeanFactory 都是使用工厂模式创建的
+		③ 原型模式：指定作用域为 protoType
+		④ 代理模式：动态代理
+		⑤ 模板方法：比如 postProcessBeanFactory、onReflush、initPropertyValue
+		⑥ 策略模式：XmlBeanDefinitionReader、PropertiesBeanDefinitionReader
+		⑦ 观察者模式：listener、event、multicast
+		⑧ 适配器：所有的 Adapter
+		⑨ 装饰者模式：BeanWrapper
+		⑩ 责任链模式：使用 aop 的时候会生成一个拦截器
+		委托者：delegate
+	5. Bean 的作用域
+		C. singleton: 在SpringIOC容器中仅存在一个Bean实例，Bean以单例的方式存在
+		D. prototype：每次调用getBean()时都会返回一个新的实例，并且使用getBean获取实例时，才会在IOC容器中创建该Bean
+		E. request：每次HTTP请求都会创建一个新的Bean，该作用域仅适用于WebApplicationContext环境
+		F. session：同一个HTTP Session共享一个Bean，不同的Http Session使用不同的Bean，该作用域仅适用于WebApplicationContext环境
+	6. 注入属性细节
+		① 集合属性
+			A. 在 Spring中可以通过一组内置的 xml 标签(例如: <list>, <set> 或 <map>) 来配置集合属性.
+			B. 配置 java.util.List 类型的属性, 需要指定 <list>  标签, 在标签里包含一些元素. 这些标签可以通过 <value> 指定简单的常量值，通过 <ref> 指定对其他 Bean 的引用，
+			通过<bean> 指定内置 Bean 定义. 通过 <null/> 指定空元素. 甚至可以内嵌其他集合.
+			C. 数组的定义和 List 一样, 都使用 <list>
+			D. 配置 java.util.Set 需要使用 <set> 标签, 定义元素的方法与 List 一样.
+			E. 	<list>
+					<ref bean="department"/>
+					<ref bean="department1"/>
+					<ref bean="department2"/>
+				</list>
+			F.	<map>
+					<entry key="department" value-ref="department"></entry>
+					<entry key="department1" value-ref="department1"></entry>
+					<entry key="department2" value-ref="department2"></entry>
+					</map>
+			G. 使用 utility scheme 定义集合
+				a. 使用基本的集合标签定义集合时, 不能将集合作为独立的 Bean 定义, 导致其他 Bean 无法引用该集合, 所以无法在不同 Bean 之间共享集合.
+				b. 以使用 util schema 里的集合标签定义独立的集合 Bean. 需要注意的是, 必须在 <beans> 根元素里添加 util schema 定义
+				c. 	<util:list id="departments">
+						<ref bean="department"/>
+						<ref bean="department1"/>
+						<ref bean="department2"/>
+					</util:list>
+三、Spring AOP
+	1. 的底层实现原理
+		① 在 Bean 的创建过程中有一个步骤可以对 Bean 进行扩展，AOP 本身就是一个扩展功能，所以在 BeanPostProcessor 的后置处理方法中进行实现
+		② 代理对象的创建过程（定义 Advice，切面和切点）
+		③ 通过 JDK 或者 cglib 的方式来生成代理对象
+		④ 在执行方法调用的时候，会调用到生成的字节码文件中，直接会找到 DynamicAdvisoredInterceptor 类中的 intercept 方法，从此方法开始执行
+		⑤ 根据之前定义好的通知来生成拦截器链
+		⑥ 从拦截器链中依次获取每一个通知开始执行
+	2. Spring 的 AOP 顺序
+		① Aop 的常用注解
+			A. @Before：前置通知，目标方法之前执行
+			B. @After：后置通知，目标方法之后执行（始终执行）
+			C. @AfterReturning：返回通知，执行方法结束前执行（异常不执行）
+			D. @AfterThrow：异常通知：出现异常时执行
+			E. @Around：环绕通知，环绕目标方法执行
+		② 面试题
+			A. 说说 Spring Aop 的全部通知顺序
+			B. SpringBoot 或者 SpringBoot2 对 Aop 的执行顺序影响
+			C. 说说使用 Aop 中碰到的坑
+		③ Spring4 和 SpringBoot
+			A. Spring4 aop 正常顺序和异常顺序
+				a. 正常顺序：@Before（前置通知）-> @After（后置通知）-> @AfterReturning（返回通知）
+				b. 异常顺序：@Before（前置通知）-> @After（后置通知）-> @AfterThrowing（异常通知）
+			B. Spring5 aop 正常顺序和异常顺序
+				a. 正常顺序：@Before（前置通知）-> @AfterReturning（返回通知）-> @After（后置通知）
+				b. 异常顺序：@Before（前置通知）-> @AfterThrowing（异常通知）-> @After（后置通知）
+四、Spring 事务
+	1. Spring 事务如何回滚
+		① Spring 的事务是由 AOP 来实现的，首先要生成具体的代理对象，然后通过 AOP 的整套流程来执行具体的操作逻辑，正常情况下要通过通知来完成核心功能，但是事务不是通过
+		通知来实现的，而是通过一个 TransactionInterceptor，然后调用 invoke 来实现具体的逻辑
+		② 先做准备工作，解析各个方法上事务相关的属性，根据具体的属性来判断是否开始新事务
+		③ 当需要开启的时候，获取数据库连接，关闭自动提交功能，开启事务
+		④ 执行具体的 SQL 逻辑操作
+		⑤ 在操作过程中，如果执行失败了，那么会通过 completeTransactionAfterThrowing 来完成事务的回滚操作，回滚的具体逻辑是通过 doRollBack 方法来实现的，实现的时候也
+		是要先获取数据库连接对象，通过连接对象来提交
+		⑥ 如果执行过程中，没有任何意外情况的发生，那么通过 commitTransactionAfterReturning 来完成事务的提交操作，提交的具体逻辑是通过 doCommit 方法来实现的，实现的时
+		候也是要先获取数据库连接对象，通过连接对象来提交
+		⑦ 当事务执行完毕之后需要通过 cleanupTransactionInfo 方法清除相关的事务信息
+	2. 事务传播
+		① 问题：事务方法被另一个事务方法调用时，事务如何传播
+		② 事务的传播特性是指不同事务方法的嵌套调用过程中，事务应该如何处理，是用同一个事务还是使用不同的事务，当出现异常时，是回滚还是提交，在日常工作中使用得比较多的
+		是 required、required_new、nested
+		③ 事务传播的分类有：支持当前事务、不支持当前事务、嵌套事务
+		④ 如果外层是 required，内层是 required、required_new、nested
+		⑤ 如果外层是 required_new，内层是 required、required_new、nested
+		⑥ 如果外层是 nested，内层是 required、required_new、nested
+		a. REQUIRED: 如果有事务在运行，当前的方法就在这个事务内运行，否则，就启动一个新的事务，并在自己的事务内运行
+		b. REQUIRED_NEW: 当前方法必须启动新的事务，并在它自己的事务内运行，如果有事务正在运行，应该将它挂起
+		c. SUPPORTS: 如果有事务正在运行，当前方法就在这个事务内运行，否则它可以不允许在事务中。
+		d. NOT_SUPPORTED: 当前的方法不应该运行在事务中，如果有运行事务，将它挂起
+		e. MANDATORY: 当前方法必须运行在事务内部，如果没有正在运行的事务，就抛出异常
+		f. NEVER: 当前方法不应该运行在事务中，如果有正在运行的事务，则抛出异常
+		g. NESTED: 如果有事务在运行，当前的方法就应该在这个事务的嵌套事务内部运行，否则，就启动一个新的事务，并在它自己的事务内运行
+		h. 一般最常用的是REQUIRED、REQUIRED_NEW事务传播行为
+五、SpringMVC的运行流程
+	1. 运行流程图解
+		① 浏览器发送的请求会被SpringDispatcherServlet的url-pattern捕获
+		② SpringMVC会判断是否存在请求相应的映射
+		③ 如果不存在相应的映射，根据SpringMVC是否配置了<mvc:default-servlet-handler/>，如果配置了，则会发送目标资源，
+		如果没有配置，则控制台会打印No mapping found for HTTP request with URI [/xx/xx] in DispatcherServlet
+		并且返回404页面，如果配置而不存在目标资源，会出现404页面，但控制台不会打印请求没有映射的信息
+		④ 如果存在相应的映射HandlerMapping获取HandlerExecutionChain对象
+		⑤ 获取HandlerAdapter对象
+		⑥ 调用拦截器的preHandle方法
+		⑦ 调用目标Handler的目标方法得到ModeAndView对象
+		⑧ 调用拦截器的postHandle方法
+		⑨ 如果存在异常，则由HandlerExceptionResolver组件处理异常，得到新的ModeAndView对象
+		⑩ 如果不存在异常，返回的视图或者由HandlerExceptionResolver处理得到新的视图由ViewResolver组件根据
+		ModeAndView对象得到实际的视图View对象
+		①① 渲染视图
+		①② 调用拦截器的afterCompletion方法
+	2. 自定义拦截器
+		1. Spring MVC 也可以使用拦截器对请求进行拦截处理，用户可以自定义拦截器来实现特定的功能，自定义的拦截器必
+		须实现HandlerInterceptor接口
+			① preHandle()：这个方法在业务处理器处理请求之前被调用，在该方法中对用户请求 request 进行处理。如果程序员决定该拦截器对
+			请求进行拦截处理后还要调用其他的拦截器，或者是业务处理器去进行处理，则返回true；如果程序员决定不需要再调用其他的组件
+			去处理请求，则返回false。
+			② postHandle()：这个方法在业务处理器处理完请求后，但 是DispatcherServlet 向客户端返回响应前被调用，在该方法中对
+			用户请求request进行处理。
+			③ afterCompletion()：这个方法在 DispatcherServlet 完全处理完请求后被调用，可以在该方法中进行一些资源清理的操作
+		2. 拦截器方法执行顺序
+			① 执行拦截器HandlerInterceptor的preHandle()方法
+			② 执行目标方HandleAdapter的handle
+			③ 执行拦截器HandlerInterceptor的postHandle()方法，该方法可以对目标方法返回的视图进行处理
+			④ 执行DispatcherServlet的render()方法，即请求被完成
+			⑤ 执行拦截器HandlerInterceptor的fterCompletion()方法
+		3. 多个拦截器之间的执行顺序
+			① 执行第一个拦截器的preHandle()方法
+			② 执行第二个拦截器的preHandle()方法
+			③ 如果第二个拦截器的preHandle()方法返回的是false，则直接跳到第八步，如果返回的是true，则继续往下执行
+			④ 执行目标方法的handle方法
+			⑤ 执行第二个拦截器的postHandle()方法
+			⑥ 执行第一个拦截器的postHandle()方法
+			⑦ 执行完DispatcherServlet的render()方法
+			⑧ 执行第二个拦截器的afterCompletion()方法
+			⑧ 执行第一个拦截器的afterCompletion()方法
+六、Spring Boot
+	1. 自动配置
+		① 比如在 SpringBoot 应用中加入 Web 的场景启动器时，在应用的主程序启动的时候，会为容器自动配置 Tomcat、SpringMVC 以及 Web 常见的功能，如：字符码编码、消息转换器等。
+		② 默认包结构：SpringBoot 会自动配置默认的包结构，即主程序所在的包及其子包中的组件都会被加入容器。
+			A. 在 SpringBoot 主程序类中，使用 @SpringBootApplication 注解标注，该注解是由@SpringBootConfiguration、@EnableAutoConfiguration 以及 @ComponentScan 组合而成
+			B. @SpringBootConfiguration 就是一个 @Configuration 注解，代表当前主程序类就是一个配置类
+			C. @ComponentScan 是一个包扫描注解，指定要扫描的类
+			D. @EnableAutoConfiguration 是 @AutoConfigurationPackage 和 @Import({AutoConfigurationImportSelector.class}) 的合成
+				a. @AutoConfigurationPackage 的作用是给容器导入一个组件 Registrar，利用 Registrar 给容器批量导入一系列组件，即将主程序所在的包及其子包的所有组件导入容器中
+				b. @Import({AutoConfigurationImportSelector.class}) 的作用就是利用 getAutoConfigurationEntry(annotationMetadata) 使用工厂方法给容器中批量导入一系列配置类，
+				该方法会从所有的JAR包下的 META-INF/spring.factories 位置加载一个文件，并加载文件中 EnableAutoConfiguration 位置下的配置类
+		③ 按需加载：SpringBoot 的所有自动配置类都是由 spring-boot-autoconfigure 包提供，但是所有的默认配置类都不是默认生效，而是使用 @Conditional 条件装配规则按需加载。
+		③ 各种配置拥有默认值：SpringBoot 的各种配置项最终将被映射到具体的属性配置类，该类的对象会被加载进容器中，所有的配置项的值也将绑定到属性配置类的具体属性上。
+	2. 自定义 starter 
+		① starter 启动原理
+			A. 一般在自定义 starter 中引入该 starter 的自动配置包
+			B. 自动配置包下使用 META-INF/spring.factories 文件中的 EnableAutoConfiguration 指定自动配置类，使得项目启动时，自动加载指定的自动配置类
+		② 自定义 starter
+			A. 定义一个空工程，在该空工程下新建两个模块，分别为 Hello-spring-boot-start 和  Hello-spring-boot-autoconfigure
+			B. 在 Hello-spring-boot-start 模块中，只需要在 pom.xml 文件里指定 Hello-spring-boot-autoconfigure 的依赖即可
+			C. 在 Hello-spring-boot-autoconfigure 中
+				a. 新建一个 HelloService 类，该类就是最终需要使用自动配置加入容器中，如果该类需要一些可自定义的属性的话，将该属性封装成一个属性类 HelloProperties，并将该类
+				注入到 HelloService 对象的属性中。
+				b. 新建一个 HelloConfiguration 配置类，该类就是自定义启动器需要加载的类，在该类中，使用 @Configuration 注解标注该类是一个配置类，接着使用 
+				@EnableConfigurationProperties 注解指定 HelloProperties 属性类，并加入容器中
+				c. 在该配置类中，使用 @Bean 直接将 HelloService 加入容器，可以使用条件装配规则注解 @ConditionalOnMissingBean 指定当容器中不存在 HelloService 时加载该 Bean
+				d. 在当前类路径下新建 META-INF/spring.factories 文件，并在文件中设置 EnableAutoConfiguration 的值为 HelloConfiguration 的全类名
+				e. 将自动配置包 Hello-spring-boot-autoconfigure 和 启动器 Hello-spring-boot-start 分别安装到本地仓库，就可以在其他 SpringBoot 工程中引入
+七、Spring Cloud
+	1. 微服务架构
+		微服务是一种架构模式，它提倡将单一应用划分成一组小的服务，服务之间互相协调、互相配合，为用户提供最终价值，每个服务运行在其独立的进程中，
+		服务与服务之间采用轻量级的通信机制互相协作（通常是基于HTTP协议的RESTful API），每个服务都能围绕着具体业务进行构建，并且能独立的部署到生
+		产环境、类生产环境等。另外，应当尽量避免统一的、集中式的服务管理机制，对具体的一个服务而言，应根据上下文，选择合适的语言、工具对其进行构建。
+	2. SpringCloud 核心组件，分别有什么作用
+		① 服务注册中心：
+			A. Euceka			X
+			B. Zookeeper		/
+			C. Consul			/
+			D. Nacos			/
+		② 客户端负载均衡
+			A. Ribbon			/
+			B. LoadBalance		/
+		③ 服务调用
+			A. Feign			X
+			B. OpenFeign		/
+		④ 服务降级
+			A. Hystrix			X
+			B. resilience4j		/
+			C. sentinel			/
+		⑤ 服务网关
+			A. Zuul				X
+			B. Zuul2			？
+			C. gateway			/
+		⑥ 服务配置
+			A. Config			X
+			B. Nacos			/
+		⑦ 服务总线
+			A. Bus				X
+			B. Nacos			/
+		⑧ 链路追踪
+			A. Sleuth
+			B. Skywalking
+			C. Pinpoint
+	3. 服务注册原理
+		① 在传统的RPC远程调用框架中，管理每个服务与服务之间依赖关系比较复杂，所以需要使用服务治理
+		② 在服务注册与发现中有一个注册中心。当服务启动时，会把当前自己服务器信息，比如：服务通讯地址等以别名的方式注册到注册中心上，另一方
+		（消费者，服务提供者），以该别名的方式去注册中心上读取到实际的服务通讯地址
+	4. 配置中心原理
+		分布式系统面临的——配置问题：微服务意味着要将单体应用中的业务拆分成一个个子服务。由于每个
+		服务都需要进行必要的配置信息才能够运行，所以一套集中式的、动态的配置管理设施是必不可少的。
+	5. 配置中心实现自动刷新
+		① 配置中心 Server 端承担起配置刷新得职责
+		② 提交配置触发 Post 请求给 Server 端的 bus/refresh 接口
+		③ Server 端接收到请求并发送给 Spring Cloud Bus 总线
+		④ Spring Cloud Bus 接收到消息并通知给其他连接总线的客户端
+		⑤ 其他客户端接收到通知，请求 Server 端获取新配置
+		⑥ 全部客户端均获取到最新的配置
+	6. 配置中心是如何保证数据安全的
+		① 保证容器文件访问的安全性，即保证所有的网络资源请求都需要登录
+		② 将配置中心里的所有配置文件中的密码进行加密，保证其密文性
+		③ 开发环境禁止拉取生产环境的配置文件
+	7. 用 Zookeeper、Consul 和 eureka 做注册中心有什么区别
+		① Consul 和 Zookeeper 保证的是CP：满足一致性和分区容错性，通常性能不是很高
+		② Eureka 保证的是AP：满足可用性和分区容错性，通常对一致性要求低一些
+	8. Spring Cloud 和 Dubbo 哪些区别
+		① Dubbo 是二进制传输，对象直接转成二进制，使用 RPC 通信。而 Spring Cloud 是 http 传输，同时使用 http 协议一般会使用 json 报文，json 再转二进制，
+		消耗会更大
+		② Dubbo 只是实现了服务治理，而 Spring Cloud 下面有几十个子项目分别覆盖了微服务架构下的方方面面，服务治理只是其中一个方面，一定程度来说，Dubbo 
+		只是 Spring Cloud 的一个子集
+	9. Dubbo 与 Eureka 系统架构图之间的对比
+							
+				2.subscript：服务消费者启动 ------------
+				订	 ---------------------->| Registry | 1. registry：将服务信息注册到注册中心（Zookeeper）
+				阅	 | ---------------------| 注册中心 |<--------------------------
+				服	 | |3. notify:			------------						  |
+				务	 | |长连接的方式											  |
+					 | |实时推送服务变更										  |
+					 | ↓													--------------
+				--------------												| Provider   |
+				| Consumer   | 4.invoke：调用服务，多次调用，直到成功		| 服务提供者 |<----------
+				| 服务消费者 |--------------------------------------------->|------------| 			| 0.start：Dubbo 容器启动和加载服务提供者
+				--------------												| Container  |-----------
+					 |														| 服务容器   | 
+					 |														--------------
+					 |		   			 5.count：定时监控						  |
+					 |						------------						  |
+					 ---------------------->| Monitor  |<--------------------------
+											| 监控中心 |
+											------------
+										  --------|		
+										  |---------|
+										  ||----------
+						Get Registry	  -|| Server |      Registry/Renew/Cancel
+				 |---------------------->  -| Eureka | <--------------------------------
+				 |							----------								   |
+				 |																	   |
+				 |																	   |
+				 |																	   |
+				 |																	   |
+			-------------														  ------------
+			|  Service  |						Remote Call						  |	Service  |-
+			|  Consumer |-------------------------------------------------------->| Provider ||-
+			-------------														  ------------||
+																				   |-----------|
+																				     |----------
+	10. Ribbon 负载均衡原理是什么
+		① Spring Cloud Ribbon是基于Netflix Ribbon 实现的负载均衡工具，主要功能是提供客户端的软件负载均衡算法和服务调用，Ribbon会自动的基于某种规则（如：
+		简单轮询，随机连接等）去连接这些客户端
+		② Ribbon 通过 ILoadBalance 接口根据不同的负载均衡策略（IRule）选择合适的 Server选择服务器（Server）
+		③ IRule 是负载均衡策略的抽象，ILoadBalance 通过调用 IRule 的 choose() 方法返回 Server
+		④ IPing 用来检测 Server 是否可用，ILoadBalance 的实现类维护一个 Timer 每隔 10s 检测一次 Server 的可用状态
+		⑤ IClientConfig 初始化客户端和负载均衡器的配置信息，主要实现类为 DefaultClientConfigImpl
+	11. 微服务熔断降级机制是什么
+		① 分布式系统面临的问题：复杂的分布式体系结构中的应用程序有着错综复杂的依赖关系，每个依赖关系在某些时候将不可避免地失败，多个微服务之间调用的时候，
+		如果链路上某个微服务调用响应时间过长或者不可用，对微服务的调用就会占用越来越多的系统资源，进而引起服务雪崩
+		② Hystrix是一个用于处理分布式系统的延迟和容错的开源库，在分布式系统里，许多依赖不可避免的会调用失败，比如超时、异常等，Hystrix能够保证在一个依赖
+		出问题的情况下，不会导致整个服务失败，避免级联故障，以提高分布式系统的弹性
+		③ “断路器”本身是一种开关装置，当某个服务发生故障之后，通过断路器的故障监控（类似于熔断保险丝），向调用方返回一个符合预期的、可处理的备选响应，
+		而不是长时间的等待或者抛出调用方无法处理的异常，从而避免了故障在分布式系统中的蔓延，乃至雪崩
+		④ 服务降级、服务熔断、接近实时的监控以及限流、隔离等
+		⑤ 实现原理
+			A. 正常情况下，断路器关闭，服务消费正常请求微服务
+			B. 一段时间内，服务请求失败率达到一定阈值，断路器将打开，此时将不再提供服务，而只是快速失败，返回断路方法
+			C. 断路器打开一段时间，自动进入“半开”状态，此时，断路器允许一个请求方法进入服务提供者，如果请求调用成功，则关闭断路器，否则继续保持断路器打开状态
+			D. 断路器是保障了局部发生的错误，不会扩展到整个系统，造成系统雪崩
+	12. Gateway 工作流程
+		① 核心概念
+			A. Spring Cloud Gateway 的目标是提供统一的路由方式且基于Filter链的方式提供了网关基本功能，例如：安全，监控/指标，和限流
+			B. SpringCloud Gateway使用的Webflux中的reactor-netty响应时编程组件，底层使用了Netty通讯框架
+		② 原理与工作流程
+			A. 客户端向Spring Cloud Gateway发出请求，然后在Gateway Handler Mappering中找到请求相匹配的路由，将其发送到Gateway Web Handler
+			B. Handler再通过指定的过滤器链来将请求发送到实际的服务，然后返回。过滤器可能会在发送代理请求之前（pre）或之
+			后（post）执行业务逻辑。
+			C. Filter在“pre”类型的过滤器可以做参数校验、权限检验、流量控制、日志输入、协议装换等，在“post”类型的过滤器中可以做响应内容、响应头的修改，日志的
+			输出，流量监控等有着非常
+			重要的作用。
+		③ Zuul 1.x和Gateway的比较
+			A. Zuul 1.x是一个基于阻塞I/O的API Gateway
+			B. Zuul 1.x基于Servlet 2.5使用阻塞架构，它支持长连接（如webSocket）Zuul的设计模式和Nginx较像，每次I/O操作都是从工作
+			线程中选择一个执行，请求线程被阻塞到工作线程完成，但是差别是Nginx用C++实现，而Zuul用Java实现，而JVM本身会有第一次加载较
+			慢的情况，使得Zuul的性能相对较差
+			C. Spring Cloud Gateway建立在Spring 5，Project Reactor 和 Spring Boot2.0之上，使用费=非阻塞API
+			D. Spring Cloud Gateway还支持WebSocket，并且与Spring的紧密集成拥有更好的开发体验。
+		④ 三大核心概念
+			A. Route（路由）：构建网关的基本模块，它由ID，目标URI，一系列断言和过滤器组成，如果断言为true则匹配该路由
+			B. Predicate（断言）：参考Java8的java.util.function.Predicate，开发人员可以匹配HTTP请求中的所有内容（请求头或者请求参数），如果请求与断言相匹配则进行路由
+			C. Filter（过滤）：指的是Spring框架中GatewayFilter的实例，使用过滤器，可以在请求被路由前或者之后对请求进行修改。
+			D. 总体：web请求，通过一些匹配条件，定位到真正的服务节点，并在这个转发过程的前后，进行一些精细化控制，Predicate就是我们的匹配条件，而filter，就可以理解为一个无所
+			不能的拦截器，有了这两个元素，再加上目标URI，就可以实现一个具体的路由了
+	13. OpenFeign
+		① 核心概念
+			A. Feign是一个声明式WebService客户端，Spring Cloud对Feign进行了封装，使其支持了Spring MVC标准注解和HTTPMessageConverters。Feign可以与Eureka和Ribbon组合以支持负载均衡
+			B. 在Feign的实现下，我们只需要创建一个接口并使用注解的方式来配置它，即可完成对服务提供方的接口绑定
+		② Feign和OPenFeign两者的区别
+			A. Feign：Feign是Spring Cloud组件中的一个轻量级RESTful的Http服务客户端，Feign内置了Ribbon，用来做客户端负载均衡，去调用服务注册中心的服务。Feign的使用方式是：
+			使用Feign的直接定义接口，调用这个接口，就可以调用服务注册中心的服务
+			B. OpenFeign：OpenFeign是Spring Cloud在Feign的基础上支持了SpringMVC的注解，如@RequestMapping等。OpenFeign的@FeignClient可以解析SpringMVC的的@RequestMapping注解
+			下的接口，并通过动态代理的方式产生实现类
+	14. Seata
+		① 分布式事务处理过程的一ID+三组件模型
+			A. Transaction ID XID：全局唯一的事务ID
+			B. 三组件概念：
+				a. TC（Transaction Coordinator）：事务协调器，维护全局事务的运行状态，负责协调并驱动全局事务的提交或回滚
+				b. TM（Transaction Manager）：负责开启一个全局事务，并最终发起全局提交或全局回滚决议。
+				c. RM（Resource Manager）：控制分支事务，负责分支注册、状态汇报、并接受事务协调器的指令，驱动分支（本地）事务的提交和回滚
+			C. 处理过程
+				a. TM 向 TC申请开启一个全局事务，全局事务创建成功并生成一个全局唯一XID
+				b. XID 在微服务调用链路的上下文中传播
+				c. RM 向 TC 注册分支事务，将其纳入XID对应全局事务的管辖
+				d. TM 向 TC 发起针对XID的全局提交或者回滚决议
+				e. TC 调度XID下管辖的全部分支事务完成提交或回滚请求
+		② AT模式如何做到对业务的无侵入：
+			A. 一阶段加载：
+				a. 业务数据和回滚日志记录在同一个本地事务中提交，释放本地锁和连接资源。
+				b. 在一阶段，Seata会拦截“业务SQL”
+					(1) 解析SQL语句，找到“业务SQL”要更新的业务数据，在业务数据更新前，将其保存到“before image”
+					(2) 执行“业务SQL”更新业务数据，在业务数据更新之后，将其保存到“after image”，最后生成行锁
+					(3) 以上操作全部在一个数据库事务中完成，这样保证了一阶段操作的原子性
+			B. 二阶段提交
+				a. 二阶段如果是顺利提交的话，因为“业务SQL”在一阶段已经提交至数据库，所以Seata框架只需要将一阶段保存的快照数据和行锁删除，完成数据清理即可
+			C. 二阶段回滚
+				a. 二阶段如果是回滚的话，Seata就需要回滚一阶段已经执行的“业务SQL”，还原业务数据；
+				b. 回滚方式便是用“before image”还原业务数据，但在还原前要首先检验脏写，对比“数据库当前业务数据”和“after image”，如果两份数据完全一致就说明没有脏写，可以还原业务数据，
+				如果不一致就说明有脏写，出现脏写就需要转人工处理
+Maven
+	1. dependencyManagement：
+		① Maven使用dependencyManagement元素来统一管理依赖版本号的方式
+		② 通常会在一个组织或者项目的最顶层的f父POM中看到dependencyManagement元素
+		③ 使用pom.xml中的dependencyManagement元素能能让所有在子项目中引用一个依赖而不用显示列出版本号，Maven会沿着父子层次向上走，直到
+		找到一个拥有dependencyManagement元素的项目，然后就会使用这个dependencyManagement元素指定的版本号。
+		④ 这样做的好处是：如果有多个子项目都引用一样的依赖，则可以避免在每个子项目中都声明一个版本号，这样如果想升级或者切换到另一个版
+		本时，只需要在顶层父容器里更新，而不需要一个一个子项目的修改；另外如果某个子项目需要另外使用一个版本，只需要声明version即可
+		⑤ dependencyManagement里只是声明依赖，并不实现引入。因此子项目需要显示声明需要的依赖。
+		⑥ 如果不在子项目中声明依赖，是不会从父项目中继承下来的，只有在子项目中写了该依赖项，并且没有指定具体的版本，才会从父项目中继承
+		该项，并且version和scope都读取自父pom
+	2. 常用的命令
+		① mvn clean：清理
+		② mvn compile：编译主程序
+		③ mvn test-compile：编译测试程序
+		④ mvn test：执行测试
+		⑤ mvn package：执行打包
+		⑥ mav install: 安装
+		⑦ mvn site：生成站点
+	3. 生命周期
+		① Maven 有三套相互独立的生命周期，分别是：
+			A. Clean Lifecycle：在进行真正构建之前进行一些清理工作
+			B. Default Lifecycle：构建的核心部分，编译、测试、打包、安装、部署等等
+			C. Site Lifecycle：生成项目报告，站点，发布站点。
+		② Clean Liftcycle：Clean 生命周期一共包含了三个阶段
+			A. pre-clean：执行一些需要在clean 之前完成的工作
+			B. clean：移除所有上一次构建生成的文件
+			C. post-clean：执行一些需要在clean 之后立刻完成的工作
+		③ Site Lifecycle：
+			A. pre-site：执行一些需要在生成站点文档之前完成的工作
+			B. site：生成项目的站点文档
+			C. post-site：执行一些需要在生成站点文档之后完成的工作，并且为部署做准备
+			D. site-deploy：将生成的站点文档部署到特点的服务器上。
+			E. 这里经常用到的是 site 阶段和 site-deploy，用以生成个发布Maven站点，这可是Maven 相当强大的功能，Maven比较喜欢文档及统计数据自动生成
+		④ Default Lifecycle
+			A. compile：编译项目的源代码
+			B. test-compile：编译测试源代码
+			C. test：使用合适的单元测试框架运行测试，这些测试代码不会被打包或者部署
+			D. package：接受编译好的代码，打包成可以发布的格式，如JAR
+			E. install 将包安装值本地仓库，以让其他项目依赖
+			F. deploy：将最终的包复制到远程的仓库，以让其他开发人员与项目共享或者部署到服务器是上运行。

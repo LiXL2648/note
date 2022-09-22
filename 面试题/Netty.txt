@@ -1,0 +1,162 @@
+一、NIO
+	1. BIO、NIO 和 AIO 的区别？
+		① NIO 与原来的 IO 有同样的作用和目的，但是使用的方式完全不同
+		② BIO：一个连接一个线程，客户端有连接请求时服务器端就需要启动一个线程进行处理，线程开销大。
+		③ NIO：一个请求一个线程，但客户端发送的连接请求都会注册到多路复用器上，多路复用器轮询到连接有 I/O 请求时才启动一个线程进行处理。
+		④ AIO：一个有效请求一个线程，客户端的 I/O 请求都是由 OS 先完成了再通知服务器应用去启动线程进行处理
+		⑤ BIO 是面向流的，NIO 是面向缓冲区的，BIO 的各种流是阻塞的。而 NIO 是非阻塞的；BIO的 Stream 是单向的，而 NIO 的 channel 是双向的。
+	2. NIO 的组成
+		① Buffer
+			A. 主要用于与 NIO 通道进行交互，数据是从通道读入缓冲区，从缓冲区写入通道中的。
+			B. 缓冲区中的四大核心属性：
+				a. capacity：容量，表示缓冲区中最大存储数据的容量。一旦声明不能改变
+				b. limit：界限，表示缓冲区中可以操作数据的大小（limit 后面的数据不能进行读写）
+				c. position：位置，表示缓冲区中正在操作数据的位置。
+				d. mark：标记，表示记录当前 position 的位置（非核心）。
+				e. 0 <= mark <= position <= limit <= capacity
+			C. 缓冲区存取数据的API
+				a. static ByteBuffer allocate(int capacity)：创建非直接缓冲区
+				b. static ByteBuffer allocateDirect(int capacity)：创建直接缓冲区
+				c. put()：存入数据到缓冲区中（核心方法）
+				d. get()：获取缓冲区中的数据（核心方法）
+				e. filp()：切换读取数据模式
+				f. rewind()：可重复读取数据
+				g. clear()：清空缓冲区，重回些写状态，但是缓冲区中的数据依然存在，只是处于“被遗忘”状态
+				h. mark()：标记 position 的位置
+				i. reset()：恢复 position 到 mark 的位置
+			D. 直接缓冲区和非直接缓冲区：
+				a. 非直接缓冲区：通过 allocate() 方法分配非直接缓冲区，将缓冲区建立在 JVM 的内存中。
+				b. 直接缓冲区：通过 allocateDirect() 方法分配直接缓冲区，将缓存建立在 OS 的物理内存中。
+		② Channel
+			A. Channel 表示 IO 源与目标打开的连接,Channel 类似于传统的“流”。只不过 Channel 本身不能直接访问数据，只能与 Buffer 进行交互
+			B. Java 为 Channel 接口提供的最主要实现类如下：
+				a. FileChannel：用于读取、写入、映射和操作文件的通道
+				b. DatagramChannel：通过 UDP 读写网络中的数据通道
+				c. SocketChannel：通过 TCP 读写网络中的数据
+				d. ServerSocketChannel：可以监听新进来的 TCP 连接，对每一个进来的连接都会创建一个 SocketChannel
+				e. pipe：管道是两个线程之间的单项数据连接。Pipe 有一个 source 通道和一个 sink 通道。数据会被写到 sink 通道，从 source 通道读取
+		③ Selector
+			A. 基本介绍
+				a. Java 的 NIO，用非阻塞的 IO 方式。可以用一个线程，处理多个的客户端连接，就会使用到Selector(选择器)
+				b. Selector（选择器，也叫多路复用器），可以同时并发处理成百上千个客户端连接，Selector 能够检测多个注册的通道上是否有事件发生，
+				如果有事件发生，便获取事件然后针对每个事件进行相应的处理。
+				c. 当线程操作某客户端 Socket 通道时，若没数据可用，该线程可以进行其他任务。只有在 连接/通道 真正有读写事件发生时，才会进行读写
+				d. 由于读写操作都是非阻塞的，从根本上解决了传统同步阻塞 I/O 一连接一线程模型，这就可以充分提升 IO 线程的运行效率，避免由于频繁 I/O 
+				阻塞导致的线程挂起和多线程之间的上下文切换导致的开销
+			B. NIO 非阻塞网络编程原理
+				A. 当客户端连接时，会通过 ServerSocketChannel 得到 SocketChannel
+				B. Selector 进行监听 select 方法，返回有事件发生的通道个数
+				C. 将 SocketChannel 注册到 Selector 上，register(Selector sel, int ops)，一个 selector 上可以注册多个 SocketChannel
+				D. 注册成功后返回一个 SelectionKey，会和该 Selector 关联（集合）
+				E. 进一步得到各个 SelectionKey（有事件发生）
+				F. 在通过 SelectionKey 反向获取 SocketChannel，方法 channel()
+				G. 可以通过得到的 channel，完成业务处理
+	3. 零拷贝
+		① 零拷贝是从操作系统角度来说的，即是没有 CPU 拷贝，零拷贝不仅仅带来更少的数据复制，能带来其他的性能优势，例如更少的上下文切换，以及无 CPU 校验和计算
+		② 传统的 IO 需要经过三次状态切换，四次拷贝
+			A. 从硬盘通过直接内存映射（DMA Copy）到内核缓冲区
+			B. 从内核缓冲区需要通过 CPU 拷贝到用户缓冲区
+			C. 从内核缓冲区通过 CPU 拷贝到 Socket 缓冲区
+			D. 从 Socket 缓冲区直接内存映射（DMA Copy）到协议栈
+		③ 常用的零拷贝有 mmap(内存映射) 和 sendFile
+			A. mmap：经过三次状态切换，三次拷贝，该优化方式不是真正意义上得零拷贝
+				a. 通过直接内存映射（DMA Copy），将文件映射到内核缓冲区
+				b. 从内核缓冲区通过 CPU 拷贝到 Socket 缓冲区，同时，用户空间可以共享内核空间的数据
+				c. 从 Socket 缓冲区直接映射到协议栈
+			B. sendFile：避免了从内核缓冲区拷贝到 Socketbuffer 的操作，直接拷贝到协议栈，从而再一次减少了数据拷贝。 由于和用户态完全无关，就减少了一次上下文切换
+二、Netty
+	1. Netty 的特点
+		① 一个高性能、异步事件驱动的 NIO 框架，它提供了对 TCP、UDP 的支持，简化了 NIO 的处理方式。
+		② 提供多种编解码的支持，对 TCP 粘包/分包进行自动化处理
+		③ 可使用线程池，提高连接效率，对重连、心跳检测的简单支持
+		④ 可配置 IO 线程数、TCP 参数等，TCP 接收和发送缓冲区使用直接内存代替堆内存
+		⑤ 通过引用计数器及时申请释放不再引用的对象，降低了 GC 频率
+		⑥ 使用高效的 Reactor 线程模型，大量使用了 volitale、 CAS 和原子类、线程安全类、读写锁等
+	2. Netty 工作原理
+		① Netty 抽象出两组线程池 BossGroup专门负责接收客户端的连接，WorkGroup专门负责网络读写
+		② BossGroup和WorkGroup类型都是NioEventLoopGroup
+		③ NioEventLoopGroup相当于一个事件循环组，这个组中包含多个事件循环，每一个事件循环是NioEventLoop
+		④ NioEventLoop 表示一个不断循环的执行处理任务的线程，每个 NioEventLoop 都有一个 selector，用于监听绑定在其上的 socket 的网络通信
+		⑥ 每个 Boss NioEventLoop执行步骤有三步
+			a. 轮询 accept 事件
+			b. 处理 accept 事件，与 client 建立连接，生成 NioSocketChannel，并将其注册到某个 worker NioEventLoop 的 selector上
+			c. 处理任务队列的任务，即 runAllTasks
+		⑦ 每个 Worker NioEventLoop 循环执行的步骤
+			a. 轮询 read/write 事件
+			b. 处理 I/O 事件，即 read/write 事件，在对应NioSocketChannel 处理
+			c. 处理任务队列的任务，即 runAllTasks
+		⑧ 每个Worker NioEventLoop 处理业务时，会使用 pipeline（管道），pipeline 中包含了 channel，即通过 pipeline 可以获取对应的通道，管道中维护了
+		很多处理器
+	3. 异步模型
+		① 异步的概念和同步相对。当调用一个异步过程，调用者不能立刻得到结果。而是这个异步调用在完成后，通过状态、通知和回调来通知调用者。
+		② Netty 中的 I/O 操作是异步的，包括 Bind、Write、Connect 等操作会简单的返回一个 ChannelFuture。
+		③ 通过 Future-Listener 机制，用户可以方便的主动获取或者通过通知机制获得 IO 操作结果
+		④ Netty 的异步模型是建立在 future 和 callback 的之上的。Future 的核心思想是：假设一个方法 fun，计算过程可能非常耗
+		时，等待fun返回显然不合适。那么可以在调用fun的时候，立马返回一个 Future，后续可以通过Future去监控方法 fun的处理过程(即 ： Future-Listener 机制)
+	4. Netty 核心模块组件
+		① Bootstrap、ServerBootstrap：Bootstrap 意思是引导，一个 Netty 应用通常由一个 Bootstrap 开始，主要作用是配置整个 Netty 程序，串联各个组件，Netty 
+		中 Bootstrap 类是客户端程序的启动引导类，ServerBootstrap 是服务端启动引导类
+		② Future、ChannelFuture：Netty 中所有的 IO 操作都是异步的，不能立刻得知消息是否被正确处理。但是可以过一会等它执行完成或者直接注册一个监听，
+		当操作执行成功或失败时监听会自动触发注册的监听事件
+		③ Channel
+			A. Netty 网络通信的组件，能够用于执行网络 I/O 操作。
+			B. 通过 Channel 可获得当前网络连接的通道的状态和配置参数（例如接收缓冲区大小）
+			C. Channel 提供异步的网络 I/O 操作(如建立连接，读写，绑定端口)，调用立即返回一个 ChannelFuture 实例，通过注册监听器到 ChannelFuture 上，可以I/O 
+			操作成功、失败或取消时回调通知调用方
+			D. 不同协议、不同的阻塞类型的连接都有不同的 Channel 类型与之对应，常用的 Channel 类型:
+				a. NioSocketChannel，异步的客户端 TCP Socket 连接。
+				b. NioServerSocketChannel，异步的服务器端 TCP Socket 连接。
+				c. NioDatagramChannel，异步的 UDP 连接。
+				d. NioSctpChannel，异步的客户端 Sctp 连接。
+				e. NioSctpServerChannel，异步的 Sctp 服务器端连接，这些通道涵盖了 UDP 和 TCP 网络 IO 以及文件 IO。
+		④ Selector
+			A. Netty 基于 Selector 对象实现 I/O 多路复用，通过 Selector， 一个线程可以监听多个连接的 Channel 事件。
+			B. 当向一个 Selector 中注册 Channel 后，Selector 内部的机制就可以自动不断地查询(Select) 这些注册的 Channel 是否有已就绪的 I/O 事件（例如可读，可写，网络连接
+			完成等）
+		⑤ ChannelHandler 及其实现类
+			A. ChannelHandler 是一个接口，处理 I/O 事件或拦截 I/O 操作，并将其转发到其 ChannelPipeline(业务处理链)中的下一个处理程序。
+			B. 方便使用期间，可以继承它的子类
+				a. ChannelInboundHandler / ChannelInboundHandlerAdapter：用于处理入站 I/O 事件。
+				b. ChannelOutboundHandler / ChannelOutboundHandlerAdapter：用于处理出站 I/O 操作。
+		⑥ Pipeline 和 ChannelPipeline
+			A. ChannelPipeline 是一个 Handler 的集合，它负责处理和拦截 inbound 或者outbound 的事件和操作，相当于一个贯穿 Netty 的链。
+			B. ChannelPipeline 实现了一种高级形式的拦截过滤器模式，使用户可以完全控制事件的处理方式，以及 Channel 中各个的 ChannelHandler 如何相互交互
+			C. 在 Netty 中每个 Channel 都有且仅有一个 ChannelPipeline 与之对应
+		⑦ ChannelHandlerContext
+			A. 保存 Channel 相关的所有上下文信息，同时关联一个 ChannelHandler 对象
+			B. 即ChannelHandlerContext 中包含一个具体的事件处理器 ChannelHandler ，同时ChannelHandlerContext 中也绑定了对应的 pipeline 和 Channel 的信息，方便
+			对 ChannelHandler进行调用
+		⑧ ChannelOption
+			A. Netty 在创建 Channel 实例后,一般都需要设置 ChannelOption 参数。
+			B. ChannelOption 参数如下:
+				a. ChannelOption.SO_BACKLOG：对应 TCP/IP 协议 listen 函数中的 backlog 参数，用来初始化服务器可连接队列大小。服务端处理客户端连接请求是顺序处理的，
+				所以同一时间只能处理一个客户端连接。多个客户端来的时候，服务端将不能处理的客户端连接请求放在队列中等待处理，backlog 参数指定了队列的大小。
+				b. ChannelOption.SO_KEEPALIVE：一直保持连接活动状态
+		⑨ EventLoopGroup 和其实现类 NioEventLoopGroup
+			A. EventLoopGroup 是一组 EventLoop 的抽象，Netty 为了更好的利用多核 CPU 资源，一般会有多个 EventLoop 同时工作，每个 EventLoop 维护着一个 Selector 实例。
+			B. EventLoopGroup 提供 next 接口，可以从组里面按照一定规则获取其中一个EventLoop来处理任务。在 Netty 服务器端编程中，我们一般都需要提供两个EventLoopGroup，
+			例如：BossEventLoopGroup 和 WorkerEventLoopGroup。
+			C. 通常一个服务端口即一个 ServerSocketChannel对应一个Selector 和一个EventLoop线程。BossEventLoop 负责接收客户端的连接并将 SocketChannel 交给WorkerEventLoopGroup 
+			来进行 IO 处理
+		⑩ Unpooled 类：Netty 提供一个专门用来操作缓冲区(即Netty的数据容器)的工具类
+		⑩ Netty心跳检测机制
+			A. 加入 Netty 提供的一个 IdleStateHandler 空闲状态处理器
+			B. readerIdleTime：表示多长时间没有读操作，就会发送心跳检测包，检测是否仍是连接状态
+			C. writerIdleTime：表示多长时间没有写操作，也会发送心跳检测包，检测是否仍是连接状态
+			D. allIdleTime：表示多长时间没有读写操作，也会发送心跳检测包，检测是否仍是连接状态
+			E. 当IdleStateHandler 一旦被触发后，就会传递给管道的下一个handler去处理，通过回调触发下一个 Handler 的 userEventTiggered，
+			在该方法中处理 IdleStateEvent（读空闲、写空闲和读写空闲）
+	5. TCP 粘包和拆包及解决方案
+		① TCP 粘包和拆包基本介绍
+			A. TCP是面向连接的，面向流的。收发两端（客户端和服务器端）都要有一一成对的socket，因此，发送端为了将多个发给接收端的包，
+			更有效的发给对方，使用了优化方法（Nagle算法），将多次间隔较小且数据量小的数据，合并成一个大的数据块，然后进行封包。这样做虽然提高了效率，
+			但是接收端就难于分辨出完整的数据包了，因为面向流的通信是无消息保护边界的
+			B. 由于TCP无消息保护边界, 需要在接收端处理消息边界问题，也就是我们所说的粘包、拆包问题。
+			C. 假设客户端分别发送了两个数据包D1和D2给服务端，由于服务端一次读取到字节数是不确定的，故可能存在以下四种情况：
+				a. 服务端分两次读取到了两个独立的数据包，分别是D1和D2，没有粘包和拆包
+				b. 服务端一次接受到了两个数据包，D1和D2粘合在一起，称之为TCP粘包
+				c. 服务端分两次读取到了数据包，第一次读取到了完整的D1包和D2包的部分内容，第二次读取到了D2包的剩余内容，这称之为TCP拆包
+				d. 服务端分两次读取到了数据包，第一次读取到了D1包的部分内容D1_1，第二次读取到了D1包的剩余部分内容D1_2和完整的D2包。
+		② TCP 粘包和拆包解决方案
+			A. 使用自定义协议 + 编解码器 来解决
+			B. 关键就是要解决 服务器端每次读取数据长度的问题，从而避免的TCP 粘包、拆包。
