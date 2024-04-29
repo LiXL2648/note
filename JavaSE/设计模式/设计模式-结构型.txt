@@ -1,0 +1,1939 @@
+八、适配器模式
+	1. 适配器模式基本介绍
+		① 适配器模式(Adapter Pattern)将某个类的接口转换成客户端期望的另一个接口，目的是兼容性，让原本因接口不匹配不能一起工作的两个类可以协同
+		工作。其别名为包装器(Wrapper)
+		② 适配器模式属于结构型模式
+		③ 主要分为三类：类适配器模式、对象适配器模式、接口适配器模式
+	2. 适配器模式工作原理
+		① 适配器模式：将一个类的接口转换成另一种接口.让原本接口不兼容的类可以兼容
+		② 从用户的角度看不到被适配者，是解耦的
+		③ 用户调用适配器转化出来的目标接口方法，适配器再调用被适配者的相关接口方法
+		④ 用户收到反馈结果，感觉只是和目标接口交互，如图
+			+-----------------------+			+--------------+			+-----------------------------+
+			| 		   目标			| <-------- | 	 适配器	   | <--------- | 被适配者					  |
+			| 最终需要的输出 dst	|			| 称为 Adapter |			| 需要被适配的类 、接口、对象 |
+			| destination 既 target |			+--------------+			| 简称 src（source）		  |
+			+-----------------------+										+-----------------------------+
+	3. 类适配器模式
+		① 类适配器模式介绍：Adapter类，通过继承 src类，实现 dst 类接口，完成src->dst的适配
+		② 类适配器模式应用实例
+			A. 让方钉适配圆孔
+			B. 适配器假扮成一个圆钉（Round­Peg），其半径等于方钉（Square­Peg）横截面对角线的一半（即能够容纳方钉的最小外接圆的半径）。
+			C. UML 类图
+				+---------------------------------------+			+---------------------+		+-------------------------------------+
+				| 				C RoundHole				| --------> | 	  I RoundPeg	  |		| 			  C SquarePeg			  |
+				+---------------------------------------+			+---------------------+		+-------------------------------------+
+				| radius: double						|			| getRadius(): double |		| width: double						  |
+				+---------------------------------------+			+---------------------+		+-------------------------------------+
+				| RoundHole(radius: double): RoundHole	|						△				| SquarePeg(width: double): SquarePeg |
+				| fits(peg: RoundPeg): boolean			|						.				| getWidth(): double				  |
+				+---------------------------------------+						.				+-------------------------------------+
+																				.									△
+																				.									|
+																				+.................+-----------------+
+																								  |
+																			+---------------------------------------------------+
+																			| 					C SquarePegAdapter				|
+																			+---------------------------------------------------+
+																			| SquarePegAdapter(width: double): SquarePegAdapter |
+																			| getRadius(): double								|
+																			+---------------------------------------------------+
+			D. 代码实现
+				/**
+				 * 圆钉
+				 */
+				public interface RoundPeg {
+
+					double getRadius();
+				}
+
+				/**
+				 * 方钉
+				 */
+				public class SquarePeg {
+
+					private final double width;
+
+					public SquarePeg(double width) {
+						this.width = width;
+					}
+
+					public double getWidth() {
+						return width;
+					}
+				}
+
+				public class SquarePegAdapter extends SquarePeg implements RoundPeg {
+
+					public SquarePegAdapter(double width) {
+						super(width);
+					}
+
+					@Override
+					public double getRadius() {
+						return (Math.sqrt(Math.pow((getWidth() / 2), 2) * 2));
+					}
+				}
+
+				/**
+				 * 圆孔
+				 */
+				public class RoundHole {
+
+					private final double radius;
+
+					public RoundHole(double radius) {
+						this.radius = radius;
+					}
+
+					public boolean fits(RoundPeg peg) {
+						return this.radius >= peg.getRadius();
+					}
+				}
+
+				public class Client {
+
+					public static void main(String[] args) {
+						RoundHole hole = new RoundHole(5);
+
+						SquarePegAdapter smallSqPegAdapter = new SquarePegAdapter(2);
+						SquarePegAdapter largeSqPegAdapter = new SquarePegAdapter(20);
+						if (hole.fits(smallSqPegAdapter)) {
+							System.out.println("Square peg w2 fits round hole r5.");
+						}
+						if (!hole.fits(largeSqPegAdapter)) {
+							System.out.println("Square peg w20 does not fit into round hole r5.");
+						}
+					}
+				}
+		③ 类适配器模式注意事项和细节
+			A. Java是单继承机制，所以类适配器需要继承src类这一点算是一个缺点, 因为这要求dst必须是接口，有一定局限性;
+			B. src类的方法在Adapter中都会暴露出来，也增加了使用的成本。
+			C. 由于其继承了src类，所以它可以根据需求重写src类的方法，使得Adapter的灵活性增强了。
+	4. 对象适配器模式
+		① 对象适配器模式介绍
+			A. 基本思路和类的适配器模式相同，只是将Adapter类作修改，不是继承src类，而是持有src类的实例，以解决兼容性的问题。 即：持有 src类，
+			实现 dst 类接口，完成src->dst的适配
+			B. 根据“合成复用原则”，在系统中尽量使用关联关系来替代继承关系。
+			C. 对象适配器模式是适配器模式常用的一种
+		② 对象适配器模式应用实例
+			A. 让方钉适配圆孔
+			B. 适配器假扮成一个圆钉（Round­Peg），其半径等于方钉（Square­Peg）横截面对角线的一半（即能够容纳方钉的最小外接圆的半径）。
+			C. UML 类图
+				+---------------------------------------+			+---------------------+		+-------------------------------------+
+				| 				C RoundHole				| --------> | 	  C RoundPeg	  |		| 			  C SquarePeg			  |
+				+---------------------------------------+			+---------------------+		+-------------------------------------+
+				| radius: double						|			| radius: double	  |		| width: double						  |
+				+---------------------------------------+			+---------------------+		+-------------------------------------+
+				| RoundHole(radius: double): RoundHole	|			| RoundPeg(): RoundPeg|		| SquarePeg(width: double): SquarePeg |
+				| fits(peg: RoundPeg): boolean			|			| getRadius(): double |		| getWidth(): double				  |
+				+---------------------------------------+			+---------------------+		+-------------------------------------+
+																				△									|
+																				|									|
+																				|									△
+																				|				  					▽
+																			+---------------------------------------------------+
+																			| 					C SquarePegAdapter				|
+																			+---------------------------------------------------+
+																			| SquarePegAdapter(width: double): SquarePegAdapter |
+																			| getRadius(): double								|
+																			+---------------------------------------------------+
+			D. 代码实现
+				/**
+				 * 圆钉
+				 */
+				public class RoundPeg {
+					private double radius;
+
+					public RoundPeg() {}
+
+					public RoundPeg(double radius) {
+						this.radius = radius;
+					}
+
+					public double getRadius() {
+						return radius;
+					}
+				}
+				
+				/**
+				 * 方钉
+				 */
+				public class SquarePeg {
+
+					private final double width;
+
+					public SquarePeg(double width) {
+						this.width = width;
+					}
+
+					public double getWidth() {
+						return width;
+					}
+				}
+
+				public class SquarePegAdapter extends RoundPeg {
+
+					private final SquarePeg peg;
+
+					public SquarePegAdapter(SquarePeg peg) {
+						this.peg = peg;
+					}
+
+					@Override
+					public double getRadius() {
+						return (Math.sqrt(Math.pow((peg.getWidth() / 2), 2) * 2));
+					}
+				}
+
+				/**
+				 * 圆孔
+				 */
+				public class RoundHole {
+
+					private final double radius;
+
+					public RoundHole(double radius) {
+						this.radius = radius;
+					}
+
+					public boolean fits(RoundPeg peg) {
+						return this.radius >= peg.getRadius();
+					}
+				}
+
+				public class Client {
+
+					public static void main(String[] args) {
+						RoundHole hole = new RoundHole(5);
+
+						SquarePeg smallSqPeg = new SquarePeg(2);
+						SquarePeg largeSqPeg = new SquarePeg(20);
+
+						SquarePegAdapter smallSqPegAdapter = new SquarePegAdapter(smallSqPeg);
+						SquarePegAdapter largeSqPegAdapter = new SquarePegAdapter(largeSqPeg);
+
+						if (hole.fits(smallSqPegAdapter)) {
+							System.out.println("Square peg w2 fits round hole r5.");
+						}
+						if (!hole.fits(largeSqPegAdapter)) {
+							System.out.println("Square peg w20 does not fit into round hole r5.");
+						}
+					}
+				}
+		③ 对象适配器模式注意事项和细节
+			A. 对象适配器和类适配器其实算是同一种思想，只不过实现方式不同。根据合成复用原则，使用组合替代继承， 所以它解决了类适配器必
+			须继承src的局限性问题，也不再要求dst必须是接口。
+			B. 使用成本更低，更灵活。
+	5. 接口适配器模式介绍
+		① 接口适配器模式介绍
+			A. 一些书籍称为：适配器模式(Default Adapter Pattern)或缺省适配器模式。
+			B. 当不需要全部实现接口提供的方法时，可先设计一个抽象类实现接口，并为该接口中每个方法提供一个默认实现（空方法），那么该抽象类的子
+			类可有选择地覆盖父类的某些方法来实现需求
+			C.  适用于一个接口不想使用其所有的方法的情况。
+		② 接口适配器模式应用实例
+			A. Android中的属性动画ValueAnimator类可以通过addListener(AnimatorListener listener)方法添加监听器， 那么常规写法如下：
+				ValueAnimator valueAnimator = ValueAnimator.ofInt(0,100);
+				valueAnimator.addListener(new Animator.AnimatorListener() {
+					@Override
+					public void onAnimationStart(Animator animation) {
+					}
+					@Override
+					public void onAnimationEnd(Animator animation) {
+					}
+					@Override
+					public void onAnimationCancel(Animator animation) {
+					}
+					@Override
+					public void onAnimationRepeat(Animator animation) {
+					}
+				});
+				valueAnimator.start();
+			B. 有时候我们不想实现Animator.AnimatorListener接口的全部方法，我们只想监听onAnimationStart，我们会如下写
+				ValueAnimator valueAnimator = ValueAnimator.ofInt(0,100);
+				valueAnimator.addListener(new AnimatorListenerAdapter() {
+					@Override
+					public void onAnimationStart(Animator animation) {
+						//xxxx具体实现
+					}
+				});
+				valueAnimator.start();
+			C. AnimatorListenerAdapter类，就是一个接口适配器，代码如下图：它空实现了Animator.AnimatorListener类(src)的所有方法.
+				public abstract class AnimatorListenerAdapter implements Animator.AnimatorListener
+				Animator.AnimatorPauseListener {
+					@Override //默认实现
+					public void onAnimationCancel(Animator animation) {
+					}
+					@Override
+					public void onAnimationEnd(Animator animation) {
+					}
+					@Override
+					public void onAnimationRepeat(Animator animation) {
+					}
+					@Override
+					public void onAnimationStart(Animator animation) {
+					}
+					@Override
+					public void onAnimationPause(Animator animation) {
+					}
+					@Override
+					public void onAnimationResume(Animator animation) {
+					}
+				}
+
+			D. AnimatorListener是一个接口
+				public static interface AnimatorListener {
+					void onAnimationStart(Animator animation);
+					void onAnimationEnd(Animator animation);
+					void onAnimationCancel(Animator animation);
+					void onAnimationRepeat(Animator animation);
+				}
+			E. 程序里的匿名内部类就是Listener 具体实现类
+				new AnimatorListenerAdapter() {
+					@Override
+					public void onAnimationStart(Animator animation) {
+						//xxxx具体实现
+					}
+				}
+
+	6. 适配器模式在SpringMVC框架应用的源码分析、
+		① SpringMvc中的HandlerAdapter, 就使用了适配器模式
+		② SpringMVC处理请求的流程
+		③ 使用HandlerAdapter 的原因分析：处理器的类型不同，有多重实现方式，那么调用方式就不是确定的，如果需要直接调用Controller方法，需要调用
+		的时候就得不断是使用if else来进行判断是哪一种子类然后执行。那么如果后面要扩展Controller，就得修改原来的代码，这样违背了OCP原则。
+		④ 代码分析
+			A. 通过HandlerMapping来映射Controller
+				public class DispatcherServlet extends FrameworkServlet {
+					// ...
+					protected void doDispatch(HttpServletRequest request, HttpServletResponse response) throws Exception {
+						// ...
+						// 通过HandlerMapping来映射Controller
+						mappedHandler = this.getHandler(processedRequest);
+						// ...
+						// 获取适配器
+						HandlerAdapter ha = this.getHandlerAdapter(mappedHandler.getHandler());
+						// ...
+						// 通过适配器调用controller的方法并返回ModelAndView
+						mv = ha.handle(processedRequest, response, mappedHandler.getHandler());
+					}
+				}
+			B. Spring创建了一个适配器接口（HandlerAdapter）
+				public interface HandlerAdapter {
+					boolean supports(Object handler);
+
+					@Nullable
+					ModelAndView handle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception;
+
+					/** @deprecated */
+					@Deprecated
+					long getLastModified(HttpServletRequest request, Object handler);
+				}
+			C. HandlerAdapter 的实现子类使得每一种Controller有一种对应的适配器
+				HandlerAdapter
+					AbstractHandlerMethodAdapter
+						RequestMappingHandlerAdapter
+					HttpRequestHandlerAdapter
+					SimpleControllerHandlerAdapter
+					SimpleServletHandlerAdapter
+			D. DispatcherServlet 的 getHandlerAdapter方法根据需要返回适当的 HandlerAdapter
+				protected HandlerAdapter getHandlerAdapter(Object handler) throws ServletException {
+					if (this.handlerAdapters != null) {
+						Iterator var2 = this.handlerAdapters.iterator();
+
+						while(var2.hasNext()) {
+							HandlerAdapter adapter = (HandlerAdapter)var2.next();
+							if (adapter.supports(handler)) {
+								return adapter;
+							}
+						}
+					}
+
+					throw new ServletException("No adapter for handler [" + handler + "]: The DispatcherServlet configuration needs to include 
+					a HandlerAdapter that supports this handler");
+				}
+		⑤ 手写SpringMVC通过适配器设计模式获取到对应的Controller的源码
+			A. 说明
+				a. Spring定义了一个适配接口，使得每一种Controller有一种对应的适配器实现类
+				b. 适配器代替controller执行相应的方法
+				c. 扩展Controller 时，只需要增加一个适配器类就完成了SpringMVC的扩展了
+			B. 代码实现
+				public interface HandlerAdapter {
+
+					boolean supports(Object handler);
+
+					void handle(Object handler);
+				}
+
+				class HttpHandlerAdapter implements HandlerAdapter {
+
+					@Override
+					public boolean supports(Object handler) {
+						return handler instanceof HttpController;
+					}
+
+					@Override
+					public void handle(Object handler) {
+						((HttpController) handler).doHttpHandler();
+					}
+				}
+
+				class SimpleHandlerAdapter implements HandlerAdapter {
+
+					@Override
+					public boolean supports(Object handler) {
+						return handler instanceof SimpleController;
+					}
+
+					@Override
+					public void handle(Object handler) {
+						((SimpleController) handler).doSimpleHandler();
+					}
+				}
+
+				class AnnotationHandlerAdapter implements HandlerAdapter {
+
+					@Override
+					public boolean supports(Object handler) {
+						return handler instanceof AnnotationController;
+					}
+
+					@Override
+					public void handle(Object handler) {
+						((AnnotationController) handler).doAnnotationHandler();
+					}
+				}
+
+				public interface Controller {
+				}
+
+				class HttpController implements Controller {
+
+					public void doHttpHandler() {
+						System.out.println("http...");
+					}
+				}
+
+				class SimpleController implements Controller {
+
+					public void doSimpleHandler() {
+						System.out.println("simple...");
+					}
+				}
+
+				class AnnotationController implements Controller {
+
+					public void doAnnotationHandler() {
+						System.out.println("annotation...");
+					}
+				}
+				
+				public class DispatchServlet {
+
+					private List<HandlerAdapter> handlerAdapters = new ArrayList<>();
+					public DispatchServlet() {
+						this.handlerAdapters.add(new HttpHandlerAdapter());
+						this.handlerAdapters.add(new SimpleHandlerAdapter());
+						this.handlerAdapters.add(new AnnotationHandlerAdapter());
+					}
+
+					public void doDispatch() {
+						HttpController httpController = new HttpController();
+						HandlerAdapter handler = getHandler(httpController);
+						handler.handle(httpController);
+					}
+
+					public HandlerAdapter getHandler(Controller controller) {
+						for (HandlerAdapter handlerAdapter : this.handlerAdapters) {
+							if (handlerAdapter.supports(controller)) {
+								return handlerAdapter;
+							}
+						}
+
+						return null;
+					}
+
+					public static void main(String[] args) {
+						DispatchServlet dispatchServlet = new DispatchServlet();
+						dispatchServlet.doDispatch();
+					}
+				}
+	7. 适配器模式的注意事项和细节
+		① 三种命名方式，是根据 src是以怎样的形式给到Adapter（在Adapter里的形式）来命名的。
+			A. 类适配器：以类给到，在Adapter里，就是将src当做类，继承
+			B. 对象适配器：以对象给到，在Adapter里，将src作为一个对象，持有
+			C. 接口适配器：以接口给到，在Adapter里，将src作为一个接口，实现
+		② Adapter模式最大的作用还是将原本不兼容的接口融合在一起工作
+		③ 实际开发中，实现起来不拘泥于三种经典形式
+九、桥接模式
+	1. 手机操作问题
+		① 现在对不同手机类型的不同品牌实现操作编程(比如:开机、关机、上网，打电话等)，如图:
+													  +------+
+											   +----> | 华为 |
+											   |	  +------+
+								+--------+	   |	  +------+
+						 +----> | 折叠式 | ----+----> | 小米 |
+						 |		+--------+	   |	  +------+
+						 |					   |	  +------+
+						 |					   +----> | VIVO |
+						 |							  +------+
+						 |							  +------+
+						 |					   +----> | 华为 |
+						 |					   |	  +------+
+			+------+	 |		+--------+	   |	  +------+
+			| 手机 | ----+----> | 直立式 | ----+----> | 小米 |
+			+------+	 |		+--------+	   |	  +------+
+						 |		+--------+	   |	  +------+
+						 +----> | 直立式 |	   +----> | VIVO |
+								+--------+			  +------+
+		② 传统方案解决手机使用问题(类图)
+								+--------------+
+								|	 C Phone   |
+								+--------------+
+								| call(): void |
+								+--------------+
+									   △
+									   |
+					+------------------+--------------------+
+					|				   |					|
+			+--------------+	+--------------+	+--------------+
+			|   C Folded   |	|   C UpRight  |	|    C Silde   |
+			+--------------+	+--------------+	+--------------+
+			| call(): void |	| call(): void |	| call(): void |
+			+--------------+	+--------------+	+--------------+
+									   △
+									   |
+					+------------------+--------------------+
+					|				   |					|
+			+--------------+	+--------------+	+--------------+
+			|   C HuaWei   |	|     C VIVO   |	|   C XiaoMi   |
+			+--------------+	+--------------+	+--------------+
+			| call(): void |	| call(): void |	| call(): void |
+			+--------------+	+--------------+	+--------------+
+		③ 传统方案解决手机操作问题分析
+			A. 扩展性问题(类爆炸)，如果我们再增加手机的样式(旋转式)，就需要增加各个品牌手机的类，同样如果我们增加一个手机品牌，也要在各个手
+			机样式类下增加。
+			B. 违反了单一职责原则，当我们增加手机样式时，要同时增加所有品牌的手机，这样增加了代码维护成本
+			C. 解决方案-使用桥接模
+	2. 桥接模式(Bridge)
+		① 基本介绍
+			A. 桥接模式(Bridge模式)是指：将实现与抽象放在两个不同的类层次中，使两个层次可以独立改变。
+			B. 是一种结构型设计模式
+			C. Bridge模式基于类的最小设计原则，通过使用封装、聚合及继承等行为让不同的类承担不同的职责。它的主要特点是把抽象(Abstraction)与行
+			为实现(Implementation)分离开来，从而可以保持各部分的独立性以及应对他们的功能扩展
+		② 原理类图
+			+----------+		+---------------------------------------+						+-----------------------+
+			| C Client | -----> | 			  C Abstraction 			| ◁▷------------------> | 	  I Implementor		|
+			+----------+		+---------------------------------------+						+-----------------------+
+								| pImpl: Implementor					|						| operationImpl(): void |
+								+---------------------------------------+						+-----------------------+
+								| Abstraction(pImpl: Implementor): void |									△
+								| operation(): void						|									.
+								+---------------------------------------+									.
+													△										+...............+...............+
+													|										.								.
+													|						          		.								.
+							+----------------------------------------------+	+------------------------+		+------------------------+
+							| 			C RefinedAbstraction			   | 	| C ConcreteImplementorA |		| C ConcreteImplementorB |
+							+----------------------------------------------+	+------------------------+		+------------------------+
+							| RefinedAbstraction(pImpl: Implementor): void | 	| operationImpl(): void  |		| operationImpl(): void  |
+							| operation(): void							   |	+------------------------+		+------------------------+
+							+----------------------------------------------+
+			A. 原理类图说明
+				a. Client类：桥接模式的调用者
+				b. 抽象类(Abstraction) :维护了 Implementor / 即它的实现类ConcreteImplementorA.., 二者是聚合关系, Abstraction 充当桥接类
+				c. RefinedAbstraction：是Abstraction抽象类的子类
+				d. Implementor：行为实现类的接口
+				e. ConcreteImplementorA/B：行为的具体实现类
+				f. 从 UML图：这里的抽象类和接口是聚合关系，其实是调用和被调用关系
+	3. 桥接模式解决遥控器和设备问题
+		① 应用实例说明
+			A. 本例展示了远程控制器及其所控制的设备的类之间的分离
+			B. 远程控制器是抽象部分， 设备则是其实现部分。 由于有通用的接口， 同一远程控制器可与不同的设备合作， 反过来也一样
+			C. 桥接模式允许在不改动另一层次代码的前提下修改已有类， 甚至创建新类
+		② 具体实现
+			A. UML 类图
+				+---------------------------------------+								+--------------------------------+
+				| 				C Remote				| ◁▷--------------------------- | 			I Device 			 |
+				+---------------------------------------+								+--------------------------------+
+				| device: Device						|								| isEnabled(): boolean			 |
+				+---------------------------------------+								| enable(): void				 |
+				| Remote(device: Device): void			|								| disable(): void				 |
+				| power(): void							|								| getVolume(): int				 |
+				| volumeDown(): void					|								| setVolume(percent: int): void	 |
+				| volumeUp(): void						|								| getChannel(): int				 |
+				| channelDown(): void					|								| setChannel(channel: int): void |
+				| channelUp(): void						|								| printStatus(): void			 |
+				+---------------------------------------+								+--------------------------------+
+									△																	△
+									|																	.
+									|											+.......................+.......................+
+									|											.												.
+				+---------------------------------------+		+--------------------------------+				+--------------------------------+
+				| 			C BasicRemote				|		| 			  C Radio			 |				| 				C Tv			 |
+				+---------------------------------------+		+--------------------------------+				+--------------------------------+
+				| BasicRemote(device: Device): void		|		| on: boolean					 |				| on: boolean					 |
+				+---------------------------------------+		| volume: int					 |				| volume: int					 |
+				| Remote(device: Device): void			|		| channel: int					 |				| channel: int					 |
+				| power(): void							|		+--------------------------------+				+--------------------------------+
+				| volumeDown(): void					|		| isEnabled(): boolean			 |				| isEnabled(): boolean			 |
+				| volumeUp(): void						|		| enable(): void				 |				| enable(): void				 |
+				| channelDown(): void					|		| disable(): void				 |				| disable(): void				 |
+				| channelUp(): void						|		| getVolume(): int				 |				| getVolume(): int				 |
+				+---------------------------------------+		| setVolume(percent: int): void	 |				| setVolume(percent: int): void	 |
+									△							| getChannel(): int				 |				| getChannel(): int				 |
+									|							| setChannel(channel: int): void |				| setChannel(channel: int): void |
+				+---------------------------------------+		| printStatus(): void			 |				| printStatus(): void			 |	
+				| 			C AdvancedRemote			|		+--------------------------------+				+--------------------------------+
+				+---------------------------------------+
+				| AdvancedRemote(device: Device): void	|
+				| mute(): void							|
+				+---------------------------------------+
+			B. 代码实现
+				a. devices
+					/**
+					 * @author LiXL
+					 * @date 2024/2/2
+					 * 设备
+					 */
+					public interface Device {
+
+						boolean isEnabled();
+
+						void enable();
+
+						void disable();
+
+						int getVolume();
+
+						void setVolume(int percent);
+
+						int getChannel();
+
+						void setChannel(int channel);
+
+						void printStatus();
+					}
+
+					/**
+					 * @author LiXL
+					 * @date 2024/2/2
+					 * 收音机
+					 */
+					public class Radio implements Device {
+
+						// 启动
+						private boolean on = false;
+
+						// 音量
+						private int volume = 30;
+
+						// 频道
+						private int channel = 1;
+
+						@Override
+						public boolean isEnabled() {
+							return on;
+						}
+
+						@Override
+						public void enable() {
+							on = true;
+						}
+
+						@Override
+						public void disable() {
+							on = false;
+						}
+
+						@Override
+						public int getVolume() {
+							return volume;
+						}
+
+						@Override
+						public void setVolume(int volume) {
+							if (volume > 100) {
+								this.volume = 100;
+							} else if (volume < 0) {
+								this.volume = 0;
+							} else {
+								this.volume = volume;
+							}
+						}
+
+						@Override
+						public int getChannel() {
+							return channel;
+						}
+
+						@Override
+						public void setChannel(int channel) {
+							this.channel = channel;
+						}
+
+						@Override
+						public void printStatus() {
+							System.out.println("------------------------------------");
+							System.out.println("| I'm radio.");
+							System.out.println("| I'm " + (on ? "enabled" : "disabled"));
+							System.out.println("| Current volume is " + volume + "%");
+							System.out.println("| Current channel is " + channel);
+							System.out.println("------------------------------------\n");
+						}
+					}
+
+					/**
+					 * @author LiXL
+					 * @date 2024/2/2
+					 * 电视机
+					 */
+					public class Tv implements Device {
+						private boolean on = false;
+						private int volume = 30;
+						private int channel = 1;
+
+						@Override
+						public boolean isEnabled() {
+							return on;
+						}
+
+						@Override
+						public void enable() {
+							on = true;
+						}
+
+						@Override
+						public void disable() {
+							on = false;
+						}
+
+						@Override
+						public int getVolume() {
+							return volume;
+						}
+
+						@Override
+						public void setVolume(int volume) {
+							if (volume > 100) {
+								this.volume = 100;
+							} else if (volume < 0) {
+								this.volume = 0;
+							} else {
+								this.volume = volume;
+							}
+						}
+
+						@Override
+						public int getChannel() {
+							return channel;
+						}
+
+						@Override
+						public void setChannel(int channel) {
+							this.channel = channel;
+						}
+
+						@Override
+						public void printStatus() {
+							System.out.println("------------------------------------");
+							System.out.println("| I'm TV set.");
+							System.out.println("| I'm " + (on ? "enabled" : "disabled"));
+							System.out.println("| Current volume is " + volume + "%");
+							System.out.println("| Current channel is " + channel);
+							System.out.println("------------------------------------\n");
+						}
+					}
+				b. remotes
+					/**
+					 * @author LiXL
+					 * @date 2024/2/2
+					 * 所有远程控制器的通用接口
+					 */
+					public abstract class Remote {
+
+						protected Device device;
+
+						public Remote(Device device) {
+							this.device = device;
+						}
+
+						public abstract void power();
+
+						public abstract void volumeDown();
+
+						public abstract void volumeUp();
+
+						public abstract void channelDown();
+
+						public abstract void channelUp();
+					}
+
+					/**
+					 * @author LiXL
+					 * @date 2024/2/2
+					 * 基础远程控制器
+					 */
+					public class BasicRemote extends Remote {
+
+						public BasicRemote(Device device) {
+							super(device);
+						}
+
+						@Override
+						public void power() {
+							System.out.println("Remote: power toggle");
+							if (device.isEnabled()) {
+								device.disable();
+							} else {
+								device.enable();
+							}
+						}
+
+						@Override
+						public void volumeDown() {
+							System.out.println("Remote: volume down");
+							device.setVolume(device.getVolume() - 10);
+						}
+
+						@Override
+						public void volumeUp() {
+							System.out.println("Remote: volume up");
+							device.setVolume(device.getVolume() + 10);
+						}
+
+						@Override
+						public void channelDown() {
+							System.out.println("Remote: channel down");
+							device.setChannel(device.getChannel() - 1);
+						}
+
+						@Override
+						public void channelUp() {
+							System.out.println("Remote: channel up");
+							device.setChannel(device.getChannel() + 1);
+						}
+					}
+
+					/**
+					 * @author LiXL
+					 * @date 2024/2/2
+					 * 高级远程控制器
+					 */
+					public class AdvancedRemote extends BasicRemote {
+
+						public AdvancedRemote(Device device) {
+							super(device);
+						}
+
+						public void mute() {
+							System.out.println("Remote: mute");
+							device.setVolume(0);
+						}
+					}
+				c. client
+					public class Demo {
+
+						public static void main(String[] args) {
+							testDevice(new Tv());
+							testDevice(new Radio());
+						}
+
+						public static void testDevice(Device device) {
+							System.out.println("Tests with basic remote.");
+							BasicRemote basicRemote = new BasicRemote(device);
+							basicRemote.power();
+							device.printStatus();
+
+							System.out.println("Tests with advanced remote.");
+							AdvancedRemote advancedRemote = new AdvancedRemote(device);
+							advancedRemote.power();
+							advancedRemote.mute();
+							device.printStatus();
+						}
+					}
+	4. 桥接模式在JDBC的源码剖析
+		① Jdbc 的 Driver接口，如果从桥接模式来看，Driver就是一个接口，下面可以有MySQL的Driver，Oracle的Driver，这些就可以当做实现接口类
+		② 代码分析+Debug源码
+			A. 源码
+				public class Driver extends NonRegisteringDriver implements java.sql.Driver {
+					public Driver() throws SQLException {
+					}
+
+					static {
+						try {
+							DriverManager.registerDriver(new Driver());
+						} catch (SQLException var1) {
+							throw new RuntimeException("Can't register driver!");
+						}
+					}
+				}
+			B. MySQL有自己的ConnectionImpl类，同样Oracle也有对应的实现类
+			C. Driver和Connection之间是通过DriverManager类进行桥连接的
+	5. 桥接模式的注意事项和细节
+		① 实现了抽象和实现部分的分离，从而极大的提供了系统的灵活性，让抽象部分和实现部分独立开来，这有助于系统进行分层设计，从而产生更好的结
+		构化系统。
+		② 对于系统的高层部分，只需要知道抽象部分和实现部分的接口就可以了，其它的部分由具体业务来完成。
+		③ 桥接模式替代多层继承方案，可以减少子类的个数，降低系统的管理和维护成本。
+		④ 桥接模式的引入增加了系统的理解和设计难度，由于聚合关联关系建立在抽象层，要求开发者针对抽象进行设计和编程
+		⑤ 桥接模式要求正确识别出系统中两个独立变化的维度，因此其使用范围有一定的局限性，即需要有这样的应用场景
+	6. 桥接模式其它应用场景
+		① 对于那些不希望使用继承或因为多层次继承导致系统类的个数急剧增加的系统，桥接模式尤为适用
+		② 常见的应用场景
+			A. JDBC驱动程序
+			B. 银行转账系统
+				a. 转账分类: 网上转账，柜台转账，AMT转账
+				b. 转账用户类型：普通用户，银卡用户，金卡用户
+			C. 消息管理
+				a. 消息类型：即时消息，延时消息
+				b. 消息分类：手机短信，邮件消息，QQ消息...
+十、装饰者设计模式
+	1. 星巴克咖啡订单项目
+		① 介绍
+			A. 咖啡种类/单品咖啡：Espresso(意大利浓咖啡)、ShortBlack、LongBlack(美式咖啡)、Decaf(无因咖啡)
+			B. 调料：Milk、Soy(豆浆)、Chocolate
+			C. 要求在扩展新的咖啡种类时，具有良好的扩展性、改动方便、维护方便
+			D. 使用OO的来计算不同种类咖啡的费用: 客户可以点单品咖啡，也可以单品咖啡+调料组合
+		② 方案1
+			A. 方案
+												+---------------------------+
+												| 		<abstract>			|
+												| 		  Drink				|
+												+---------------------------+
+												| description: String		|
+												| price: double				|
+												+---------------------------+
+												| getDescription(): String	|
+												| cost(): double			|
+												+---------------------------+
+															△
+															|
+						+-----------+-----------+-----------+-----------+-----------+-----------+
+						|			|			|			|			|			|			|
+				+----------------+	|	+----------------+	|	+----------------+	|	+----------------+
+				| 	  C Decaf	 |	|	|  C ShortBlack	 |	|	|  C LongBlack	 |	|	|   C Espresso	 |
+				+----------------+	|	+----------------+	|	+----------------+	|	+----------------+
+				| cost(): double |	|	| cost(): double |	|	| cost(): double |	|	| cost(): double |
+				+----------------+	|	+----------------+	|	+----------------+	|	+----------------+
+									|						|						|
+							+----------------+		+----------------+		+---------------------+
+							|C Espresso&Milk |		| C Espresso&Soy |		| C Espresso&Milk&Soy |
+							+----------------+		+----------------+		+---------------------+
+							| cost(): double |		| cost(): double |		| 	cost(): double	  |
+							+----------------+		+----------------+		+---------------------+
+			B. 问题分析
+				a. Drink 是一个抽象类，表示饮料
+				b. des就是对咖啡的描述, 比如咖啡的名字
+				c. cost() 方法就是计算费用，Drink 类中做成一个抽象方法
+				d. Decaf 就是单品咖啡， 继承Drink, 并实现cost
+				e. Espress && Milk 就是单品咖啡+调料， 这个组合很多
+				f. 问题：这样设计，会有很多类，当我们增加一个单品咖啡，或者一个新的调料，类的数量就会倍增，就会出现类爆炸
+		③ 方案2
+			A. 前面分析到方案1因为咖啡单品+调料组合会造成类的倍增，因此可以做改进，将调料内置到Drink类，这样就不会造成类数量过多。从而提高
+			项目的维护性
+												+------------------------------------+
+												| 				<abstract>			 |
+												| 		  		  Drink				 |
+												+------------------------------------+
+												| description: String				 |
+												| milk: int							 |
+												| soy: int							 |
+												| chocolate: int					 |		
+												+------------------------------------+
+												| getDescription(): String			 |
+												| setMilk(milk: int): void			 |
+												| getMilk(): int					 |
+												| setSoy(soy: int): void			 |
+												| getSoy(): int						 |
+												| setchocolate(chocolate: int): void |
+												| getchocolate(): int				 |
+												| cost(): double					 |
+												+------------------------------------+
+																△
+																|
+							+-----------------------+-----------+-----------+-----------------------+
+							|						|						|						|
+					+----------------+		+----------------+		+----------------+		+----------------+
+					| 	  C Decaf	 |		|  C ShortBlack	 |		|  C LongBlack	 |		|   C Espresso	 |
+					+----------------+		+----------------+		+----------------+		+----------------+
+					| cost(): double |		| cost(): double |		| cost(): double |		| cost(): double |
+					+----------------+		+----------------+		+----------------+		+----------------+
+			B. 说明: milk,soy,chocolate 可以设计为Boolean,表示是否要添加相应的调料
+			C. 问题分析
+				a. 方案2可以控制类的数量，不至于造成很多的类
+				b. 在增加或者删除调料种类时，代码的维护量很大
+				c. 考虑使用 装饰者 模式
+	2. 装饰者模式定义：动态的将新功能附加到对象上。在对象功能扩展方面，它比继承更有弹性，装饰者模式也体现了开闭原则(ocp)
+	3. 装饰者模式(Decorator)原理
+		① 装饰者模式就像打包一个快递
+			A. 主体：比如：陶瓷、衣服 (Component) // 被装饰者
+			B. 包装：比如：报纸填充、塑料泡沫、纸板、木板(Decorator)
+		② Component主体：比如类似前面的Drink
+		③ ConcreteComponent：具体的主体，比如前面的各个单品咖啡
+		④ Decorator: 装饰者，比如各调料
+		⑤ 在如图的Component与ConcreteComponent之间，如果ConcreteComponent类很多,还可以设计一个缓冲层，将共有的部分提取出来，抽象成一个类
+												+-----------------+
+												| 	<abstract>	  |
+												| 	Component	  |
+												+-----------------+
+												| methodA(): void |
+												| methodB(): void |
+												+-----------------+
+														△
+														|
+									+-------------------+---------------+
+									|									|
+							+-------------------+				+-----------------+
+							| ConcreteComponent |				|  	Decorator	  |
+							+-------------------+				+-----------------+
+							| methodA(): void	|				| Component obj   |
+							| methodB(): void	|				+-----------------+
+							+-------------------+				| methodA(): void |
+																| methodB(): void |
+																+-----------------+
+																		△
+																		|
+															+-----------------------+
+															| 	ConcreteDecorator	|
+															+-----------------------+
+															| methodA(): void		|
+															| methodB(): void		|
+															+-----------------------+
+	4. 案例：编码和压缩装饰
+		① 描述：
+			A. 最初的业务逻辑类仅能读取和写入纯文本的数据。 此后， 我们创建了几个小的封装器类， 以便在执行标准操作后添加新的行为。
+			B. 第一个封装器负责加密和解密数据， 而第二个则负责压缩和解压数据。
+		② UML类图
+											+-------------------------------+
+											| 			I DataSource		|<----------------------------------------------+
+											+-------------------------------+												|
+											| writeData(data: String): void |												|
+											| readData(): String			|												|
+											+-------------------------------+												|
+															△																|
+															.																|
+								+...........................+...........................+									|
+								.														.									|
+			+----------------------------------------+			+---------------------------------------------------+		|
+			| 			C FileDataSource			 |			|				C DataSourceDecorator				|◁▷-----+	
+			+----------------------------------------+			+---------------------------------------------------+
+			| fileName: String						 |			| dataSource: DataSource							|
+			+----------------------------------------+			+---------------------------------------------------+
+			| FileDataSource(fileName: String): void |			| DataSourceDecorator(dataSource: DataSource): void |
+			| writeData(data: String): void			 |			| writeData(data: String): void						|
+			| readData(): String					 |			| readData(): String								|
+			+----------------------------------------+			+---------------------------------------------------+
+																						△
+																						|
+													+-----------------------------------+-----------------------------------+
+													|																		|
+							+---------------------------------------------------+					+----------------------------------------------------+
+							| 				C EncryptionDecorator				|					| 				C CompressionDecorator				 |
+							+---------------------------------------------------+					+----------------------------------------------------+
+							| EncryptionDecorator(dataSource: DataSource): void |					| compLevel: int									 |
+							| writeData(data: String): void						|					+----------------------------------------------------+
+							| readData(): String								|					| CompressionDecorator(dataSource: DataSource): void |
+							| encode(data: String): String						|					| writeData(data: String): void						 |
+							| decode(data: String): String						|					| readData(): String								 |
+							+---------------------------------------------------+					| compress(data: String): String					 |
+																									| decompress(data: String): String					 |
+																									| getCompressionLevel(): int						 |
+																									| setCompressionLevel(compLevel: int)				 |
+																									+----------------------------------------------------+
+		③ 代码实现
+			public interface DataSource {
+
+				void writeData(String data);
+
+				String readData();
+			}
+
+			public class FileDataSource implements DataSource {
+
+				private String fileName;
+
+				public FileDataSource(String fileName) {
+					this.fileName = fileName;
+				}
+
+				@Override
+				public void writeData(String data) {
+					File file = new File(fileName);
+					try(FileOutputStream fos = new FileOutputStream(file)) {
+						fos.write(data.getBytes(), 0, data.length());
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+
+				@Override
+				public String readData() {
+					File file = new File(fileName);
+					byte[] b = new byte[(int) file.length()];
+					try(FileInputStream fis = new FileInputStream(file)) {
+						fis.read(b);
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+					return new String(b);
+				}
+			}
+						
+			public class DataSourceDecorator implements DataSource {
+
+				private DataSource dataSource;
+
+				public DataSourceDecorator(DataSource dataSource) {
+					this.dataSource = dataSource;
+				}
+
+				@Override
+				public void writeData(String data) {
+					dataSource.writeData(data);
+				}
+
+				@Override
+				public String readData() {
+					return dataSource.readData();
+				}
+			}
+
+			public class EncryptionDecorator extends DataSourceDecorator {
+
+				public EncryptionDecorator(DataSource dataSource) {
+					super(dataSource);
+				}
+
+				@Override
+				public void writeData(String data) {
+					String encode = encode(data);
+					super.writeData(encode);
+				}
+
+				@Override
+				public String readData() {
+					return decode(super.readData());
+				}
+
+				private String encode(String data) {
+					byte[] result = data.getBytes();
+					for (int i = 0; i < result.length; i++) {
+						result[i] += (byte) 1;
+					}
+					return Base64.getEncoder().encodeToString(result);
+				}
+
+				private String decode(String data) {
+					byte[] result = Base64.getDecoder().decode(data);
+					for (int i = 0; i < result.length; i++) {
+						result[i] -= (byte) 1;
+					}
+					return new String(result);
+				}
+			}
+
+			public class CompressionDecorator extends DataSourceDecorator {
+
+				private int compLevel = 6;
+
+				public CompressionDecorator(DataSource dataSource) {
+					super(dataSource);
+				}
+
+				public int getCompressionLevel() {
+					return this.compLevel;
+				}
+
+				public void setCompressionLevel(int compLevel) {
+					this.compLevel = compLevel;
+				}
+
+				@Override
+				public void writeData(String data) {
+					String compress = compress(data);
+					super.writeData(compress);
+				}
+
+				@Override
+				public String readData() {
+					return decompress(super.readData());
+				}
+
+				private String compress(String data) {
+					byte[] bytes = data.getBytes();
+					try {
+						ByteArrayOutputStream bos = new ByteArrayOutputStream(512);
+						DeflaterOutputStream dos = new DeflaterOutputStream(bos, new Deflater(compLevel));
+						dos.write(bytes);
+						dos.close();
+						bos.close();
+						return Base64.getEncoder().encodeToString(bos.toByteArray());
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+					return null;
+				}
+
+				private String decompress(String data) {
+					byte[] bytes = Base64.getDecoder().decode(data);
+					try {
+						ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
+						InflaterInputStream iis = new InflaterInputStream(bis);
+						ByteArrayOutputStream bos = new ByteArrayOutputStream(512);
+						int b;
+						while ((b = iis.read()) != -1) {
+							bos.write(b);
+						}
+						bis.close();
+						iis.close();
+						bos.close();
+						return bos.toString();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+					return null;
+				}
+			}
+
+			public class Demo {
+
+				public static void main(String[] args) {
+					String salaryRecords = "Name,Salary\nJohn Smith,100000\nSteven Jobs,912000";
+					String fileName = "C:\\Users\\16344\\Desktop\\a.txt";
+					DataSource dataSource = new FileDataSource(fileName);
+
+					DataSourceDecorator dataSourceDecorator = new CompressionDecorator(new EncryptionDecorator(dataSource));
+					dataSourceDecorator.writeData(salaryRecords);
+					System.out.println(salaryRecords + "\n");
+					System.out.println(dataSource.readData() + "\n");
+					System.out.println(dataSourceDecorator.readData());
+				}
+			}
+	5. 装饰者模式在JDK应用的源码分析
+		① Java的IO结构，FilterInputStream就是一个装饰者
+													+-------------+
+													| InputStream |<--------------------------------------------------------+
+													+-------------+															|
+														   △																|
+														   |																|
+					+---------------------------+----------+------------------+--------------------------+					|
+					|							|							  |							 |					|
+			+-----------------+		+-------------------------+		+----------------------+	+-------------------+		|
+			| FileInputStream |		| StringBufferInputStream |		| ByteArrayInputStream |	| FilterInputStream |◁▷-----+
+			+-----------------+		+-------------------------+		+----------------------+	+-------------------+
+																										 △
+																										 |
+																				+------------------------+--------------------------+
+																				|						 |							|
+																	+---------------------+		+-----------------+		+-----------------------+
+																	| BufferedInputStream |		| DataInputStream |		| LineNumberInputStream |
+																	+---------------------+		+-----------------+		+-----------------------+
+		② 源码
+			A. 抽象类，类似 Component
+				public abstract class InputStream implements Closeable
+			B. 装饰者类，类似 Decorator
+				public class FilterInputStream extends InputStream
+					protected volatile InputStream in;
+
+					// 被装饰的对象
+					protected FilterInputStream(InputStream in) {
+						this.in = in;
+					}
+				}
+十一、组合模式
+	1. 学校院系展示需求
+		① 要求：编写程序展示一个学校院系结构：要在一个页面中展示出学校的院系组成，一个学校有多个学院，一个学院有多个系。
+		② 传统方案解决学校院系展示
+			+------+
+			| 学校 |
+			+------+
+				△
+				|
+			+------+
+			| 学院 |
+			+------+
+				△
+				|
+			+------+
+			|  系  |
+			+------+
+		③ 传统方案解决学校院系展示存在的问题分析
+			A. 将学院看做是学校的子类，系是学院的子类，这样实际上是站在组织大小来进行分层次的
+			B. 实际上我们的要求是 ：在一个页面中展示出学校的院系组成，一个学校有多个学院，一个学院有多个系， 因此这种方案，不能很好实现
+			的管理的操作，比如对学院、系的添加，删除，遍历等
+			C. 解决方案：把学校、院、系都看做是组织结构，他们之间没有继承的关系，而是一个树形结构，可以更好的实现管理操作。（组合模式）
+
+	2. 组合模式基本介绍
+		① 基本介绍
+			A. 组合模式（Composite Pattern），又叫部分整体模式，它创建了对象组的树形结构，将对象组合成树状结构以表示“整体-部分”的层次关系。
+			B. 组合模式依据树形结构来组合对象，用来表示部分以及整体层次。
+			C. 这种类型的设计模式属于结构型模式
+			D. 组合模式使得用户对单个对象和组合对象的访问具有一致性，即：组合能让客户以一致的方式处理个别对象以及组合对象
+		② 组合模式的原理类图
+			A. 类图
+							Component 为所有对象定义
+							一个类，不管是叶子或节点
+							+-------------------+
+							| 	  Component		|<----------------------+
+							+-------------------+						|
+							|					|						|
+							+-------------------+						|
+							| operation()		|						|
+							| add(Component)	|						|
+							| remove(Component) |						|
+							| getChild(int)		|						|
+							+-------------------+						|
+									  △									|
+									  |									|
+						+-------------+-------------+					|
+						|							|					|
+				+-------------+				+-------------------+		|
+				| 	  Leaf	  |				| 		Composite	|◁▷-----+
+				+-------------+				+-------------------+
+				|			  |				|					|
+				+-------------+				+-------------------+
+				| operation() |				| operation()		|
+				+-------------+				| add(Component)	|
+				叶子没有孩子，不能			| remove(Component) | 组合可以操作子节点和叶子节点，
+				操作孩子，担其定义组合		| getChild(int)		| 担可能不具有叶子的某些行为
+				内元素的行为				+-------------------+
+			B. 对原理结构图的说明-即(组合模式的角色及职责)
+				a. Component: 这是组合中对象声明接口，在适当情况下，实现所有类共有的接口默认行为,用于访问和管理Component 子部件, Component 
+				可以是抽象类或者接口
+				b. Leaf：在组合中表示叶子节点，叶子节点没有子节点
+				c. Composite：非叶子节点，用于存储子部件，在 Composite 中实现子部件的相关操作，比如新增（add）、删除（remove）
+	3. 组合模式解决的问题
+		① 组合模式解决这样的问题，当要处理的对象可以生成一颗树形结构，而要对树上的节点和叶子进行操作时，它能够提供一致的方式，而不用考虑
+		它是节点还是叶子
+	4. 组合模式解决学校院系展示的 应用实例
+		① 应用实例要求：编写程序展示一个学校院系结构：需求是这样，要在一个页面中展示出学校的院系组成，一个学校有多个学院，一个学院有多个系。
+		② 思路分析和图解(类图)
+															+-------------------------------------------+
+			+---------------------------------------------->| 				C Organization				|<----------------------------------------------------------+
+			|												+-------------------------------------------+															|
+			|												| name: String								|															|
+			|												+-------------------------------------------+															|
+			|												| Organization(name: String): void  		|															|
+			|												| getName(): String							|															|
+			|												| add(organization: Organization): void		|															|
+			|												| remove(organization: Organization): void	|															|
+			|												| print(): void								|															|
+			|												+-------------------------------------------+															|
+			|																	△																					|
+			|																	|																					|
+			|						+-------------------------------------------+---------------------------------------------------+								|
+			|						|											|													|								|
+			|		+--------------------------------+		+-------------------------------------------+		+-------------------------------------------+		|
+			|		|			C Department		 |		| 					C College				|		| 					C University			|◁▷-----+
+			|		+--------------------------------+		+-------------------------------------------+		+-------------------------------------------+
+			|		| Department(name: String): void |		| list: List<Organization>					|		| list: List<Organization>					|
+			|		| print(): void 				 |		+-------------------------------------------+		+-------------------------------------------+
+			|		+--------------------------------+		| College(name: String): void				|		| University(name: String): void			|
+			|												| add(organization: Organization): void		|		| add(organization: Organization): void		|
+			+---------------------------------------------◁▷| remove(organization: Organization): void	|		| remove(organization: Organization): void	|
+															| print(): void								|		| print(): void								|
+															+-------------------------------------------+		+-------------------------------------------+
+		③ 代码实现
+			public abstract class Organization {
+
+				private final String name;
+
+				protected Organization(String name) {
+					this.name = name;
+				}
+
+				public String getName() {
+					return name;
+				}
+
+				public void add(Organization organization) {
+					throw new UnsupportedOperationException();
+				}
+
+				public void remove(Organization organization) {
+					throw new UnsupportedOperationException();
+				}
+
+				public abstract void print();
+			}
+			
+			public class University extends Organization {
+
+				private final List<Organization> list = new ArrayList<>();
+
+				public University(String name) {
+					super(name);
+				}
+
+				@Override
+				public void add(Organization organization) {
+					list.add(organization);
+				}
+
+				@Override
+				public void remove(Organization organization) {
+					list.remove(organization);
+				}
+
+				@Override
+				public void print() {
+					System.out.println("大学：" + super.getName());
+					for (Organization organization : list) {
+						organization.print();
+					}
+				}
+			}
+			
+			public class College extends Organization {
+
+				private final List<Organization> list = new ArrayList<>();
+
+				public College(String name) {
+					super(name);
+				}
+
+				@Override
+				public void add(Organization organization) {
+					list.add(organization);
+				}
+
+				@Override
+				public void remove(Organization organization) {
+					list.remove(organization);
+				}
+
+				@Override
+				public void print() {
+					System.out.println("学院：" + super.getName());
+					for (Organization organization : list) {
+						organization.print();
+					}
+				}
+			}
+			
+			public class Department extends Organization {
+
+				public Department(String name) {
+					super(name);
+				}
+
+				@Override
+				public void print() {
+					System.out.println("系：" + super.getName());
+				}
+			}
+			
+			public class Demo {
+
+				public static void main(String[] args) {
+
+					Organization department1 = new Department("信息与计算科学");
+					Organization department2 = new Department("统计学");
+					Organization department3 = new Department("网络工程");
+					Organization department4 = new Department("计算机科学与技术");
+
+					Organization college1 = new College("计算机科学学院");
+					Organization college2 = new College("信息工程学院");
+					college1.add(department1);
+					college1.add(department2);
+
+					college2.add(department3);
+					college2.add(department4);
+
+					Organization university = new University("仲恺");
+					university.add(college1);
+					university.add(college2);
+					university.print();
+				}
+			}
+	5. 组合模式在JDK集合的源码分析
+		① Java的集合类-HashMap就使用了组合模式
+		② 代码分析+Debug 源码
+			A. Map：类似与组合模式中的Component
+				public interface Map<K,V> {
+
+					// ...
+					
+					V put(K key, V value);
+					
+					V remove(Object key);
+					
+					void putAll(Map<? extends K, ? extends V> m);
+				}
+			B. AbstractMap：在Component下的默认实现
+				public abstract class AbstractMap<K,V> implements Map<K,V> {
+
+					// ...
+					public V put(K key, V value) {
+						throw new UnsupportedOperationException();
+					}
+				}
+			C. HashMap：类似于组合模式中的非叶子节点
+				public class HashMap<K,V> extends AbstractMap<K,V> implements Map<K,V>, Cloneable, Serializable {
+					
+					// ...
+					final V putVal(int hash, K key, V value, boolean onlyIfAbsent, boolean evict) {
+						Node<K,V>[] tab; Node<K,V> p; int n, i;
+						
+						// ....
+					}
+				}
+			D. Node：类似于组合模式中的叶子节点
+				static class Node<K,V> implements Map.Entry<K,V> {
+				
+					// ...
+					public final K getKey()        { return key; }
+					
+					public final V getValue()      { return value; }
+					
+					public final V setValue(V newValue)
+					
+				}
+	6. 组合模式的注意事项和细节			
+		① 简化客户端操作。客户端只需要面对一致的对象而不用考虑整体部分或者节点叶子的问题。
+		② 具有较强的扩展性。当我们要更改组合对象时，我们只需要调整内部的层次关系，客户端不用做出任何改动
+		③ 方便创建出复杂的层次结构。客户端不用理会组合里面的组成细节，容易添加节点或者叶子从而创建出复杂的树形结构
+		④ 需要遍历组织机构，或者处理的对象具有树形结构时, 非常适合使用组合模式
+		⑤ 要求较高的抽象性，如果节点和叶子有很多差异性的话，比如很多方法和属性都不一样，不适合使用组合模式
+十二、外观模式
+	1. 影院管理项目
+		① 组建一个家庭影院：
+			DVD播放器、投影仪、自动屏幕、环绕立体声、爆米花机,要求完成使用家庭影院的
+			功能，其过程为：
+			直接用遥控器：统筹各设备开关
+			开爆米花机
+			放下屏幕
+			开投影仪
+			开音响
+			开DVD，选dvd
+			去拿爆米花
+			调暗灯光
+			播放
+			观影结束后，关闭各种设备
+		② 传统方式解决影院管理
+			+-----------+		+-----------+		+-------------+		+---------+		+--------+		+---------------+
+			| DVDPlayer |		| Projector |		| 	Stereo	  |		| Popcorn |		| Screen |		| TheaterLights |
+			+-----------+		+-----------+		+-------------+		+---------+		+--------+		+---------------+
+			| on()		|		| on()		|		| on()		  |		| on()	  |		| up()	 |		| on()			|
+			| off()		|		| off()		|		| off()		  |		| off()	  |		| down() |		| off()			|
+			| play()	|		| focus()	|		| setVolume() |		| pop()   |		+--------+		| dim()			|
+			| pause()	|		| zoom()	|		+-------------+		+---------+		    ↑			| bright()		|
+			| setDvd()	|		+-----------+			   ↑				 ↑				|			+---------------+
+			+-----------+			 ↑					   |				 |				|					↑
+				  ↑					 |					   |				 |				|					|
+				  +------------------+---------------------+--------+--------+--------------+-------------------+
+																	|
+																+--------+
+																| Client |
+																+--------+															
+			Client {
+				public static void main() {
+					// 1. 创建相关的对象
+					// 2. 调用创建的各个对象的一系列方法
+					// 3. 调用DVDPlayer 对象的play方法
+				}
+			}
+		③ 传统方式解决影院管理问题分析
+			A. 在ClientTest 的main方法中，创建各个子系统的对象，并直接去调用子系统(对象)相关方法，会造成调用过程混乱，没有清晰的过程
+			B. 不利于在ClientTest 中，去维护对子系统的操作
+			C. 解决思路：定义一个高层接口，给子系统中的一组接口提供一个一致的界面(比如在高层接口提供四个方法 ready, play, pause, end )，用来
+			访问子系统中的一群接口
+			D. 也就是说 就是通过定义一个一致的接口(界面类)，用以屏蔽内部子系统的细节，使得调用端只需跟这个接口发生调用，而无需关心这个子系统
+			的内部细节(外观模式)
+	2. 外观模式基本介绍
+		① 外观模式（Facade），也叫“过程模式：外观模式为子系统中的一组接口提供一个一致的界面，此模式定义了一个高层接口，这个接口使得这一子系统
+		更加容易使用
+		② 外观模式通过定义一个一致的接口，用以屏蔽内部子系统的细节，使得调用端只需跟这个接口发生调用，而无需关心这个子系统的内部细节
+	3. 外观模式原理类图
+		① UML 类图
+							+--------+		 +--------+
+							| 外观类 | <-----| Client |
+							+--------+		 +--------+
+								△
+								▽
+								|
+				+---------------+---------------+
+				|				|				|
+			+---------+		+---------+		+---------+
+			| 子系统1 |		| 子系统2 |		| 子系统3 |
+			+---------+		+---------+		+---------+
+		② 原理类图的说明(外观模式的角色)
+			A. 外观类(Facade): 为调用端提供统一的调用接口, 外观类知道哪些子系统负责处理请求,从而将调用端的请求代理给适当子系统对象
+			B. 调用者(Client): 外观接口的调用者
+			C. 子系统的集合：指模块或者子系统，处理Facade 对象指派的任务，他是功能的实际提供者
+	4. 复杂视频转换库的简单接口
+		① 介绍
+			A. 在本例中， 外观简化了复杂视频转换框架所进行的沟通工作
+			B. 外观提供了仅包含一个方法的类， 可用于处理对框架中所需类的配置与以正确格式获取结果的复杂工作。
+		② UML 类图
+								+--------+			+------------------------------------------------------+
+								| Client |--------->| 				C VideoConversionFacade 			   |
+								+--------+			+------------------------------------------------------+
+													| convertVideo(fileName: String, format: String): File |
+													+------------------------------------------------------+
+																				△
+																				▽
+																				|
+												+-------------------+-----------+-----------+---------------------+
+												|					|						|					  |
+											+---------+		+----------------+		+---------------+		+------------+
+											| I Codec |		| C CodecFactory |		| BitrateReader |		| AudioMixer |
+											+---------+		+----------------+		+---------------+		+------------+
+												△			| extract()		 |		| read()		|		| fix()		 |
+												.			+----------------+		| convert()		|		+------------+
+									+...........+.............+						+---------------+
+									.						  .
+						+-----------------------+	+---------------------+
+						| MPEG4CompressionCodec |	| OggCompressionCodec |
+						+-----------------------+	+---------------------+
+		③ 代码实现
+			public class VideoFile {
+
+				private final String filename;
+
+				private final String codecType;
+
+				public VideoFile(String filename) {
+					this.filename = filename;
+					this.codecType = filename.substring(filename.lastIndexOf(".") + 1);
+				}
+
+				public String getFilename() {
+					return filename;
+				}
+
+				public String getCodecType() {
+					return codecType;
+				}
+			}
+
+			public interface Codec {
+			}
+
+
+			public class MPEG4CompressionCodec implements Codec {
+
+				public String type = "mp4";
+			}
+
+			public class OggCompressionCodec implements Codec {
+
+				public String type = "ogg";
+			}
+
+			public class CodecFactory {
+
+				public static Codec extract(VideoFile videoFile) {
+					if ("mp4".equals(videoFile.getCodecType())) {
+						System.out.println("CodecFactory: 提取MP4格式的音频...");
+						return new MPEG4CompressionCodec();
+					} else {
+						System.out.println("CodecFactory: 提取OGG格式的音频");
+						return new OggCompressionCodec();
+					}
+				}
+			}
+
+			public class BitrateReader {
+
+				public static VideoFile read(VideoFile file, Codec codec) {
+					System.out.println("BitrateReader: 读取文件");
+					return file;
+				}
+
+				public static VideoFile convert(VideoFile buffer, Codec codec) {
+					System.out.println("BitrateReader: 写出文件");
+					return buffer;
+				}
+			}
+
+			public class AudioMixer {
+
+				public File fix(VideoFile result){
+					System.out.println("AudioMixer: 修复音频...");
+					return new File("tmp");
+				}
+			}
+
+			public class VideoConversionFacade {
+				public File convertVideo(String fileName, String format) {
+					System.out.println("视频转换器: 转换开始");
+					// 获取视频文件
+					VideoFile file = new VideoFile(fileName);
+					// 获取源文件的原格式
+					Codec sourceCodec = CodecFactory.extract(file);
+					Codec destinationCodec;
+					// 判断文件的转换格式
+					if (format.equals("mp4")) {
+						destinationCodec = new MPEG4CompressionCodec();
+					} else {
+						destinationCodec = new OggCompressionCodec();
+					}
+					// 读取文件
+					VideoFile buffer = BitrateReader.read(file, sourceCodec);
+					// 开始转换
+					VideoFile intermediateResult = BitrateReader.convert(buffer, destinationCodec);
+					// 修复文件
+					File result = (new AudioMixer()).fix(intermediateResult);
+					System.out.println("视频转换器: 转换完成");
+					return result;
+				}
+			}
+
+			public class Demo {
+				public static void main(String[] args) {
+					VideoConversionFacade converter = new VideoConversionFacade();
+					File mp4Video = converter.convertVideo("youtubevideo.ogg", "mp4");
+				}
+			}
+	5. 外观模式在MyBatis框架应用的源码分析
+		① MyBatis 中的Configuration 去创建MetaObject 对象使用到外观模式
+		② 代码分析+Debug源码+
+			public class Configuration {
+				
+				// ...
+				protected ReflectorFactory reflectorFactory;
+				protected ObjectFactory objectFactory;
+				protected ObjectWrapperFactory objectWrapperFactory;
+				
+				public MetaObject newMetaObject(Object object) {
+					return MetaObject.forObject(object, this.objectFactory, this.objectWrapperFactory, this.reflectorFactory);
+				}
+				
+				// ...
+			}
+	6. 外观模式的注意事项和细节
+		① 外观模式对外屏蔽了子系统的细节，因此外观模式降低了客户端对子系统使用的复杂性
+		② 外观模式对客户端与子系统的耦合关系，让子系统内部的模块更易维护和扩展
+		③ 通过合理的使用外观模式，可以帮我们更好的划分访问的层次
+		④ 当系统需要进行分层设计时，可以考虑使用Facade模式
+		⑤ 在维护一个遗留的大型系统时，可能这个系统已经变得非常难以维护和扩展，此时可以考虑为新系统开发一个Facade类，来提供遗留系统的比较清晰
+		简单的接口，让新系统与Facade类交互，提高复用性
+		⑥ 不能过多的或者不合理的使用外观模式，使用外观模式好，还是直接调用模块好。要以让系统有层次，利于维护为目的。
+十三、享元模式
+	1. 展示网站项目需求
+		① 小型的外包项目，给客户A做一个产品展示网站，客户A的朋友感觉效果不错，也希望做这样的产品展示网站，但是要求都有些不同：
+			A. 有客户要求以新闻的形式发布
+			B. 有客户人要求以博客的形式发布
+			C. 有客户希望以微信公众号的形式发布
+		② 传统方案解决网站展现项目
+			A. 直接复制粘贴一份，然后根据客户不同要求，进行定制修改
+			B. 给每个网站租用一个空间
+			C. 方案设计示意图
+									+-------------+
+									| 客户A的网站 |
+									+-------------+
+										   ↑
+						+------------------+------------------+
+						|				   |				  |
+				+-------------+		+-------------+		+-------------+
+				| 客户B的网站 |		| 客户C的网站 |		| 客户D的网站 |
+				+-------------+		+-------------+		+-------------+
+		③ 传统方案解决网站展现项目-问题分析
+			A. 需要的网站结构相似度很高，而且都不是高访问量网站，如果分成多个虚拟空间来处理，相当于一个相同网站的实例对象很多，造成服务器的资
+			源浪费
+			B. 解决思路：整合到一个网站中，共享其相关的代码和数据，对于硬盘、内存、CPU、数据库空间等服务器资源都可以达成共享，减少服务器资源
+			C. 对于代码来说，由于是一份实例，维护和扩展都更加容易
+			D. 上面的解决思路就可以使用 享元模式 来解决
+	2. 享元模式基本介绍
+		① 享元模式（Flyweight Pattern） 也叫 蝇量模式: 运用共享技术有效地支持大量细粒度的对象
+		② 常用于系统底层开发，解决系统的性能问题。像数据库连接池，里面都是创建好的连接对象，在这些连接对象中有我们需要的则直接拿来用，避免重
+		新创建，如果没有我们需要的，则创建一个
+		③ 享元模式能够解决重复对象的内存浪费的问题，当系统中有大量相似对象，需要缓冲池时。不需总是创建新对象，可以从缓冲池里拿。这样可以降低
+		系统内存，同时提高效率
+		④ 享元模式经典的应用场景就是池技术了，String常量池、数据库连接池、缓冲池等等都是享元模式的应用，享元模式是池技术的重要实现方式
+	3. 享元模式的原理类图
+		① UML 类图
+			+-------------------+			 		+-------------+
+			| FlyWeightFactory  |◁▷---------------->| FlyWeight   |
+			+-------------------+			 		+-------------+
+			| getFlyWeight(key) |			 		| operation() |
+			+-------------------+			 		+-------------+
+					 ↑									   △
+					 |									   |
+					 |						+--------------+------------------+
+					 |						|								  |
+				+--------+		  +-------------------+			+---------------------------+
+				| Client |		  | ConcreteFlyWeight |			| UnsharedConcreteFlyWeight |
+				+--------+		  +-------------------+			+---------------------------+
+					 |						↑								  ↑
+					 |						|								  |
+					 +----------------------+---------------------------------+
+		② 对原理图的说明（模式的角色及职责）
+			A. FlyWeight 是抽象的享元角色, 他是产品的抽象类, 同时定义出对象的外部状态和内部状态(后面介绍) 的接口或实现
+			B. ConcreteFlyWeight 是具体的享元角色，是具体的产品类，实现抽象角色定义相关业务
+			C. UnSharedConcreteFlyWeight 是不可共享的角色，一般不会出现在享元工厂
+			D. FlyWeightFactory 享元工厂，用于构建一个容器池（集合），同时提供从池中获取对象的方法
+	4. 内部状态和外部状态
+		① 比如围棋、五子棋、跳棋，它们都有大量的棋子对象，围棋和五子棋只有黑白两色，跳棋颜色多一点，所以棋子颜色就是棋子的内部状态；而各个棋
+		子之间的差别就是位置的不同，当我们落子后，落子颜色是定的，但位置是变化的，所以棋子坐标就是棋子的外部状态
+		② 享元模式提出了两个要求：细粒度和共享对象。这里就涉及到内部状态和外部状态了，即将对象的信息分为两个部分：内部状态和外部状态
+		③ 内部状态指对象共享出来的信息，存储在享元对象内部且不会随环境的改变而改变
+		④ 外部状态指对象得以依赖的一个标记，是随环境改变而改变的、不可共享的状态。
+		⑤ 举个例子：围棋理论上有361个空位可以放棋子，每盘棋都有可能有两三百个棋子对象产生，因为内存空间有限，一台服务器很难支持更多的玩家玩围
+		棋游戏，如果用享元模式来处理棋子，那么棋子对象就可以减少到只有两个实例，这样就很好的解决了对象的开销问题
+	5. 享元模式解决网站展现项目
+		① UML类图
+			+-------------------+			 		+-----------------------+
+			| FlyWeightFactory  |◁▷---------------->|		C WebSite		|
+			+-------------------+			 		+-----------------------+
+			| getFlyWeight(key) |			 		| use(user: User):void  |
+			+-------------------+			 		+-----------------------+
+					 ↑									   		△
+					 |									   		|
+				+--------+		  				+-------------------------------+
+				| Client |		  				|		C ConcreteWebSite		|
+				+--------+		  				+-------------------------------+
+					 |							| type: String					|
+					 +--------------------------| ConcreteWebSite(type: String) |
+					 ↓							| use(user: User):void			|
+			+--------------------+				+-------------------------------+
+			| 		C user		 |
+			+--------------------+
+			| name: String		 |
+			| User(name: String) |
+			| getName(): String	 |
+			+--------------------+
+		② 代码实现
+			public class User {
+
+				private final String name;
+
+				public User(String name) {
+					this.name = name;
+				}
+
+				public String getName() {
+					return name;
+				}
+			}
+
+			public abstract class WebSite {
+
+				public abstract void use(User user);
+			}
+
+			public class ConcreteWebSite extends WebSite {
+
+				private final String type;
+
+				public ConcreteWebSite(String type) {
+					this.type = type;
+				}
+
+				@Override
+				public void use(User user) {
+					System.out.println("网站的发布形式为：" + type + ", 使用者：" + user.getName());
+				}
+			}
+
+			public class WebSiteFactory {
+
+				public final Map<String, WebSite> pool = new HashMap<>();
+
+				public WebSite getWebSiteCategory(String type) {
+					if (!pool.containsKey(type)) {
+						pool.put(type, new ConcreteWebSite(type));
+					}
+					return pool.get(type);
+				}
+
+				public int getWebSiteSize() {
+					return pool.size();
+				}
+			}
+
+			public class Demo {
+
+				public static void main(String[] args) {
+
+					WebSiteFactory webSiteFactory = new WebSiteFactory();
+
+					WebSite newWebSite = webSiteFactory.getWebSiteCategory("新闻");
+					newWebSite.use(new User("a"));
+
+					WebSite blogWebSite = webSiteFactory.getWebSiteCategory("博客");
+					blogWebSite.use(new User("b"));
+
+					WebSite blogWebSite1 = webSiteFactory.getWebSiteCategory("博客");
+					blogWebSite1.use(new User("c"));
+
+					System.out.println("网站类型个数：" + webSiteFactory.getWebSiteSize());
+				}
+			}
+	6. 享元模式在JDK-Interger的应用源码分析
+		① Integer中的享元模式
+		② 代码分析+Debug源码+说明
+			A. 代码
+				public class IntegerTest {
+
+					public static void main(String[] args) {
+						Integer x = Integer.valueOf(127);
+						Integer y = new Integer(127);
+						Integer z = Integer.valueOf(127);
+						Integer w = new Integer(127);
+						Integer a = Integer.valueOf(128);
+						Integer b = Integer.valueOf(128);
+						System.out.println(x.equals(y)); // true
+						System.out.println(x == y); // false
+						System.out.println(x == z); // true
+						System.out.println(w == x); // false
+						System.out.println(w == y); // false
+						System.out.println(a == b); // false
+					}
+				}
+			B. 说明
+				public static Integer valueOf(int i) {
+					if (i >= IntegerCache.low && i <= IntegerCache.high)
+						return IntegerCache.cache[i + (-IntegerCache.low)];
+					return new Integer(i);
+				}
+				a. 如果 Integer.valueOf(x) 中的 x 在 [-128, 127] 区间内，就是使用享元模式返回，如果不在区间内，则是使用new新建 Integer 对象
+				b. Integer 使用到享元模式
+	7. 享元模式的注意事项和细节
+		① 在享元模式这样理解，“享”就表示共享，“元”表示对象
+		② 系统中有大量对象，这些对象消耗大量内存，并且对象的状态大部分可以外部化时，我们就可以考虑选用享元模式
+		③ 用唯一标识码判断，如果在内存中有，则返回这个唯一标识码所标识的对象，用HashMap/HashTable存储
+		④ 享元模式大大减少了对象的创建，降低了程序内存的占用，提高效率
+		⑤ 享元模式提高了系统的复杂度。需要分离出内部状态和外部状态，而外部状态具有固化特性，不应该随着内部状态的改变而改变，这是我们使用享元
+		模式需要注意的地方
+		⑥ 使用享元模式时，注意划分内部状态和外部状态，并且需要有一个工厂类加以控制
+		⑦ 享元模式经典的应用场景是需要缓冲池的场景，比如 String常量池、数据库连接池
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+△▽▷◁▼▶◀
+◄►▲▲◅▻◁▷▽△ 

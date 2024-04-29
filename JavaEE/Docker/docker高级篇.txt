@@ -1274,29 +1274,29 @@ CREATE TABLE t_user(
 						}
 				g. mvn package 命令将微服务形成新的 jar 包并上传到 Linux 服务器 /usr/local/mydata/mydocker/docker-boot 目录下
 				h. 编写Dockerfile
-					FROM centos
-					MAINTAINER LiXL<1634491328@qq.com>
+		FROM centos
+		MAINTAINER LiXL<1634491328@qq.com>
 
-					ENV MYPATH /usr/local
-					WORKDIR $MYPATH 
+		ENV MYPATH /usr/local
+		WORKDIR $MYPATH 
 
-					# 安装jdk
-					# RUN yum -y install glibc.i686
-					RUN mkdir /usr/local/java
-					ADD jdk-8u261-linux-x64.tar.gz /usr/local/java/
-					ENV JAVA_HOME /usr/local/java/jdk1.8.0_261
-					ENV JRE_HOME $JAVA_HOME/jre
-					ENV CLASSPATH $JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar:$JRE_HOME/lib:$CLASSPATH
-					ENV PATH $JAVA_HOME/bin:$PATH
+		# 安装jdk
+		# RUN yum -y install glibc.i686
+		RUN mkdir /usr/local/java
+		ADD jdk-8u261-linux-x64.tar.gz /usr/local/java/
+		ENV JAVA_HOME /usr/local/java/jdk1.8.0_261
+		ENV JRE_HOME $JAVA_HOME/jre
+		ENV CLASSPATH $JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar:$JRE_HOME/lib:$CLASSPATH
+		ENV PATH $JAVA_HOME/bin:$PATH
 
-					# 部署微服务
-					RUN mkdir /usr/local/docker-boot
-					COPY docker_boot_service-1.0-SNAPSHOT.jar /usr/local/docker-boot/
-					ENTRYPOINT ["java", "-jar", "/usr/local/docker-boot/docker_boot_service-1.0-SNAPSHOT.jar"]
+		# 部署微服务
+		RUN mkdir /usr/local/docker-boot
+		COPY docker_boot_service-1.0-SNAPSHOT.jar /usr/local/docker-boot/
+		ENTRYPOINT ["java", "-jar", "/usr/local/docker-boot/docker_boot_service-1.0-SNAPSHOT.jar"]
 
-					EXPOSE 8099
-					CMD echo "JDK安装成功"
-					CMD echo "部署微服务成功"
+		EXPOSE 8099
+		CMD echo "JDK安装成功"
+		CMD echo "部署微服务成功"
 				i. 构建镜像
 					docker build -t docker-boot:1.0 .
 		② 不用Compose
@@ -1313,51 +1313,51 @@ CREATE TABLE t_user(
 			C. 容器间的启停或宕机，有可能导致IP地址对应的容器实例变化，映射出错，要么生产 IP 写死(可以但是不推荐)，要么通过服务调用
 		⑤ 使用Compose
 			A. 编写docker-compose.yml 文件
-				version: "3"
+			version: "3"
 
+			networks:
+			  mybridge:
+
+			services:
+			  microService:
+				image: docker-boot:1.0
+				container_name: ms01
+				ports:
+				  - "8099:8099"
 				networks:
-				  mybridge:
+				  - mybridge
+				depends_on:
+				  - mysql
+				  - redis
 
-				services:
-				  microService:
-					image: docker-boot:1.0
-					container_name: ms01
-					ports:
-					  - "8099:8099"
-					networks:
-					  - mybridge
-					depends_on:
-					  - mysql
-					  - redis
+			  mysql:
+				image: mysql:5.7.30
+				container_name: mysql3309
+				environment:
+				  MYSQL_ROOT_PASSWORD: "2648"
+				  MYSQL_ALLOW_EMPTY_PASSWORD: "no"
+				  MYSQL_DATABASE: "db01"
+				ports:
+				  - "3309:3309"
+				volumes:
+				  - /usr/local/mydata/mysql3309/log:/var/log/mysql
+				  - /usr/local/mydata/mysql3309/data:/var/lib/mysql
+				  - /usr/local/mydata/mysql3309/conf:/etc/mysql
+				networks:
+				  - mybridge
+				command: --default-authentication-plugin=mysql_native_password # 解决外部无法访问
 
-				  mysql:
-					image: mysql:5.7.30
-					container_name: mysql3309
-					environment:
-					  MYSQL_ROOT_PASSWORD: "2648"
-					  MYSQL_ALLOW_EMPTY_PASSWORD: "no"
-					  MYSQL_DATABASE: "db01"
-					ports:
-					  - "3309:3309"
-					volumes:
-					  - /usr/local/mydata/mysql3309/log:/var/log/mysql
-					  - /usr/local/mydata/mysql3309/data:/var/lib/mysql
-					  - /usr/local/mydata/mysql3309/conf:/etc/mysql
-					networks:
-					  - mybridge
-					command: --default-authentication-plugin=mysql_native_password # 解决外部无法访问
-
-				  redis:
-					image: redis:6.0.8
-					container_name: redis6380
-					ports:
-					  - "6380:6380"
-					volumes:
-					  - /usr/local/mydata/redis6380/data:/data
-					  - /usr/local/mydata/redis6380/conf:/etc/redis
-					networks:
-					  - mybridge
-					command: redis-server /etc/redis/redis.conf
+			  redis:
+				image: redis:6.0.8
+				container_name: redis6380
+				ports:
+				  - "6380:6380"
+				volumes:
+				  - /usr/local/mydata/redis6380/data:/data
+				  - /usr/local/mydata/redis6380/conf:/etc/redis
+				networks:
+				  - mybridge
+				command: redis-server /etc/redis/redis.conf
 			B. 第二次修改微服务工程docker_boot
 				a. 写YML，通过服务名访问，IP无关
 					server:

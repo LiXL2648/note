@@ -181,8 +181,8 @@
 			A. LockSupport 中的 park() 和 unpark() 的作用分别是阻塞线程和解除阻塞线程
 		② 线程等待唤醒机制（wait/notify）
 			A. 三种让线程等待和唤醒的方法
-				a. 方式一：使用 Object 中的 wait() 方法让线程等待，使用 Object 中的 notify() 方法唤醒线程
-				b. 方式二：使用 JUC 包中 Condition 的 await() 方法让线程等待，使用 signal() 方法唤醒线程
+				a. 方式一：使用 Object 中的 wait() 方法让线程等待，使用 Object 中的 notify()/notifyAll() 方法唤醒线程
+				b. 方式二：使用 JUC 包中 Condition 的 await() 方法让线程等待，使用 signal()/signalAll() 方法唤醒线程
 				c. 方式三：使用 LockSupport 类的 park() 方法让线程等待，使用 unpark() 方法唤醒线程
 			B. Object 类中的 wait 和 notify 方法实现线程等待和唤醒
 				a. 代码

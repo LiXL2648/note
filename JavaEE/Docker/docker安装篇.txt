@@ -40,10 +40,10 @@
 		mkdir -p /mydata/redis/conf
 		touch /mydata/redis/conf/redis.conf
 
-		docker run -p 6379:6379 --name redis \
-		-v /usr/local/mydata/redis/data:/data \
-		-v /usr/local/mydata/redis/conf/redis.conf:/etc/redis/redis.conf \
-		-d redis redis-server /etc/redis/redis.conf
+docker run -p 6379:6379 --name redis \
+-v /mydata/redis/data:/data \
+-v /mydata/redis/conf/redis.conf:/etc/redis/redis.conf \
+-d redis:7.0.9 redis-server /etc/redis/redis.conf
 	3. 使用redis-cli连接redis
 		docker exec -it redis redis-cli
 	4. 设置redis容器在docker重启时自启动

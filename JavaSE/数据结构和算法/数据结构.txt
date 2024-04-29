@@ -1,0 +1,4099 @@
+一、数据结构和算法内容介绍
+	1. 经典的算法面试题
+		① 字符串匹配问题：
+			A. 有一个字符串 str1 = "abcdefghijklmn"，和一个字串 str2 = "defg"，现在要判断 str1 是否含有 str2，如果存在，就返回第一次出现的位置，
+			如果没有，则返回 -1。要求用最快的速度来完成匹配，思路是什么
+			B. 使用 KMP 算法
+		② 汉诺塔游戏
+			A. 请完成汉诺塔游戏的代码，要求：将 A 塔的所有圆盘移动到 C 塔。并且规定，在小圆盘上不能放大圆盘，在三根柱子之间一次只能移动一个圆盘
+			B. 使用分治算法 
+		③ 八皇后问题
+			A. 在 8 x 8 格的国际象棋上摆放八个皇后，使其不能互相攻击，即：任意两个皇后都不能处于同一行、同一列或同一斜线上，问有多少种摆法
+			B. 使用回溯算法
+		④ 马踏棋盘算法
+			A. 马踏棋盘算法也被称为骑士周游问题，将马随机放在国际象棋的 8 x 8 棋盘 Board[0-7][0-7] 的某个方格中，马按走棋规则（马走日字）进行移
+			动，要求每个方格只进入一次，走遍棋盘上全部 64 个方格
+			B. 使用带图的深度优先遍历算法（DFS）+贪心算法优先
+	2. 数据结构和算法的重要性
+		① 算法是程序的灵魂，优秀的程序可以在海量数据计算时，依然保持高速计算
+		② 一般来讲 程序会使用了内存计算框架(比如Spark)和缓存技术(比如Redis等)来优化程序,再深入的思考一下，这些计算框架和缓存技术，它的核心功能是
+		哪个部分呢？
+		③ 目前程序员面试的门槛越来越高，很多一线IT公司(大厂)，都会有数据结构和算法面试题
+二、数据结构和算法概述
+	1. 数据结构和算法的关系
+		① 数据data结构(structure)是一门研究组织数据方式的学科，有了编程语言也就有了数据结构。学好数据结构可以编写出更加漂亮，更加有效率的代码。
+		② 要学习好数据结构就要多多考虑如何将生活中遇到的问题，用程序去实现解决。
+		③ 程序 = 数据结构 + 算法
+		④ 数据结构是算法的基础, 换言之，想要学好算法，需要把数据结构学到位。
+	2. 几个实际编程中遇到的问题
+		① 问题一
+			A. Java代码:
+				public static void main(String[] args) {
+					String str = "Java,Java, hello,world!";
+					String newStr = str.replaceAll("Java", "尚硅谷~"); //算法
+					System.out.println("newStr=" + newStr);
+				}
+			B. 问：试写出用单链表表示的字符串类及字符串结点类的定义，并依次实现它的构造函数、以及计算串长度、串赋值、判断两串相等、求子串、两串连接、
+			求子串在串中位置等7个成员函数。
+		② 一个五子棋程序
+			A. 如何判断游戏的输赢，并可以完成存盘退出和继续上局的功能
+			B. 提示
+				a. 棋盘（二维数组）=>（稀疏数组）=> 写入文件（存档功能）
+				b. 读取文件 => 稀疏数组 => 二维数组 => 棋盘 【接上局】
+		③ 约瑟夫(Josephu)问题(丢手帕问题)
+			A. Josephu 问题为：设编号为 1，2，… n 的 n 个人围坐一圈，约定编号为 k（1<=k<=n）的人从 1 开始报数，数到 m 的那个人出列，它的下一位又从 1 
+			开始报数，数到 m 的那个人又出列，依次类推，直到所有人出列为止，由此产生一个出队编号的序列。
+			B. 提示：用一个不带头结点的循环链表来处理 Josephu 问题：先构成一个有 n 个结点的单循环链表（单向环形链表），然后由 k 结点起从 1 开始计数，
+			计到 m 时，对应结点从链表中删除，然后再从被删除结点的下一个结点又从 1 开始计数，直到最后一个结点从链表中删除算法结束。
+		④ 其它常见算法问题:
+			A. 修路问题  => 最小生成树（加权值）【数据结构】+ 普利姆算法
+			B. 最短路径问题  => 图+弗洛伊德算法
+			C. 汉诺塔 => 分支算法 
+			D. 八皇后问题 => 回溯法
+	3. 线性结构和非线性结构
+		① 数据结构包括：线性结构和非线性结构。
+		② 线性结构
+			A. 线性结构作为最常用的数据结构，其特点是数据元素之间存在一对一的线性关系
+			B. 线性结构有两种不同的存储结构，即顺序存储结构和链式存储结构。顺序存储的线性表称为顺序表，顺序表中的存储元素是连续的
+			C. 链式存储的线性表称为链表，链表中的存储元素不一定是连续的，元素节点中存放数据元素以及相邻元素的地址信息
+			D. 线性结构常见的有：数组、队列、链表和栈，后面我们会详细讲解
+		③ 非线性结构：非线性结构包括：二维数组，多维数组，广义表，树结构，图结构
+三、稀疏数组和队列
+	1. 稀疏（sparsearray）数组
+		① 先看一个实际的需求
+			A. 编写的五子棋程序中，有存盘退出和续上盘的功能
+			B. 分析问题: 因为该二维数组的很多值是默认值0，因此记录了很多没有意义的数据，可以转换为稀疏数组进行保存。
+		② 基本介绍
+			A. 当一个数组中大部分元素为０，或者为同一个值的数组时，可以使用稀疏数组来保存该数组。
+			B. 稀疏数组的处理方法是:
+				a. 记录数组一共有几行几列，有多少个不同的值
+				b. 把具有不同值的元素的行列及值记录在一个小规模的数组中，从而缩小程序的规模
+			C. 稀疏数组举例说明
+				| 0  | 0  | 0  | 22 | 0  | 0  | 15 |		 	|	行  |  列   |   值	  |
+				| 0  | 11 | 0  | 0  | 0  | 17 | 0  |	  	 	|（row）|（col）|（value）|
+				| 0  | 0  | 0  | -6 | 0  | 0  | 0  |			+-------+-------+---------+
+				| 0  | 0  | 0  | 0  | 0  | 39 | 0  |		[0] |   6   |   7   |    8    |
+				| 91 | 0  | 0  | 0  | 0  | 0  | 0  |		[1] |   0   |   3   |    22   |
+				| 0  | 0  | 28 | 0  | 0  | 0  | 0  |		[2] |   0   |   6   |    15   |
+															[3] |   1   |   1   |    11   |
+															[4] |   1   |   5   |    17   |
+															[5] |   2   |   3   |    -6   |
+															[6] |   3   |   5   |    39   |
+															[7] |   4   |   0   |    91   |
+															[8] |   5   |   2   |    28   |
+		③ 应用实例
+			A. 将上面的二维数组与稀疏数组进行相互转换
+			B. 二维数组转系数数组的思路
+				a. 遍历原始的二维数组，得到有效数据的个数
+				b. 根据 sum 就可以创建稀疏数组 sparseArr[sum + 1][3]
+				c. 将二维数组的有效数据存入到稀疏数组
+			C. 稀疏数组转二维数组的思路
+				a. 先读取稀疏数组的第一行，根据第一行的数据，创建二维数组 chessArr[6][7]
+				b. 再读取稀疏数组后几行的数据，并赋值给原始的二维数组即可
+			D. 稀疏数组代码实现：
+				public class SparseArrayDemo {
+
+					public static void main(String[] args) {
+						// 创建二维数组
+						int[][] twoDimensionalArray = createTwoDimensionalArray();
+						// 遍历二维数组
+						for (int[] ints : twoDimensionalArray) {
+							for (int anInt : ints) {
+								System.out.printf("%d\t", anInt);
+							}
+							System.out.println();
+						}
+						System.out.println("--------------------------");
+
+						// 将二维数组转换为稀疏数组
+						int[][] sparseArray = toSparseArray(twoDimensionalArray);
+						// 遍历稀疏数组
+						for (int[] ints : sparseArray) {
+							for (int anInt : ints) {
+								System.out.printf("%d\t", anInt);
+							}
+							System.out.println();
+						}
+						System.out.println("--------------------------");
+
+						// 将稀疏数组转换为二维数组
+						int[][] twoDimensionalArray2 = toTwoDimensionalArray(sparseArray);
+						// 遍历二维数组
+						for (int[] ints : twoDimensionalArray2) {
+							for (int anInt : ints) {
+								System.out.printf("%d\t", anInt);
+							}
+							System.out.println();
+						}
+					}
+
+					/**
+					 * 将稀疏数组转换为二维数组
+					 */
+					public static int[][] toTwoDimensionalArray(int[][] sparseArray) {
+						int row = sparseArray[0][0];
+						int col = sparseArray[0][1];
+
+						int[][] twoDimensionalArray = new int[row][col];
+						for (int i = 1; i < sparseArray.length; i++) {
+							row = sparseArray[i][0];
+							col = sparseArray[i][1];
+							twoDimensionalArray[row][col] = sparseArray[i][2];
+						}
+
+						return twoDimensionalArray;
+					}
+
+					/**
+					 * 将二维数组转换为稀疏数组
+					 */
+					public static int[][] toSparseArray(int[][] twoDimensionalArray) {
+
+						// 获取二维数组有效数字个数
+						int count = 0;
+						for (int[] ints : twoDimensionalArray) {
+							for (int anInt : ints) {
+								if (anInt != 0) {
+									count++;
+								}
+							}
+						}
+
+						// 创建稀疏数组
+						int[][] sparseArray = new int[count + 1][3];
+						sparseArray[0][0] = twoDimensionalArray.length;
+						sparseArray[0][1] = twoDimensionalArray[0].length;
+						sparseArray[0][2] = count;
+
+						// 将二维数组中的有效数字保存咋稀疏数组中
+						int row = 0;
+						for (int i = 0; i < twoDimensionalArray.length; i++) {
+							for (int j = 0; j < twoDimensionalArray[i].length; j++) {
+								if (twoDimensionalArray[i][j] != 0) {
+									row++;
+									sparseArray[row][0] = i;
+									sparseArray[row][1] = j;
+									sparseArray[row][2] = twoDimensionalArray[i][j];
+								}
+							}
+						}
+
+						return sparseArray;
+					}
+
+					/**
+					 * 创建二维数组
+					 */
+					public static int[][] createTwoDimensionalArray() {
+						int[][] twoDimensionalArray = new int[6][7];
+						twoDimensionalArray[0][3] = 22;
+						twoDimensionalArray[0][6] = 15;
+						twoDimensionalArray[1][1] = 11;
+						twoDimensionalArray[1][5] = 17;
+						twoDimensionalArray[2][3] = -6;
+						twoDimensionalArray[3][5] = 39;
+						twoDimensionalArray[4][0] = 91;
+						twoDimensionalArray[5][2] = 28;
+
+						return twoDimensionalArray;
+					}
+				}
+	2. 队列
+		① 队列介绍
+			A. 队列是一个有序列表，可以用数组或是链表来实现。
+			B. 遵循先入先出的原则。即：先存入队列的数据，要先取出。后存入的要后取出
+			C. 示意图：(使用数组模拟队列示意图)
+					  +----+					+----+						+----+
+			maxSize-1 |    |		  maxSize-1 |    |			  maxSize-1 |    |
+					  +----+		  		    +----+					  	+----+
+					. |    |				  . |    |					  . |    |
+					  +----+				    +----+						+----+
+					3 |    |				  3 |    | <- rear=3		  3 |    | <- rear=3
+					  +----+					+----+						+----+
+					2 |    |				  2 |    |					  2 |    | <- front=2
+					  +----+				    +----+						+----+
+					1 |    |				  1 |    |					  1 |    |
+					  +----+				    +----+						+----+
+					0 |    |				  0 |    |					  0 |    |
+					  +----+ <- rear=-1		    +----+ 						+----+
+					   Queue <- front=-1		 Queue <- front=-1			Queue 
+		② 数组模拟队列
+			A. 队列本身是有序列表，若使用数组的结构来存储队列的数据，则队列数组的声明如下图, 其中 maxSize 是该队列的最大容量。
+			B. 因为队列的输出、输入是分别从前后端来处理，因此需要两个变量 front及 rear 分别记录队列前后端的下标，front 会随着数据输出而改变，而 rear
+			则是随着数据输入而改变
+			C. 我们将数据存入队列时称为 addQueue，addQueue 的处理需要有两个步骤：思路分析
+				a. 当 front == rear，队列空
+				b. 将尾指针往后移：rear+1
+				c. 若尾指针 rear 小于队列的最大下标 maxSize-1，则将数据存入 rear所指的数组元素中，否则无法存入数据
+				d. 当 rear  == maxSize - 1，队列满
+			D. 队列代码实现
+				public class ArrayQueueDemo {
+					public static void main(String[] args) {
+						ArrayQueue arrayQueue = new ArrayQueue(10);
+						Scanner scanner = new Scanner(System.in);
+						char c;
+						boolean flag = true;
+						while (flag) {
+							System.out.print("请输入命令：");
+							c = scanner.next().charAt(0);
+							int value;
+							switch (c) {
+								case 'a':
+									arrayQueue.add(new Random().nextInt(100));
+									break;
+								case 'r':
+									value = arrayQueue.remove();
+									System.out.println(value);
+									break;
+								case 'p':
+									value = arrayQueue.peek();
+									System.out.println(value);
+									break;
+								case 'l':
+									arrayQueue.list();
+									break;
+								case 'e':
+									flag = false;
+									break;
+							}
+						}
+					}
+				}
+
+				class ArrayQueue {
+					private final int[] arr; // 模拟队列的数组
+					private final int maxSize; // 队列最大长度
+					private int rear; // 队列尾的前一个位置
+					private int front; // 队列头的前一个位置
+
+					public ArrayQueue(int arrMaxSize) {
+						rear = -1;
+						front = -1;
+						maxSize = arrMaxSize;
+						arr = new int[maxSize];
+					}
+
+					/**
+					 * 判断队列是否已经满了
+					 */
+					public boolean isFull() {
+						return rear == maxSize - 1;
+					}
+
+					/**
+					 * 判断队列是否为空
+					 */
+					public boolean isEmpty() {
+						return rear == front;
+					}
+
+					/**
+					 * 添加一个元素到队列中
+					 */
+					public void add(int num) {
+						if (!isFull()) {
+							arr[++rear] = num;
+						} else {
+							System.out.println("队列已满，无法添加数据");
+						}
+					}
+
+					/**
+					 * 从队列中取出一个元素
+					 */
+					public int remove() {
+						if (!isEmpty()) {
+							return arr[++front];
+						}
+						System.out.println("队列已空，无法获数据");
+						return Integer.MIN_VALUE;
+					}
+
+					/**
+					 * 遍历队列元素
+					 */
+					public void list() {
+						if (!isEmpty()) {
+							System.out.print("arr[");
+							for (int i = front; i < rear; i++) {
+								System.out.printf("%d ", arr[i + 1]);
+							}
+							System.out.println("]");
+						}
+					}
+
+					/**
+					 * 查看队列头
+					 */
+					public int peek() {
+						if (!isEmpty()) {
+							return arr[front + 1];
+						}
+						System.out.println("队列已空，无法获数据");
+						return Integer.MIN_VALUE;
+					}
+				}
+		③ 数组模拟环形队列
+			A. 对前面的数组模拟队列的优化，充分利用数组. 因此将数组看做是一个环形的。(通过取模的式来实现即可)
+			B. 分析说明：
+				a. 尾索引的下一个为头索引时表示队列满，即将队列容量空出一个作为约定,这个在做判断队列满的时候需要注意：(rear + 1) % maxSize == front 
+				b. rear == front
+			C. 思路如下：
+				a. front 变量的含义是指向队列的第一个元素，也就是说 arr[front] 就是队列的第一个元素，front 的初始值为 0
+				b. rear 变量的含义是指向队列的最后一个元素的后一个位置，因为希望空出一个空间作为约定，rear 的初始值为 0
+				c. 当队列满时，条件是 (rear + 1) % maxSize == front，此时会空出一个位置
+				d. 当队列空时，条件是 rear == front
+				e. 队列中的有效数据的个数为 (rear - front + maxSize) % maxSize，即当队列的长度为 5 时，如果此时队列已经满了，那么队列中的有效个数为 4
+			D. 环形队列代码实现
+				public class CircleArrayQueueDemo {
+
+					public static void main(String[] args) {
+						CircleArrayQueue arrayQueue = new CircleArrayQueue(5);
+						Scanner scanner = new Scanner(System.in);
+						char c;
+						boolean flag = true;
+						while (flag) {
+							System.out.print("请输入命令：");
+							c = scanner.next().charAt(0);
+							int value;
+							switch (c) {
+								case 'a':
+									arrayQueue.add(new Random().nextInt(100));
+									break;
+								case 'r':
+									value = arrayQueue.remove();
+									System.out.println(value);
+									break;
+								case 'p':
+									value = arrayQueue.peek();
+									System.out.println(value);
+									break;
+								case 'l':
+									arrayQueue.list();
+									break;
+								case 'e':
+									flag = false;
+									break;
+							}
+						}
+					}
+				}
+				class CircleArrayQueue {
+					private final int[] arr; // 模拟队列的数组
+					private final int maxSize; // 队列最大长度
+					private int rear; // 指向队列的最后一个元素的后一个位置
+					private int front; // 指向队列的第一个元素
+
+					public CircleArrayQueue(int arrMaxSize) {
+						maxSize = arrMaxSize;
+						arr = new int[maxSize];
+						rear = 0;
+						front = 0;
+					}
+
+					/**
+					 * 判断队列是否已经满了
+					 */
+					public boolean isFull() {
+						// 预留一个空间
+						return (rear + 1) % maxSize == front;
+					}
+
+					/**
+					 * 判断队列是否为空
+					 */
+					public boolean isEmpty() {
+						return rear == front;
+					}
+
+					/**
+					 * 添加一个元素到队列中
+					 */
+					public void add(int num) {
+						if (!isFull()) {
+							arr[rear++] = num;
+							// 当 rear 超过 maxSize之后，该值指向的下一个应该是原点
+							rear %= maxSize;
+						} else {
+							System.out.println("队列已满，无法添加数据");
+						}
+					}
+
+					/**
+					 * 从队列中取出一个元素
+					 */
+					public int remove() {
+						if (!isEmpty()) {
+							int value = arr[front++];
+							// 当 front 超过 maxSize 之后，下一个指向应该是原点
+							front %= maxSize;
+							return value;
+						}
+						System.out.println("队列已空，无法获数据");
+						return Integer.MIN_VALUE;
+					}
+
+					/**
+					 * 获取队列有效数据的个数
+					 */
+					public int size() {
+						return (rear - front + maxSize ) % maxSize;
+					}
+
+					/**
+					 * 遍历队列元素
+					 */
+					public void list() {
+						if (!isEmpty()) {
+							System.out.print("arr[");
+							int count = size();
+							int index;
+							for (int i = 0; i < count; i++) {
+								index = (front + i ) % maxSize;
+								System.out.print(arr[index] + " ");
+							}
+							System.out.println("]");
+						} else {
+							System.out.println("队列已空，无法获数据");
+						}
+					}
+
+					/**
+					 * 查看队列头
+					 */
+					public int peek() {
+						if (!isEmpty()) {
+							return arr[front];
+						}
+						System.out.println("队列已空，无法获数据");
+						return Integer.MIN_VALUE;
+					}
+				}
+四、链表
+	1. 链表(Linked List)介绍
+		① 链表是有序的列表，但是它在内存中是存储如下
+				 头指针		地址	data域 next域
+				 +-----+			+-----+-----+
+			head | 150 |	110		| a2  | 180 |
+				 +-----+			+-----+-----+
+									|	  |		|
+									+-----+-----+
+									| a4  |	170	|
+									+-----+-----+
+									| a6  |	NULL|
+									+-----+-----+
+									| a1  |	110 |
+									+-----+-----+
+									|	  |		|
+									+-----+-----+
+									| a5  |	140	|
+									+-----+-----+
+									| a3  |	130 |
+									+-----+-----+
+		② 小结
+			A. 链表是以节点的方式来存储,是链式存储
+			B. 每个节点包含 data 域， next 域：指向下一个节点
+			C. 链表的各个节点不一定是连续存储
+			D. 链表分带头节点的链表和没有头节点的链表，根据实际的需求来确定
+	2. 单链表介绍
+		① 单链表(带头结点) 逻辑结构示意图如下
+					+----+----+	   +----+----+	  +----+----+	 			+----+----+
+			head -> | 头 |    | -> | a1 |    | -> | a2 |    | -> ...... ->	| an |    |
+					+----+----+	   +----+----+	  +----+----+	 			+----+----+
+		② 单链表的应用实例
+			A. 使用带head头的单向链表实现水浒英雄排行榜管理
+			B. 完成对英雄人物的增删改查操作
+			C. 第一种方法在添加英雄时，直接添加到链表的尾部
+				a. 先创建一个 head 头节点，作用就是表示单链表的头
+				b. 后面每添加一个节点，就直接加入到链表的最后
+			D. 第二种方式在添加英雄时，根据排名将英雄插入到指定位置（如果有这个排名，则添加失败，并给出提示）
+				a. 首先找到新添加的节点的位置，是通过辅助变量（指针），通过遍历来搞定
+				b. 新的节点 .next = temp.next
+				c. 将 temp.next = 新的节点
+			E. 遍历：通过一个辅助遍历，帮助遍历整个链表
+			F. 修改：根据 no 编号来修改
+			G. 删除一个节点
+				a. 先找到需要删除的这个节点的前一个节点 temp
+				b. 比较时，使用 temp.next.no 和需要删除的节点的 no 比较
+				c. 删除节点时，使 temp.next = temp.next.next
+				d. 被删除的节点，将不会有其他引用指向，会被垃圾回收机制回收
+			H. 单链表代码实例
+				public class SingleLinkedListDemo {
+
+					public static void main(String[] args) {
+						HeroNode node1 = new HeroNode(1, "宋江","及时雨");
+						HeroNode node2 = new HeroNode(2, "卢俊义","玉麒麟");
+						HeroNode node3 = new HeroNode(3, "吴用","智多星");
+						HeroNode node4 = new HeroNode(4, "林冲","豹子头");
+						SingleLinkedList linkedList = new SingleLinkedList();
+						linkedList.add(node4);
+						linkedList.add2(node1);
+						linkedList.add2(node3);
+						linkedList.add2(node2);
+						linkedList.add2(node2);
+						HeroNode node5 = new HeroNode(6, "林冲","豹子头1");
+						linkedList.update(node5);
+						linkedList.delete(node1);
+						linkedList.add2(node1);
+						linkedList.list();
+						System.out.println(linkedList.size());
+						System.out.println(linkedList.lastIndex(1));
+						System.out.println();
+						linkedList.reverse();
+						linkedList.list();
+
+						linkedList.reverseList();
+					}
+				}
+
+				/**
+				 * 定义一个链接，来管理节点
+				 */
+				class SingleLinkedList {
+					// 初始化头节点，用于指向第一个节点，不存放任何数据
+					private final HeroNode head = new HeroNode(0, "", "");
+
+					/**
+					 * 添加节点到链表中
+					 * 找到当前链表的最末尾的节点
+					 * 将最末尾的节点的next指向新节点
+					 */
+					public void add(HeroNode node) {
+						HeroNode temp = head;
+						// 遍历链表，找到末尾节点
+						while (true) {
+							// 找到末尾节点
+							if (temp.next == null) {
+								temp.next = node;
+								break;
+							}
+							// 如果没有找到就后移动
+							temp = temp.next;
+						}
+					}
+
+					/**
+					 * 插入节点到指定位置
+					 * 如果该位置已经有值了，则添加失败，并给出提示
+					 */
+					public void add2(HeroNode node) {
+						HeroNode temp = head;
+						boolean flag = false; // 判断添加的节点编号是否村子
+
+						while (true) {
+							if (temp.next == null) {
+								// 说明 temp 已经在链表的最后
+								break;
+							} else if (temp.next.no > node.no) {
+								// 找到位置，就在temp的后面
+								break;
+							} else if (temp.next.no == node.no) {
+								// 找到相同编号的节点
+								flag = true;
+								break;
+							} else {
+								// 后移，遍历当前链表
+								temp = temp.next;
+							}
+						}
+						if (flag) {
+							System.out.println("该节点已经存在，添加失败");
+						} else {
+							node.next = temp.next;
+							temp.next = node;
+						}
+					}
+
+					/**
+					 * 删除节点
+					 */
+					public void delete(HeroNode node) {
+						//  判断当前链表是否为空
+						if (head.next == null) {
+							System.out.println("链表为空，不能删除");
+							return;
+						}
+						// 需要一个辅助节点找到待删除节点的前一个节点
+						HeroNode temp = head;
+						boolean flag = false;
+						while (true) {
+							if (temp.next == null) {
+								// 已经到链表的最后
+								break;
+							} else if (temp.next.no == node.no) {
+								// 找到待删除节点的前一个节点 temp
+								flag = true;
+								break;
+							} else {
+								// 后移，遍历当前链表
+								temp = temp.next;
+							}
+						}
+						if (flag) {
+							temp.next = temp.next.next;
+						} else {
+							System.out.printf("没有找到编号为 %d 的节点\n", node.no);
+						}
+					}
+
+					/**
+					 * 修改节点的编号，根据 no 编号来修改
+					 */
+					public void update(HeroNode node) {
+						// 判断当前链表是否为空
+						if (head.next == null) {
+							System.out.println("链表为空，不能修改");
+							return;
+						}
+						// 表示是否找到改节点
+						boolean flag = false;
+						HeroNode temp = head.next;
+						while (true) {
+							if (temp == null) {
+								// 已经遍历完整个链表
+								break;
+							} else if (temp.no == node.no) {
+								// 找到要修改的节点
+								flag = true;
+								break;
+							} else {
+								// 后移，遍历当前链表
+								temp = temp.next;
+							}
+						}
+						if (flag) {
+							temp.name = node.name;
+							temp.nickName = node.nickName;
+						} else {
+							System.out.printf("没有找到编号为 %d 的节点\n", node.no);
+						}
+					}
+
+					/**
+					 * 遍历链表
+					 */
+					public void list() {
+						HeroNode temp = head.next;
+						// 判断链表是否为空
+						if (temp == null) {
+							System.out.println("链表为空");
+							return;
+						}
+						do {
+							System.out.println(temp);
+							// 如果不为空就后移
+							temp = temp.next;
+						} while (temp != null);
+					}
+
+					/**
+					 * 获取链表的有效节点
+					 */
+					public int size() {
+						if (head.next == null) {
+							return 0;
+						}
+						int size = 0;
+						HeroNode cur = head;
+						while ((cur = cur.next) != null) {
+							size++;
+						}
+						return size;
+					}
+
+					/**
+					 * 获取倒数第k个节点
+					 */
+					public HeroNode lastIndex(int index) {
+						if (head.next == null) {
+							return null;
+						}
+						// 获取链表的有效节点个数
+						int size = size();
+						if (index <= 0 || index > size) {
+							return null;
+						}
+
+						HeroNode cur = head.next;
+						for (int i = 0; i < size - index; i++) {
+							cur = cur.next;
+						}
+
+						return cur;
+					}
+
+					/**
+					 * 将链表反转
+					 */
+					public void reverse() {
+						// 如果当前链表没有或者只有一个节点，不需要反转
+						int size = size();
+						if (size == 0 || size == 1) {
+							return;
+						}
+
+						HeroNode reverseHead = new HeroNode(0, "", null);
+						HeroNode temp;
+						// 遍历原来的链表，每遍历一个节点，就将其取出，并放在新的链表 reverseHead 的最前面
+						while ((temp = head.next) != null) {
+							// 将遍历的节点从旧的链表取出
+							head.next = temp.next;
+							// 将节点放在新链表的最前面
+							temp.next = reverseHead.next;
+							reverseHead.next = temp;
+						}
+
+						// 得到新的额链表
+						head.next = reverseHead.next;
+					}
+
+					/**
+					 * 逆序打印
+					 */
+					public void reverseList() {
+						if (head.next == null) {
+							return;
+						}
+						// 使用栈数据结构
+						Stack<HeroNode> stack = new Stack<>();
+
+						// 将各个节点压入栈中
+						HeroNode temp = head;
+						while ((temp = temp.next) != null) {
+							stack.push(temp);
+						}
+
+						// 然后利用栈的后进先出的特点，实现逆序打印的效果
+						while (stack.size() > 0) {
+							System.out.println(stack.pop());
+						}
+					}
+				}
+
+				/**
+				 * 定义 HeroNode，每个 HeroNode 对象是一个节点
+				 */
+				class HeroNode {
+					int no;
+					String name;
+					String nickName;
+					HeroNode next; // 指向下一个节点
+
+					public HeroNode(Integer no, String name, String nickName) {
+						this.no = no;
+						this.name = name;
+						this.nickName = nickName;
+					}
+
+					@Override
+					public String toString() {
+						return "HeroNode{" +
+								"no=" + no +
+								", name='" + name + '\'' +
+								", nickName='" + nickName + '\'' +
+								'}';
+					}
+				}
+				
+		③ 单链表面试题(新浪、百度、腾讯)
+			A. 求单链表中有效节点的个数
+			B. 查找单链表中的倒数第k个结点（新浪面试题），思路：倒数第 k 个节点 = size - k;
+			C. 单链表的反转（腾讯面试题），思路：
+				a. 先定义一个节点，代表新的头节点 reverseHead
+				b. 从头到尾遍历原来的链表，每遍历一个节点，就将其取出，并放在新的链表 reverseHead 的最前端
+				c. 原来的链表 head.next = reverseHead.next
+			D. 从尾到头打印单链表 （百度，方式1：反转遍历；方式2：Stack 栈）
+			E. 合并两个有序的单链表，合并之后的链表依然有序
+	3. 双向链表应用实例
+		① 单向链表的缺点分析
+			A. 单向链表，查找的方向只能是一个方向，而双向链表可以向前或者向后查找
+			B. 单向链表不能自我删除，需要靠辅助节点 ，而双向链表，则可以自我删除
+		② 双向列表的遍历、添加、修改、删除的操作思路
+			A. 遍历和单链表一样，只是可以向前，也可以向后查找
+			B. 添加（默认添加到双向链表的最后）
+				a. 先找到双向链表的最后这个节点
+				b. temp.next = newHeroNode
+				c. newHeroNode.pre = temp;
+			C. 修改思路、原理和单向链表一样
+			D. 删除
+				a. 因为是双向链表，因此，可以实现自我删除某个节点
+				b. 直接找到要删除的这个节点，比如 temp
+				c. temp.pre.next = temp.next
+				d. temp.next.pre = temp.pre，需要判断删除的节点是否为最后一个节点
+			E. 按照指定顺序添加节点
+				a. 找到新节点的添加位置
+				b. 加入节点时，先处理当前位置的下一个节点，再处理当前位置的节点
+				c. temp.next.pre = node; 需要判断当前位置是否为最后一个节点
+				d. node.next = temp.next;
+				e. node.pre = temp;
+				f. temp.next = node;
+		③ 双向链表代码实例
+			public class DoubleLinkedListDemo {
+
+				public static void main(String[] args) {
+					HeroNode2 node1 = new HeroNode2(1, "宋江","及时雨");
+					HeroNode2 node2 = new HeroNode2(2, "卢俊义","玉麒麟");
+					HeroNode2 node3 = new HeroNode2(3, "吴用","智多星");
+					HeroNode2 node4 = new HeroNode2(4, "林冲","豹子头");
+					DoubleLinkedList linkedList = new DoubleLinkedList();
+					linkedList.add(node1);
+					linkedList.add2(node4);
+					linkedList.add2(node2);
+					linkedList.add2(node3);
+					System.out.println("添加");
+					linkedList.list();
+
+					HeroNode2 node5 = new HeroNode2(4, "林冲","豹子头1");
+					linkedList.update(node5);
+					System.out.println("修改");
+					linkedList.list();
+					linkedList.delete(1);
+					System.out.println("删除");
+					linkedList.list();
+				}
+			}
+
+			class DoubleLinkedList {
+
+				// 初始化头节点，用于指向第一个节点，不存放任何数据
+				HeroNode2 head = new HeroNode2(0, "", "");
+
+				/**
+				 * 插入节点到指定位置
+				 */
+				public void add2(HeroNode2 node) {
+					HeroNode2 temp = head;
+					boolean flag = false;
+					while (true) {
+						if (temp.next == null) {
+							break;
+						} else if (temp.next.no > node.no) {
+							break;
+						} else if (temp.next.no == node.no) {
+							flag = true;
+							break;
+						}
+
+						temp = temp.next;
+					}
+					if (flag) {
+						System.out.printf("编号为 %d 的节点已经存在\n", node.no);
+					} else {
+						// 判断是否为最后一个节点
+						// 先处理当前位置的下一个节点，再处理当前位置的节点
+						if (temp.next != null) {
+							temp.next.pre = node;
+						}
+						node.next = temp.next;
+						node.pre = temp;
+						temp.next = node;
+					}
+				}
+
+				/**
+				 * 添加节点到链表中
+				 */
+				public void add(HeroNode2 node) {
+					HeroNode2 temp = head;
+					while (true) {
+						if (temp.next == null) {
+							temp.next = node;
+							node.pre = temp;
+							break;
+						}
+						temp = temp.next;
+					}
+				}
+
+				/**
+				 * 修改节点的编号，根据 no 编号来修改
+				 */
+				public void update(HeroNode2 node) {
+					if (head.next == null) {
+						return;
+					}
+					HeroNode2 temp = head.next;
+					boolean flag = false;
+					while (true) {
+						if (temp == null) {
+							break;
+						} else if (temp.no == node.no) {
+							flag = true;
+							break;
+						}
+						temp = temp.next;
+					}
+					if (flag) {
+						temp.name = node.name;
+						temp.nickName = node.nickName;
+					}
+				}
+
+				public void delete(int no) {
+					if (head.next == null) {
+						return;
+					}
+
+					HeroNode2 temp = head.next;
+					boolean flag = false;
+					while (true) {
+						if (temp == null) {
+							break;
+						} else if (temp.no == no) {
+							flag = true;
+							break;
+						}
+						temp = temp.next;
+					}
+					if (flag) {
+						temp.pre.next = temp.next;
+						if (temp.next != null) {
+							temp.next.pre = temp.pre;
+						}
+					}
+				}
+
+				/**
+				 * 遍历链表
+				 */
+				public void list() {
+					HeroNode2 temp = head.next;
+					// 判断链表是否为空
+					if (temp == null) {
+						return;
+					}
+					do {
+						System.out.println(temp);
+						// 如果不为空就后移
+						temp = temp.next;
+					} while (temp != null);
+				}
+			}
+
+			class HeroNode2 {
+				int no;
+				String name;
+				String nickName;
+				HeroNode2 next; // 指向下一个节点
+				HeroNode2 pre; // 指向下一个节点
+
+				public HeroNode2(Integer no, String name, String nickName) {
+					this.no = no;
+					this.name = name;
+					this.nickName = nickName;
+				}
+
+				@Override
+				public String toString() {
+					return "HeroNode{" +
+							"no=" + no +
+							", name='" + name + '\'' +
+							", nickName='" + nickName + '\'' +
+							'}';
+				}
+			}
+	4. 单向环形链表应用场景
+		① Josephu(约瑟夫、约瑟夫环) 问题
+			A. Josephu 问题为：设编号为1，2，… n 的 n 个人围坐一圈，约定编号为 k（1<=k<=n）的人从 1 开始报数，数到 m 的那个人出列，它的下一位又从 1 开始报数，
+			数到 m 的那个人又出列，依次类推，直到所有人出列为止，由此产生一个出队编号的序列。
+			B. 提示：用一个不带头结点的循环链表来处理 Josephu 问题：先构成一个有 n 个结点的单循环链表，然后由 k 结点起从 1 开始计数，计到 m 时，对应结点从链
+			表中删除，删除结点的下一个结点又从 1 开始计数，直到最后一个结点从链表中删除算法结束。
+		② 约瑟夫问题示意图
+			+------+	   +------+	   	  +------+
+			|  1   |	   |  2   |	   	  |  3   |
+			| next | ----> | next | ----> | next |
+			+------+	   +------+		  +------+
+				↑							 |
+				|							 ↓
+			+------+					  +------+
+			|  5   |					  |  4   |
+			| next | <------------------- | next |
+			+------+					  +------+
+			A. 假设 n = 5，既有五个人
+			B. k = 1，从第一个人开始报数
+			C. m = 2，数两下
+			D. 出队的顺序：2 -> 4 -> 1 -> 5 -> 3
+		③ 单向环形链表构建和遍历思路
+			A 构建
+				a. 先创建第一个节点，让 first 指向该节点，并形成环形
+				b. 后面每当创建一个新的节点，就把该节点加入到已有的环形链表即可，并让当前指针指向该节点
+			B. 遍历
+				a. 先让一个辅助指针 curr，指向 first 节点
+				b. 然后通过一个 while 循环遍历该环形链表即可，当 curr.next == first 结束。
+			C. 单向环形链表出圈顺序思路
+				a. 需要创建一个辅助指针（变量）helper，事先应该指向环形链表的最后这个节点
+				b. 报数前，先让 first 和 helper 移动 k-1 次
+				c. 报数时，让 first 和 helper 移动 m-1 次
+				d. 这时就可以将 first 指向的节点出列
+					first = first.next;
+					help.next = first;
+				e. 当链表只剩下一个节点时，退出循环
+		④ 单向环形链表代码实例
+			public class JosephuDemo {
+
+				public static void main(String[] args) {
+					CircleSingleLinkedList linkedList = new CircleSingleLinkedList();
+					linkedList.addBoy(5);
+					linkedList.list();
+
+					linkedList.count(1, 2);
+				}
+			}
+
+			/**
+			 * 创建单项环形链表
+			 */
+			class CircleSingleLinkedList {
+				// 创建一个 first 节点，当前没有编号
+				Boy first = null;
+
+				/**
+				 * 添加节点，构成一个环形链表
+				 */
+				public void addBoy(int num) {
+					if (num < 1) {
+						return;
+					}
+
+					Boy node, curr = null;
+					for (int i = 1; i <= num; i++) {
+						node = new Boy(i);
+						if (i == 1) {
+							// 如果是单项环形链表的第一个节点
+							// 让节点头指向第一个节点
+							first = node;
+							// 让第一个节点指向自己，形成一个环状
+							node.next = node;
+							// 将指针移向当前节点
+							curr = node;
+						} else {
+							// 将最后一个节点指向第一个，形成环状
+							node.next = first;
+							// 将上一个节点指向当前新节点
+							curr.next = node;
+							// 将指针移向当前新节点
+							curr = node;
+						}
+					}
+				}
+
+				/**
+				 * 遍历
+				 */
+				public void list() {
+					// 判断链表是否为空
+					if (first == null) {
+						return;
+					}
+
+					// 由于 first 不能移动，所以需要一个辅助指针
+					Boy curr = first;
+					do {
+						System.out.println(curr.no);
+						// 指针后移，直至下一个指针为第一节点为止
+						curr = curr.next;
+					} while (curr != first);
+				}
+
+				/**
+				 * 单向环形链表出圈
+				 * @param start 移动到第 start 个节点
+				 * @param count 第 count 个节点出列
+				 */
+				public void count(int start, int count) {
+					if (first == null || start < 1 || count < 1 || start > size()) {
+						return;
+					}
+
+					// 将辅助指针指向最后一个节点
+					Boy helper = first;
+					while (helper.next != first) {
+						helper = helper.next;
+					}
+
+					// 让 helper 和 first 移动到 start 的为止
+					for (int i = 0; i < start - 1; i++) {
+						helper = first;
+						first = first.next;
+					}
+
+					// 让 helper 和 first 同时移动 count-1 次，然后出圈
+					while (helper != first) {
+
+						for (int i = 0; i < count - 1; i++) {
+							helper = first;
+							first = first.next;
+						}
+						// 这时 first 指向，就是需要出圈的节点
+						System.out.println(first.no);
+						first = first.next;
+						helper.next = first;
+					}
+					System.out.println(first.no);
+				}
+
+				public int size() {
+					if (first == null) {
+						return 0;
+					}
+					Boy curr = first;
+					int size = 1;
+					while (curr.next != first) {
+						size++;
+						curr = curr.next;
+					}
+					return size;
+				}
+			}
+
+			class Boy {
+				int no;
+				Boy next;
+
+				public Boy(int no) {
+					this.no = no;
+				}
+			}
+五、栈
+	1. 栈的一个实际需求
+		① 请输入一个表达式：7*2*2-5+1-5+3-3
+		② : 计算机底层是如何运算得到结果的？注意不是简单的把算式列出运算，因为我们看这个算式 7 * 2 * 2 - 5，但是计算机怎么理解这个算式的（对计算机而言，它接
+		收到的就是一个字符串)，我们讨论的是这个问题。
+	2. 栈的介绍
+		① 栈的英文为 stack，栈是一个先入后出（FILO-First In Last Out）的有序列表。
+		② 栈（stack）是限制线性表中元素的插入和删除只能在线性表的同一端进行的一种特殊线性表。允许插入和删除的一端，为变化的一端，称为栈顶（Top），另一端为固
+		定的一端，称为栈底（Bottom）。
+		③ 根据栈的定义可知，最先放入栈中元素在栈底，最后放入的元素在栈顶，而删除元素刚好相反，最后放入的元素最先删除，最先放入的元素最后删除
+	3. 栈的应用场景
+		A. 子程序的调用：在跳往子程序前，会先将下个指令的地址存到堆栈中，直到子程序执行完后再将地址取出，以回到原来的程序中。 	
+		B. 处理递归调用：和子程序的调用类似，只是除了储存下一个指令的地址外，也将参数、区域变量等数据存入堆栈中。
+		C. 表达式的转换[中缀表达式转后缀表达式]与求值（实际解决）。
+		D. 二叉树的遍历。
+		E. 图形的深度优先(depth一first)搜索法。
+	4. 栈的快速入门
+		① 用数组模拟栈的使用，由于栈是一种有序列表，当然可以使用数组的结构来储存栈的数据内容，下面我们就用数组模拟栈的出栈，入栈等操作。
+		② 示例代码见 ArrayStackDemo.java
+	5. 栈实现综合计算器思路
+		① 通过一个 index 值（索引），来遍历表达式
+		② 如果扫描的是一个数字，就直接入数栈
+		③ 如果扫描的是一个符号，有以下情况
+			A. 如果当前符号栈为空，就直接入栈
+			B. 如果符号栈有操作符，就进行比较，如果当前操作符的优先级小于或者等于栈中的操作符，就从数栈中 pop 出两个数，再从符号栈中 pop 出一个符号，进行运算
+			将得到的结果重新入数栈，然后将当前的操作符入符号栈。如果当前的操作符的优先级大于栈中的操作符，就直接入符号栈
+		④ 当表达式扫描完毕，就顺序的从数栈和符号栈中 pop 出相应的数值和符号，进行运算
+		⑤ 最后在数栈中只有一个数字，就是表达式的结果
+		⑦ 栈实现综合计算器代码实现
+			public class Calculator {
+
+				public static void main(String[] args) {
+					Calculator calculator = new Calculator();
+					Scanner scanner = new Scanner(System.in);
+					while (true) {
+						String expression = scanner.next();
+						int result = calculator.calculate(expression);
+						System.out.printf("%s = %d\n", expression, result);
+					}
+				}
+
+				/**
+				 * 栈实现综合计算器
+				 */
+				public int calculate(String expression) {
+					// 简单校验表达式的合理性
+					if (expression == null || expression.isEmpty()) {
+						return Integer.MIN_VALUE;
+					}
+					// 操作数栈
+					ArrayStack2<Integer> numStack = new ArrayStack2<>();
+					// 操作符栈
+					ArrayStack2<Character> operatorStack = new ArrayStack2<>();
+					// 创建索引
+					int index = 0;
+					// 预先定义好需要使用的变量
+					int num, num1, num2, result;
+					char operator;
+					while (expression.length() > 0) {
+						if (index == expression.length()) {
+							// 当表达式只剩下最后一个数值时
+							num = Integer.parseInt(expression);
+							numStack.push(num);
+							expression = "";
+						} else if (isOperator(expression.charAt(index))) {
+							// 当扫描到操作符时
+							// 获取操作符前面的数值，放入到操作数栈中
+							num = Integer.parseInt(expression.substring(0, index));
+							numStack.push(num);
+							// 获取当前操作符，判断当前操作符栈是否为空，并且判断当前操作符与操作符栈顶的操作符的优先级大小
+							operator = expression.charAt(index);
+							if (!operatorStack.isEmpty() && priority(operator) <= priority(operatorStack.peek())) {
+								// 如果当前操作符栈不为空，并且当前操作符的优先级小于等于操作符栈顶的操作符
+								// 弹出操作数栈顶两个元素与操作符栈顶一个元素，进行运算，将结果放入到操作数栈中
+								num1 = numStack.pop();
+								num2 = numStack.pop();
+								result = calculate(num1, num2, operatorStack.pop());
+								numStack.push(result);
+							}
+							// 将当前操作符压入操作符栈中
+							operatorStack.push(operator);
+							// 更新将表达式，去除已经完成入栈的表达式
+							expression = expression.substring(index + 1);
+							index = 0;
+						} else {
+							index++;
+						}
+					}
+
+					// 将操作数栈和操作符中的元素按照顺序进行运算，并将最终结果返回
+					while (!operatorStack.isEmpty()) {
+						num1 = numStack.pop();
+						num2 = numStack.pop();
+						operator = operatorStack.pop();
+						result = calculate(num1, num2, operator);
+						numStack.push(result);
+					}
+					return numStack.pop();
+				}
+
+				/**
+				 * 返回操作符的优先级，优先级使用数字表示，数字越大，则优先级越高
+				 */
+				public int priority(int operator) {
+					if (operator == '*' || operator == '/') {
+						return 1;
+					} else if (operator == '+' || operator == '-') {
+						return 0;
+					} else {
+						return -1;
+					}
+				}
+
+				/**
+				 * 判断一个字符是否是操作符
+				 */
+				public boolean isOperator(char val) {
+					return val == '+' || val == '-' || val == '*' || val == '/';
+				}
+
+				/**
+				 * 计算
+				 */
+				public int calculate(int num1, int num2, int operator) {
+					int result = 0;
+					switch (operator) {
+						case '+':
+							result = num2 + num1;
+							break;
+						case '-':
+							result = num2 - num1;
+							break;
+						case '*':
+							result = num2 * num1;
+							break;
+						case '/':
+							result = num2 / num1;
+							break;
+						default:
+							break;
+					}
+					return result;
+				}
+			}
+
+			/**
+			 * 模拟栈
+			 */
+			class ArrayStack2<T> {
+				private Object[] elements;
+				private int top = 0;
+				private static final int DEFAULT_INITIAL_CAPACITY = 16;
+
+				public ArrayStack2() {
+					elements = new Object[DEFAULT_INITIAL_CAPACITY];
+				}
+
+				public ArrayStack2(int maxSize) {
+					elements = new Object[maxSize];
+				}
+
+				/**
+				 * 入栈
+				 */
+				public void push(T obj) {
+					// 如果栈满了，就进行扩容
+					ensureCapacity();
+					// 将元素保存在栈顶
+					elements[top++] = obj;
+				}
+
+				/**
+				 * 出栈
+				 */
+				public T pop() {
+					// 先判断栈是否为空
+					if (top == 0) {
+						throw new EmptyStackException();
+					}
+
+					// 先取出栈顶元素，在将栈顶置空，最后将元素返回
+					T element = (T) elements[--top];
+					// 将弹出的元素，交给垃圾回收器回收
+					elements[top] = null;
+					return element;
+				}
+
+				/**
+				 * 遍历栈
+				 */
+				public void list() {
+					if (top == 0) {
+						return;
+					}
+					System.out.print("ArrayStack[");
+					for (int i = top - 1; i >= 0; i--) {
+						System.out.print(elements[i] + " ");
+					}
+					System.out.println("]");
+				}
+
+				/**
+				 * 栈自动扩容
+				 */
+				public void ensureCapacity() {
+					// 当栈满时，采取扩容机制，扩大为原来的两倍
+					if (top == elements.length) {
+						elements = Arrays.copyOf(elements, top * 2 + 1);
+					}
+				}
+
+				/**
+				 * 判断栈是否为空
+				 */
+				public boolean isEmpty() {
+					return top == 0;
+				}
+
+				/**
+				 * 查看栈顶元素
+				 */
+				public T peek() {
+					return (T) elements[top - 1];
+				}
+			}
+	6. 前缀、中缀、后缀表达式(逆波兰表达式)
+		① 前缀表达式(波兰表达式)
+			A. 前缀表达式又称波兰式，前缀表达式的运算符位于操作数之前
+			B. 举例说明： (3+4)×5-6 对应的前缀表达式就是 - × + 3 4 5 6
+		② 前缀表达式的计算机求值
+			A. 从右至左扫描表达式，遇到数字时，将数字压入堆栈，遇到运算符时，弹出栈顶的两个数，用运算符对它们做相应的计算（栈顶元素 和 次顶元素），并将结果入
+			栈；重复上述过程直到表达式最左端，最后运算得出的值即为表达式的结果
+			B. 例如: (3+4)×5-6 对应的前缀表达式就是 - × + 3 4 5 6 , 针对前缀表达式求值步骤如下:
+				a. 从右至左扫描，将6、5、4、3压入堆栈
+				b. 遇到+运算符，因此弹出3和4（3为栈顶元素，4为次顶元素），计算出3+4的值，得7，再将7入栈
+				c. 接下来是×运算符，因此弹出7和5，计算出7×5=35，将35入栈
+				d. 最后是-运算符，计算出35-6的值，即29，由此得出最终结果
+		③ 中缀表达式
+			A. 中缀表达式就是常见的运算表达式，如(3+4)×5-6
+			B. 中缀表达式的求值是我们人最熟悉的，但是对计算机来说却不好操作，因此，在计算结果时，往往会将中缀表达式转成其它表达式来操作（一般转成后缀表达式）
+		④ 后缀表达式
+			A. 后缀表达式又称逆波兰表达式,与前缀表达式相似，只是运算符位于操作数之后
+			B. 举例说明：(3+4)×5-6 对应的后缀表达式就是 3 4 + 5 × 6 –
+			C. 再比如:
+				正常表达式	逆波兰表达式
+				a+b			a b +
+				a+(b-c)		a b c - +
+				a+(b-c)*d	a b c - d * +
+				a+d*(b-c)	a d b c - * +
+				a=1+3		a 1 3 + =
+	7. 逆波兰计算器
+		① 后缀表达式的计算机求值
+			A. 从左至右扫描表达式，遇到数字时，将数字压入堆栈，遇到运算符时，弹出栈顶的两个数，用运算符对它们做相应的计算（次顶元素和栈顶元素），并将结果入
+			栈；重复上述过程直到表达式最右端，最后运算得出的值即为表达式的结果
+			B. 例如: (3+4)×5-6 对应的后缀表达式就是 3 4 + 5 × 6 - , 针对后缀表达式求值步骤如下:
+				a. 从左至右扫描，将3和4压入堆栈；
+				b. 遇到+运算符，因此弹出 4 和 3（4 为栈顶元素，3为次顶元素），计算出 3+4 的值，得 7，再将 7 入栈；
+				c. 将 5 入栈；
+				d. 接下来是×运算符，因此弹出5和7，计算出 7×5=35，将 35 入栈；
+				e. 将 6 入栈；
+				f. 最后是-运算符，计算出 35-6 的值，即 29，由此得出最终结果
+		② 逆波兰计算器
+			A. 输入一个逆波兰表达式（后缀表达式），使用栈（Stack）, 计算其结果
+			B. 支持小括号和多位数整数，因为这里我们主要讲的是数据结构，因此计算器进行简化，只支持对整数的计算。
+			C. 思路分析
+			D. 代码完成
+				public class ReversePolishMultiCalc {
+
+					public static void main(String[] args) {
+						ReversePolishMultiCalc reversePolishMultiCalc = new ReversePolishMultiCalc();
+						String expression = "1 + (2+3)*4 -5";
+						reversePolishMultiCalc.replaceAllBlank(expression);
+						System.out.println(reversePolishMultiCalc.replaceAllBlank(expression));
+						System.out.println(reversePolishMultiCalc.isSymbol("*"));
+						System.out.println(reversePolishMultiCalc.isNumber("11.1"));
+					}
+
+					/**
+					 * 匹配 + - * / ( ) 运算符
+					 */
+					static final String SYMBOL = "[()+\\-*/]";
+					static final String LEFT = "(";
+					static final String RIGHT = ")";
+					static final String ADD = "+";
+					static final String MINUS = "-";
+					static final String TIMES = "*";
+					static final String DIVISION = "/";
+
+					/**
+					 * 加减法的优先级
+					 */
+					static final int PRIORITY_1 = 1;
+					/**
+					 * 乘除法的优先级
+					 */
+					static final int PRIORITY_2 = 1;
+					/**
+					 * 括号法的优先级
+					 */
+					static final int PRIORITY_3 = Integer.MAX_VALUE;
+
+					/**
+					 * 去除所有空白字符
+					 */
+					public String replaceAllBlank(String expression) {
+						// \\s+，匹配任何空白字符，包括空格、制表符、换页符等等，等价于[\f\n\r\t\v]
+						return expression.replaceAll("\\s+", "");
+					}
+
+					/**
+					 * 判断是否为数字 int double long float
+					 */
+					public boolean isNumber(String number) {
+						Pattern pattern = Pattern.compile("^[-+]?(\\d+\\.)?\\d+$");
+						return pattern.matcher(number).matches();
+					}
+
+					/**
+					 * 判断是否是运算符
+					 */
+					public boolean isSymbol(String symbol) {
+						Pattern pattern = Pattern.compile(SYMBOL);
+						return pattern.matcher(symbol).matches();
+					}
+
+					/**
+					 * 获取运算符的优先级
+					 */
+					public int calPriority(String symbol) {
+						if ("+".equals(symbol) || "-".equals(symbol)) {
+							return PRIORITY_1;
+						} else if ("*".equals(symbol) || "/".equals(symbol)) {
+							return PRIORITY_2;
+						} else {
+							return PRIORITY_3;
+						}
+					}
+				}
+		③ 中缀表达式转换为后缀表达式
+			A. 后缀表达式适合计算式进行运算，但是人却不太容易写出来，尤其是表达式很长的情况下，因此在开发中，我们需要将 中缀表达式转成后缀表达式。
+			B. 具体步骤如下
+				a. 初始化两个栈：运算符栈 s1 和储存中间结果的栈 s2；
+				b. 从左至右扫描中缀表达式；
+				c. 遇到操作数时，将其压 s2；
+				d. 遇到运算符时，比较其与 s1 栈顶运算符的优先级：
+					(1) 如果 s1 为空，或栈顶运算符为左括号“(”，则直接将此运算符入栈；
+					(2) 否则，若优先级比栈顶运算符的高，也将运算符压入 s1；
+					(3) 否则，将 s1 栈顶的运算符弹出并压入到 s2 中，再次转到 4.1 与 s1 中新的栈顶运算符相比较；
+				e. 遇到括号时：
+					(1) 如果是左括号“(”，则直接压入 s1
+					(2) 如果是右括号“)”，则依次弹出 s1 栈顶的运算符，并压入 s2，直到遇到左括号为止，此时将这一对括号丢弃
+				f. 重复步骤 2 至 5，直到表达式的最右边
+				g. 将 s1 中剩余的运算符依次弹出并压入 s2
+				h. 依次弹出 s2 中的元素并输出，结果的逆序即为中缀表达式对应的后缀表达式
+			C. 举例说明：将中缀表达式“1+((2+3)×4)-5”转换为后缀表达式的结果为“1 2 3 + 4 × + 5 –”，过程如下：
+				+--------------+-------------------+-----------------+-------------------------------------+
+				| 扫描到的元素 | s2（栈底->栈顶）  | s1（栈底->栈顶）| 说明								   |
+				+--------------+-------------------+-----------------+-------------------------------------+
+				| 1			   | 1				   | 空			     | 数字，直接入栈					   |
+				| +			   | 1				   | +			     | s1 为空，运算符直接入栈			   |
+				| (			   | 1				   | + (		     | 左括号，直接入栈					   |
+				| (			   | 1				   | + ( (		     | 左括号，直接入栈					   |
+				| 2			   | 1 2			   | + ( (		     | 数字，直接入栈					   |
+				| +			   | 1 2			   | + ( ( +	     | s1 栈顶为左括号，运算符直接入栈	   |
+				| 3			   | 1 2 3			   | + ( ( +	     | 数字，直接入栈					   |
+				| )			   | 1 2 3 +		   | + (		     | 右括号，s1 弹出运算符直至遇到左括号 |
+				| *			   | 1 2 3 +		   | + ( *		     | s1 栈顶为左括号，运算符直接入栈	   |
+				| 4			   | 1 2 3 + 4		   | + ( *		     | 数字，直接入栈					   |
+				| )			   | 1 2 3 + 4 *	   | +			     | 右括号，s1 弹出运算符直至遇到左括号 |
+				| -			   | 1 2 3 + 4 * +	   | -			     | - 与 + 优先级相同，弹出+，在入栈 -  |
+				| 5			   | 1 2 3 + 4 * + 5   | -			     | 数字，直接入栈					   |
+				| 到达最右端   | 1 2 3 + 4 * + 5 - | 空			     | s1 中剩余的运算符				   |
+				+--------------+-------------------+-----------------+-------------------------------------+
+		④ 逆波兰计算器完整版，功能包括
+			A. 支持 + - * / ( ) 
+			B. 多位数，支持小数,
+			C. 兼容处理, 过滤任何空白字符，包括空格、制表符、换页符
+		⑤ 代码实现
+			public class PolishNotationDemo {
+
+				public static void main(String[] args) {
+					PolishNotation polishNotation = new PolishNotation();
+					Scanner scanner = new Scanner(System.in);
+					// 修改默认分隔符
+					scanner.useDelimiter("\n");
+					// "1+((2+3)*4)-5"
+					// "(3+4)*5-6"
+					String expression;
+					while (true) {
+						expression = scanner.next();
+						String suffixExpression = polishNotation.toSuffixExpression(expression);
+						System.out.println(suffixExpression);
+						BigDecimal decimal = polishNotation.calculate(suffixExpression);
+						// 不使用科学计算法输出
+						System.out.println(decimal.stripTrailingZeros().toPlainString());
+					 }
+				}
+			}
+
+			/**
+			 * 波兰运算规则
+			 */
+			class PolishNotation {
+
+				/**
+				 * 匹配 + - * / ( ) 运算符
+				 */
+				static final String SYMBOL = "[()+\\-*/]";
+				static final String LEFT = "(";
+				static final String RIGHT = ")";
+				static final String ADD = "+";
+				static final String SUBTRACT = "-";
+				static final String MULTIPLY = "*";
+				static final String DIVIDE = "/";
+				/**
+				 * 加减法的优先级
+				 */
+				static final int PRIORITY_1 = 1;
+				/**
+				 * 乘除法的优先级
+				 */
+				static final int PRIORITY_2 = 1;
+				/**
+				 * 括号法的优先级
+				 */
+				static final int PRIORITY_3 = Integer.MAX_VALUE;
+
+				/**
+				 * 将中缀表达式转化为后缀表达式
+				 */
+				public String toSuffixExpression(String expression) {
+					// 对表达式进行简单地校验
+					if (expression == null || expression.isEmpty()) {
+						throw new RuntimeException();
+					}
+					// 去除所有空白字符
+					expression = replaceAllBlank(expression);
+					// 将中缀表达式转成对应的 List
+					List<String> expressionList = toInfixExpressionList(expression);
+
+					// 定义运算符栈
+					Stack<String> s1 = new Stack<>();
+					// 定义储存中间结果集合，由于储存中间结果不需要pop操作，并且栈逆序比较麻烦，因此使用集合代替栈
+					List<String> s2 = new ArrayList<>();
+
+					// 从左至右扫描中缀表达式
+					expressionList.forEach(str -> {
+						if (isNumber(str)) {
+							// 遇到操作数时，将其加入 s2
+							s2.add(str);
+						} else if (s1.isEmpty() || s1.peek().equals(LEFT) || str.equals(LEFT)) {
+							// 如果 s1 为空，或栈顶运算符为左括号“(”，或者当前运算符是左括号“(”，则直接压入 s1
+							s1.push(str);
+						} else if (str.equals(RIGHT)) {
+							// 如果是右括号“)”，则依次弹出 s1 栈顶的运算符，并加入 s2，直到遇到左括号为止
+							while (!s1.peek().equals(LEFT)) {
+								s2.add(s1.pop());
+							}
+							// 丢弃这一对括号
+							s1.pop();
+						} else if ( priority(str) > priority(s1.peek())) {
+								// 若当前运算符优先级比栈顶运算符的高，则直接加入 s1
+								s1.push(str);
+						} else {
+							// 当前运算符优先级不比栈顶运算符的高，将 s1 栈顶的运算符弹出并加入到 s2 中，再次比较当前运算符优先级与栈顶运算符的优先级
+							while (!s1.isEmpty() && priority(str) <= priority(s1.peek())) {
+								s2.add(s1.pop());
+							}
+							// 直到运算符栈为空，或者当前运算符优先级比栈顶运算符的高，将当前运算符压入 s1
+							s1.push(str);
+						}
+					});
+					// s1 中剩余的运算符依次弹出并加入 s2
+					while (!s1.isEmpty()) {
+						s2.add(s1.pop());
+					}
+
+					// 将集合拼接成字符串，并使用空格隔开
+					return String.join(" ", s2);
+				}
+
+				/**
+				 * 将中缀表达式转成对应的 List
+				 */
+				public List<String> toInfixExpressionList(String expression) {
+					List<String> list = new ArrayList<>();
+					int index = 0;
+					String subStr;
+					// 如果index等于字符串的长度，则意味着扫描到最后一个数值
+					while (index != expression.length()) {
+						// 如果扫描的字符串是操作符，则将操作符和前面的数值都加入集合中
+						if (isSymbol(subStr = expression.charAt(index) + "")) {
+							if (index != 0) {
+								// 如果连续出现操作符，则不需要将前面的数值加入集合
+								list.add(expression.substring(0, index));
+							}
+							list.add(subStr);
+							// 去除已经加入集合中的部分，并让index重新置为0
+							expression = expression.substring(index + 1);
+							index = 0;
+						} else {
+							// 如果没有扫描到操作符，则让index自增
+							index++;
+						}
+					}
+					list.add(expression);
+					return list;
+				}
+
+				/**
+				 * 后缀表达式计算
+				 */
+				public BigDecimal calculate(String suffixExpression) {
+					Stack<BigDecimal> stack = new Stack<>();
+					// 将表达式进行切割，并转换成 List 进行遍历
+					Arrays.asList(suffixExpression.split(" ")).forEach(str -> {
+						if (isNumber(str)) {
+							// 如果是数字，则直接放到数栈中
+							BigDecimal decimal = new BigDecimal(str);
+							stack.push(decimal);
+						} else {
+							// 如果是操作符，则弹出栈顶和次栈顶，进行计算
+							BigDecimal decimal1 = stack.pop();
+							BigDecimal decimal2 = stack.pop();
+							// 计算得出结果后压入栈
+							BigDecimal decimal = calculate(decimal2, decimal1, str);
+							stack.push(decimal);
+						}
+					});
+
+					return stack.pop();
+				}
+
+				/**
+				 * 返回操作符的优先级，优先级使用数字表示，数字越大，则优先级越高
+				 */
+				public int priority(String symbol) {
+					if ("+".equals(symbol) || "-".equals(symbol)) {
+						return PRIORITY_1;
+					} else if ("*".equals(symbol) || "/".equals(symbol)) {
+						return PRIORITY_2;
+					} else {
+						return PRIORITY_3;
+					}
+				}
+
+				/**
+				 * 计算
+				 */
+				public BigDecimal calculate(BigDecimal decimal1, BigDecimal decimal2, String operator) {
+					BigDecimal result = null;
+					switch (operator) {
+						case ADD:
+							result = decimal1.add(decimal2);
+							break;
+						case SUBTRACT:
+							result = decimal1.subtract(decimal2);
+							break;
+						case MULTIPLY:
+							result = decimal1.multiply(decimal2);
+							break;
+						case DIVIDE:
+							result = decimal1.divide(decimal2);
+							break;
+						default:
+							break;
+					}
+					return result;
+				}
+
+				/**
+				 * 去除所有空白字符
+				 */
+				public String replaceAllBlank(String expression) {
+					// \\s+，匹配任何空白字符，包括空格、制表符、换页符等等，等价于[\f\n\r\t\v]
+					return expression.replaceAll("\\s+", "");
+				}
+
+				/**
+				 * 判断是否是运算符
+				 */
+				public boolean isSymbol(String symbol) {
+					Pattern pattern = Pattern.compile(SYMBOL);
+					return pattern.matcher(symbol).matches();
+				}
+
+				/**
+				 * 判断是否为数字 int double long float
+				 */
+				public boolean isNumber(String number) {
+					Pattern pattern = Pattern.compile("^[-+]?(\\d+\\.)?\\d+$");
+					return pattern.matcher(number).matches();
+				}
+			}
+六、递归
+	1. 递归应用场景：迷宫问题(回溯)， 递归(Recursion)
+	2. 递归的概念
+		① 简单的说: 递归就是方法自己调用自己,每次调用时传入不同的变量.递归有助于编程者解决复杂的问题,同时可以让代码变得简洁。
+	3. 递归调用机制
+		① 打印问题
+			public static void test(int n) {
+				if (n > 2) {
+					test(n - 1);
+				}
+				System.out.println("n=" + n);
+			}
+		② 阶乘问题
+			public static int factorial(int n) {
+				if (n == 1) {
+					return 1;
+				} else {
+					return factorial(n - 1) * n;
+				}
+			}
+	3. 递归能解决什么样的问题
+		① 各种数学问题如: 8皇后问题，汉诺塔，阶乘问题，迷宫问题，球和篮子的问题（google编程大赛）
+		② 各种算法中也会使用到递归，比如快排，归并排序，二分查找，分治算法等
+		③ 将用栈解决的问题替换为使用递归，使得代码比较简洁
+	4. 递归需要遵守的重要规则
+		① 执行一个方法时，就创建一个新的受保护的独立空间（栈空间）
+		② 方法的局部变量是独立的，不会相互影响, 比如 n 变量
+		③ 如果方法中使用的是引用类型变量（比如数组），就会共享该引用类型的数据
+		④ 递归必须向退出递归的条件逼近，否则就是无限递归，出现 StackOverflowError（栈溢出）
+		⑤ 当一个方法执行完毕，或者遇到 return，就会返回，遵守谁调用，就将结果返回给谁，同时当方法执行完毕或者返回时，该方法也就执行完毕。
+	5. 递归-迷宫问题
+		① 说明：
+			A. 小球得到的路径，和程序员设置的找路策略有关即：找路的上下左右的顺序相关
+			B. 再得到小球路径时，可以先使用(下右上左)，再改成(上右下左)，看看路径是不是有变化
+			C. 测试回溯现象
+			D. 思考: 如何求出最短路径? 
+		② 思路分析
+			A. 使用二维数组 map 表示地图
+			B. i，j 表示从地图的哪个位置开始出发（1,1）
+			C. 如果小球能到 map[6][5] 的位置，则说明通路找到了
+			D. 约定：当 map[i][j] 为 0 时表示该点没有走过，当为 1 时表示墙，为 2 时表示通路可以走，为 3 时表示该点已经走过，但是走不通
+			E. 在走迷宫时，需要确定一个策略（方法），从下右上左的顺序进行尝试，如果该点走不通，再回溯
+		③ 代码实现
+			public class RecursionMazeDemo {
+				public static void main(String[] args) {
+					Maze maze = new Maze();
+					int[][] map = maze.createMap();
+					for (int[] ints : map) {
+						for (int anInt : ints) {
+							System.out.print(anInt + " ");
+						}
+						System.out.println();
+					}
+
+					maze.setWay(map, 1, 1);
+					for (int[] ints : map) {
+						for (int anInt : ints) {
+							System.out.print(anInt + " ");
+						}
+						System.out.println();
+					}
+				}
+			}
+
+			class Maze {
+
+				/**
+				 * 迷宫寻找路径
+				 */
+				public boolean setWay(int[][] map, int i, int j) {
+					if (map[6][5] == 2) {
+						return true;
+					} else if (map[i][j] == 0) {
+						// 如果当前这个点还没走过，则标记为通路可以走，并按照策略下右上左的顺序进行尝试
+						map[i][j] = 2;
+						if (setWay(map, i + 1, j)) {
+							// 向下
+							return true;
+						} else if (setWay(map, i, j + 1)) {
+							// 向右
+							return true;
+						} else if (setWay(map, i - 1, j)) {
+							// 向上
+							return true;
+						} else if (setWay(map, i, j - 1)) {
+							// 向左
+							return true;
+						} else {
+							// 如果都走不通，则标记该点已经走过，但是走不通
+							map[i][j] = 3;
+							return false;
+						}
+					} else {
+						// 如果该点已经走过了，则直接返回
+						return false;
+					}
+				}
+
+				/**
+				 * 创建地图
+				 */
+				public int[][] createMap() {
+					// 使用二维数组模拟地图
+					int[][] map = new int[8][7];
+					// 设置地图障碍
+					for (int i = 0; i < 7; i++) {
+						map[0][i] = 1;
+						map[7][i] = 1;
+					}
+
+					for (int i = 1; i < 7; i++) {
+						map[i][0] = 1;
+						map[i][6] = 1;
+					}
+
+					map[3][1] = 1;
+					map[3][2] = 1;
+			//        map[3][3] = 1;
+			//        map[3][4] = 1;
+			//        map[3][5] = 1;
+					return map;
+				}
+			}
+	6. 递归-八皇后问题(回溯算法)
+		① 八皇后问题介绍
+			A. 八皇后问题，是一个古老而著名的问题，是回溯算法的典型案例。该问题是国际西洋棋棋手马克斯·贝瑟尔于 1848 年提出：在 8 × 8 格的国际象棋
+			上摆放八个皇后，使其不能互相攻击，即：任意两个皇后都不能处于同一行、同一列或同一斜线上，问有多少种摆法。
+			B. 八皇后问题算法思路分析
+				a. 第一个皇后先放第一行第一列
+				b. 第二个皇后放在第二行第一列、然后判断是否 OK，如果不 OK，继续放在第二列、第三列、依次把所有列都放完，找到一个合适
+				c. 继续第三个皇后，还是第一列、第二列……直到第 8 个皇后也能放在一个不冲突的位置，算是找到了一个正确解
+				d. 当得到一个正确解时，在栈回退到上一个栈时，就会开始回溯，即将第一个皇后，放到第一列的所有正确解，全部得到
+				e. 然后回头继续第一个皇后放第二列，后面继续循环执行 1，2，3，4 的步骤 
+			C. 说明：理论上应该创建一个二维数组来表示棋盘，但是实际上可以通过算法，用一个一维数组即可解决问题，arr[8] = {0 , 4, 7, 5, 2, 6, 1, 3}，
+			对应 arr 下标表示第几行，即第几个皇后，arr[i] = val , val 表示第 i+1 个皇后，放在第 i+1 行的第 val+1 列
+		② 代码实现
+			public class Queen8Demo {
+
+				public static void main(String[] args) {
+					Queen8 queen8 = new Queen8();
+					queen8.check(0);
+					System.out.printf("一共有%d次解法\n", queen8.printCount);
+					System.out.printf("一共有%d次判断\n", queen8.judgeCount);
+				}
+			}
+
+			class Queen8 {
+
+				// 定义一个max表示共有多少个皇后
+				int maxQueue = 8;
+				// 定义数组，保存皇后放置的结果
+				int[] arr = new int[maxQueue];
+
+				int printCount = 0;
+				int judgeCount = 0;
+
+				public void check(int n) {
+					if (n == maxQueue) {
+						print();
+						return;
+					}
+
+					// 在当前行每一列依次放入皇后，并判断是否冲突，并再该循环产生回溯
+					for (int i = 0; i < maxQueue; i++) {
+						arr[n] = i;
+						if (judge(n)) {
+							// 如果不冲突，开始递归，放置 n + 1 个皇后
+							check(n + 1);
+						}
+					}
+				}
+
+				// 当摆放第 n 个皇后后，检测该位置是否和前面的皇后冲突
+				public boolean judge(int n) {
+					judgeCount++;
+					for (int i = 0; i < n; i++) {
+						// arr[i] == arr[n]：表示同一列
+						// Math.abs(n - i) == Math.abs(arr[n] - arr[i])：表示同一斜线
+						if (arr[i] == arr[n] || Math.abs(n - i) == Math.abs(arr[n] - arr[i])) {
+							return false;
+						}
+					}
+					return true;
+				}
+
+				// 输出皇后摆放的位置
+				public void print() {
+					printCount++;
+					for (int i : arr) {
+						System.out.print(i + " ");
+					}
+					System.out.println();
+				}
+			}
+七、哈希表（散列）
+	1. 哈希表的基本介绍：散列表（Hash Table，也叫哈希表），是根据关键码值（key value）而直接进行访问的数据结构。也就是说，它通过把关键码值映射到
+	表中一个位置来访问记录，以加快查找的速度。这个映射函数叫做散列函数，存放记录的数组叫做散列表。
+	2. 哈希表应用实例
+		① 有一个公司，当有新的员工来报道时，要求将该员工的信息加入（id、性别、年龄、住址..），当输入该员工的id时，要求查找到该员工的所有信息
+		② 要求: 不使用数据库，尽量节省内存，速度越快越好（哈希表（散列））
+		③ 添加时，保证按照id从低到高插入  [课后思考：如果id不是从低到高插入，但要求各条链表仍是从低到高，怎么解决?]
+			A. 使用链表来实现哈希表，该链表不带表头（即: 链表的第一个结点就存放雇员信息）
+			B. 思路分析并画出示意图
+			C. 代码实现[增删改查(显示所有员工，按id查询)]
+				public class HashTableDemo {
+
+					public static void main(String[] args) {
+						HashTab hashTab = new HashTab();
+						hashTab.add(new Emp(1, "LiXL"));
+						hashTab.list();
+						System.out.println(hashTab.get(1));
+						System.out.println(hashTab.get(2));
+					}
+
+					static class HashTab {
+						private final EmpLinkedList[] elements;
+
+						public HashTab() {
+							this.elements = new EmpLinkedList[16];
+							for (int i = 0; i < elements.length; i++) {
+								elements[i] = new EmpLinkedList();
+							}
+						}
+
+						public void add(Emp emp) {
+							elements[emp.id % elements.length].add(emp);
+						}
+
+						public Emp get(int id) {
+							return elements[id % elements.length].get(id);
+						}
+
+						public void list() {
+							for (int i = 0; i < elements.length; i++) {
+								elements[i].list(i);
+							}
+						}
+					}
+
+					static class EmpLinkedList {
+						Emp head;
+
+						public void add(Emp emp) {
+							if (head == null) {
+								head = emp;
+								return;
+							}
+							Emp cur = head;
+							while (cur.next != null) {
+								cur = cur.next;
+							}
+							cur.next = emp;
+						}
+
+						public Emp get(int id) {
+							if (head == null) {
+								return null;
+							}
+
+							Emp cur = head;
+							while (cur!= null && cur.id != id) {
+								cur = cur.next;
+							}
+							return cur;
+						}
+
+						public void list(int index) {
+							if (head == null) {
+								System.out.printf("第%d条链表为空\n", index + 1);
+								return;
+							}
+							System.out.printf("第%d条链表：\n", index + 1);
+							Emp cur = head;
+							while (cur != null) {
+								System.out.println(cur);
+								cur = cur.next;
+							}
+						}
+					}
+
+					static class Emp {
+						int id;
+						String name;
+						Emp next;
+
+						public Emp(int id, String name) {
+							this.id = id;
+							this.name = name;
+						}
+
+						@Override
+						public String toString() {
+							return "Emp{" +
+									"id=" + id +
+									", name='" + name + '\'' +
+									'}';
+						}
+					}
+				}
+八、树结构基础部分
+	1. 树
+		① 为什么需要树这种数据结构
+			A. 数组存储方式的分析
+				a. 优点：通过下标方式访问元素，速度快。对于有序数组，还可以使用二分查找提高检索速度
+				b. 缺点：如果要检索具体某个值，或者插入值（按一定顺序）会整体移动，效率低
+			B. 链式存储方式的分析
+				a. 优点：在一定程度上对数组存储方式有优化（比如：插入一个数值节点，只需要将插入节点，链接到链表中即可，删除效率也很好）。
+				b. 缺点：在进行检索时，效率仍然较低，比如（检索某个值，需要从头节点开始遍历）
+			C. 树存储方式的分析：能提高数据存储，读取的效率，比如利用二叉排序树（Binary Sort Tree），即可保证数据的检索速度，同时也可以保证数据的
+			插入、删除、修改速度
+		② 树的示意图
+							+---+
+							| A | 根节点													<------------ 1 层
+							+---+
+							  |
+					+---------+---------+
+					|		  +---------|--------+
+					↓		  |			↓		 |
+				  +---+		  |		  +---+		 |
+				  | B |		  |		  | C |		 | C 是 F 和 G 的父节点，是 A 的字结点		<------------ 2 层
+				  +---+		  |		  +---+		 |
+					|		  |			|		 |
+			  +-----+----+	  |	  +-----+-----+	 | 虚线内是 C 作为根节点的子树
+			  |			 |	  |	  |			  |	 |
+			+---+	   +---+  |	+---+	   +---+ |
+			| D |	   | E |  |	| F |	   | G | | D、E、F、G 没有子结点，称为叶子节点		<------------ 3 层
+			+---+	   +---+  |	+---+	   +---+ |
+							  +------------------+
+		③ 树的常用语
+			A. 结点
+			B. 根结点
+			C. 父结点
+			D. 子结点
+			E. 叶子结点（没有子结点的结点）
+			F. 结点的权（结点值）
+			G. 路径（从 root 结点找到该结点的路线）
+			H. 层
+			I. 子树
+			J. 树的高度（最大层数）
+			K. 森林：多颗子树构成森林
+	2. 二叉树
+		① 二叉树的概念
+			A. 树有很多种，每个节点最多只能有两个子结点的一种形式称为二叉树
+			B. 二叉树的子节点分为左结点和右结点
+						+---+				+---+				+---+
+						| A |				| A |				| A |
+						+---+				+---+				+---+
+						  |					  |					  |
+					+-----+-----+		+-----+					  +-----+
+					↓			↓		↓								↓
+				  +---+		  +---+	  +---+							  +---+
+				  | B |		  | C |	  | B |							  | C |
+				  +---+		  +---+	  +---+							  +---+
+			C. 如果该二叉树的所有叶子节点都在最后一层，并且结点总数 =2^n-1，n 为层数，则称为满二叉树
+			D. 如果该二叉树的所有叶子节点都在最后一层或者倒数第二层，而且最后一层的叶子节点在左边连续，倒数第二层的叶子节点在右边连续，称为完全二叉树
+								+---+											+---+
+								| 1 |											| 1 |
+								+---+											+---+
+								  |												  |
+						+---------+---------+							+---------+---------+
+						↓		  			↓							↓		  			↓
+					  +---+		  		  +---+						  +---+		  		  +---+
+					  | 2 |		  		  | 3 |						  | 2 |		  		  | 3 |
+					  +---+		  		  +---+						  +---+		  		  +---+
+						|		  			|							|
+				  +-----+----+	  	  +-----+-----+				  +-----+----+
+				  |			 |	  	  |			  |				  |			 |
+				+---+	   +---+  	+---+	   +---+			+---+	   +---+
+				| 4 |	   | 5 |  	| 6 |	   | 7 |			| 4 |	   | 5 |
+				+---+	   +---+  	+---+	   +---+			+---+	   +---+
+							  满二叉树							完全二叉树，如果把 3 节点删除，就不是完全二叉树，因为叶子节点不连续。	
+		② 二叉树遍历的说明
+			A. 使用前序、中序、后序对下面的二叉树进行遍历
+								+---+
+								| 1 |
+								+---+
+								  |
+						+---------+---------+
+						↓		  			↓
+					  +---+		  		  +---+
+					  | 2 |		  		  | 3 |
+					  +---+		  		  +---+
+						|		  			|
+				  +-----+----+	  	  +-----+-----+
+				  |			 |	  	  |			  |
+				+---+	   +---+  	+---+	   +---+
+				| 4 |	   | 5 |  	| 6 |	   | 7 |
+				+---+	   +---+  	+---+	   +---+
+				a. 前序遍历: 先输出父节点，再遍历左子树和右子树
+				b. 中序遍历: 先遍历左子树，再输出父节点，再遍历右子树
+				c. 后序遍历: 先遍历左子树，再遍历右子树，最后输出父节点
+				d. 小结: 看输出父节点的顺序，就确定是前序，中序还是后序
+			B. 代码实现
+				public class Node {
+
+					int value;
+					Node left;
+					Node right;
+
+					public Node(int value) {
+						this.value = value;
+					}
+
+					public void prevOrder() {
+						// 输出父节点
+						System.out.println(this);
+						// 递归向左子树前序遍历
+						if (left != null) {
+							left.prevOrder();
+						}
+						// 递归向右子树前序遍历
+						if ((right != null)) {
+							right.prevOrder();
+						}
+					}
+
+					public void infixOrder() {
+						// 递归向左子树前序遍历
+						if (left != null) {
+							left.infixOrder();
+						}
+						// 输出父节点
+						System.out.println(this);
+						// 递归向右子树前序遍历
+						if ((right != null)) {
+							right.infixOrder();
+						}
+					}
+
+					public void afterOrder() {
+						// 递归向左子树前序遍历
+						if (left != null) {
+							left.afterOrder();
+						}
+						// 递归向右子树前序遍历
+						if (right != null) {
+							right.afterOrder();
+						}
+						// 输出父节点
+						System.out.println(this);
+					}
+
+					@Override
+					public String toString() {
+						return "Node{" +
+								"value=" + value +
+								'}';
+					}
+				}
+				
+				public class BinaryTree {
+
+					Node root;
+
+					public BinaryTree(Node root) {
+						this.root = root;
+					}
+
+					public Node prevOrderSearch(int value) {
+						if (root == null) {
+							return null;
+						}
+						return root.prevOrderSearch(value);
+					}
+
+					public void prevOrder() {
+						if (root != null) {
+							root.prevOrder();
+						}
+					}
+
+					public void infixOrder() {
+						if (root != null) {
+							root.infixOrder();
+						}
+					}
+
+					public void afterOrder() {
+						if (root != null) {
+							root.afterOrder();
+						}
+					}
+				}
+				
+				public class BinaryTreeDemo {
+
+					public static void main(String[] args) {
+						Node node1 = new Node(1);
+						Node node2 = new Node(2);
+						Node node3 = new Node(3);
+						Node node4 = new Node(4);
+						Node node5 = new Node(5);
+						Node node6 = new Node(6);
+						Node node7 = new Node(7);
+						node1.left = node2;
+						node1.right = node3;
+						node2.left = node4;
+						node2.right = node5;
+						node3.left = node6;
+						node3.right = node7;
+						BinaryTree binaryTree = new BinaryTree(node1);
+						binaryTree.prevOrder(); // 1 2 4 5 3 6 7
+						System.out.println();
+						binaryTree.infixOrder(); // 4 2 5 1 6 3 7
+						System.out.println();
+						binaryTree.afterOrder(); // 4 5 2 6 7 3 1
+					}
+				}
+		③ 二叉树-查找指定节点
+			A. 要求
+				a. 请编写前序查找，中序查找和后序查找的方法。
+				b. 并分别使用三种查找方式，查找 5 的节点
+				c. 并分析各种查找方式，分别比较了多少次
+			B. 思路
+				a. 前序查找思路
+					(1) 判断当前节点的 value 是否等于待查找的值，如果相等，则返回当前节点
+					(2) 如果不等，则向左递归前序查找
+					(3) 如果左递归前序查找，找到节点，则返回，否则向右递归前序查找
+				b. 中序查找思路
+					(1) 向左递归中序查找
+					(2) 如果找到，则返回，如果没有找到，判断当前节点的 value 是否等于待查找的值
+					(3) 如果相等，则返回当前节点，如果不相等，则向右递归中序查找
+				c. 后续查找思路
+					(1) 向左递归中序查找，如果找到，则返回
+					(2) 如果没有找到，则向右递归中序查找，如果找到，则返回
+					(3) 如果没有找到，判断当前节点的 value 是否等于待查找的值，如果相等，则返回当前节点
+					(4) 否则返回 null
+			C. 代码实现
+				public class Node {
+					// ....
+					public Node prevOrderSearch(int value) {
+						if (this.value == value) {
+							return this;
+						}
+						Node node = null;
+						if (left != null) {
+							node = left.prevOrderSearch(value);
+						}
+						if (node != null) {
+							return node;
+						}
+
+						if (right != null) {
+							node = right.prevOrderSearch(value);
+						}
+						return node;
+					}
+
+					public Node infixOrderSearch(int value) {
+						Node node = null;
+						if (left != null) {
+							node = left.infixOrderSearch(value);
+						}
+						if (node != null) {
+							return node;
+						}
+
+						if (value == this.value) {
+							return this;
+						}
+						if (right != null) {
+							node = right.infixOrderSearch(value);
+						}
+						return node;
+					}
+
+					public Node afterOrderSearch(int value) {
+						Node node = null;
+						if (left != null) {
+							node = left.afterOrderSearch(value);
+						}
+						if (node != null) {
+							return node;
+						}
+
+						if (right != null) {
+							node = right.afterOrderSearch(value);
+						}
+						if (node != null) {
+							return node;
+						}
+
+						if (value == this.value) {
+							return this;
+						}
+
+						return null;
+					}
+				}
+				
+				public class BinaryTree {
+				
+					// ....
+					
+					public Node prevOrderSearch(int value) {
+						if (root == null) {
+							return null;
+						}
+						return root.prevOrderSearch(value);
+					}
+
+					public Node infixOrderSearch(int value) {
+						if (root == null) {
+							return null;
+						}
+						return root.infixOrderSearch(value);
+					}
+
+					public Node afterOrderSearch(int value) {
+						if (root == null) {
+							return null;
+						}
+						return root.afterOrderSearch(value);
+					}
+				}
+				
+				public class BinaryTreeDemo {
+
+					public static void main(String[] args) {
+						// ...
+						BinaryTree binaryTree = BinaryTreeUtil.getFullBinaryTree();
+						Node node = binaryTree.prevOrderSearch(6);
+						System.out.println(node);
+						System.out.println();
+
+						Node node1 = binaryTree.infixOrderSearch(6);
+						System.out.println(node1);
+						System.out.println();
+
+						Node node2 = binaryTree.afterOrderSearch(6);
+						System.out.println(node2);
+					}
+				}
+		④ 二叉树-删除节点
+			A. 要求
+				a. 如果删除的节点是叶子节点，则删除该节点
+				b. 如果删除的节点是非叶子节点，则删除该子树
+				c. 测试，删除掉 6 号叶子节点 和 3 号子树
+									+---+
+									| 1 |
+									+---+
+									  |
+							+---------+---------+
+							↓		  			↓
+						  +---+		  		  +---+
+						  | 2 |		  		  | 3 |
+						  +---+		  		  +---+
+							|		  			|
+					  +-----+----+	  	  +-----+-----+
+					  |			 |	  	  |			  |
+					+---+	   +---+  	+---+	   +---+
+					| 4 |	   | 5 |  	| 6 |	   | 7 |
+					+---+	   +---+  	+---+	   +---+
+			B. 思路分析
+				A. 因为二叉树是单向的，所以判断当前结点的子结点是否为待删除结点，而不能去判断当前结点是否为待删除结点，因为无法找到该结点的父节点
+				B. 如果当前结点的左子结点不为空，并且左子结点就是待删除结点，则 this.left = null
+				C. 如果当前结点的右子结点不为空，并且右子结点就是待删除结点，则 this.right = null
+				D. 如果第二和第三步没有删除结点，则向左子树递归删除
+				E. 如果第四步也没有删除结点，则应当向右子树递归删除
+				F. 如果 root 结点就是待删除结点，则将 root 置空
+			C. 代码实现
+				public class Node {
+					// ...
+					public void delNode(int value) {
+						if (left != null && left.value == value) {
+							left = null;
+							return;
+						}
+
+						if (right != null && right.value == value) {
+							right = null;
+							return;
+						}
+
+						if (left != null) {
+							left.delNode(value);
+						}
+
+						if (right != null) {
+							right.delNode(value);
+						}
+					}
+				}
+				
+				public class BinaryTree {
+					// ...
+					public void delNode(int value) {
+						if (root != null && root.value == value) {
+							root = null;
+						} else if (root != null) {
+							root.delNode(value);
+						}
+					}
+				}
+				
+				public class BinaryTreeDemo {
+
+					public static void main(String[] args) {
+						// ...
+						binaryTree.delNode(6);
+						binaryTree.prevOrder();
+						System.out.println();
+
+						binaryTree.delNode(3);
+						binaryTree.prevOrder();
+					}
+				}
+	3. 顺序存储二叉树
+		① 概念
+			A. 基本说明：从数据存储来看，数组存储方式和树的存储方式可以相互转换，即数组可以转换成树，						+---+
+			树也可以转换成数组																								| 1 |
+			B. 特点																											+---+
+				a. 顺序二叉树通常只考虑完全二叉树																			  |
+				b. 第 n 个元素的左子结点为 2n + 1																	+---------+---------+
+				c. 第 n 个元素的右子节点为 2n + 2																	↓		  			↓
+				d. 第 n 个元素的父结点为 (n - 1) / 2															  +---+		  		  +---+
+				e. n：表示二叉树中的第几个元素（按 0 开始编号）													  | 2 |		  		  | 3 |
+		② 顺序存储二叉树遍历																		  			  +---+		  		  +---+
+			A. 需求: 给你一个数组 {1,2,3,4,5,6,7}，要求以二叉树前序遍历的方式进行遍历								|		  			|
+			B. 代码实现																						  +-----+----+	  	  +-----+-----+
+				public class ArrBinaryTreeDemo {															  |			 |	  	  |			  |
+					public static void main(String[] args) {												+---+	   +---+  	+---+	   +---+
+						int[] arr = {1, 2, 3, 4, 5, 6, 7};													| 4 |	   | 5 |  	| 6 |	   | 7 |
+						prevOrder(arr, 0); // 1 2 4 5 3 6 7													+---+	   +---+  	+---+	   +---+
+						System.out.println();
+						infixOrder(arr, 0); // 4 2 5 1 6 3 7													+---+---+---+---+---+---+---+
+						System.out.println();																	| 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+						afterOrder(arr, 0); // 4 5 2 6 7 3 1													+---+---+---+---+---+---+---+
+					}
+					
+					public static void prevOrder(int[] arr, int index) {
+						if (arr == null || arr.length == 0 || index > arr.length - 1) {
+							return;
+						}
+						System.out.print(arr[index]);
+						prevOrder(arr, 2 * index + 1);
+						prevOrder(arr, 2 * index + 2);
+					}
+
+					public static void infixOrder(int[] arr, int index) {
+						if (arr == null || arr.length == 0 || index > arr.length - 1) {
+							return;
+						}
+						infixOrder(arr, 2 * index + 1);
+						System.out.print(arr[index]);
+						infixOrder(arr, 2 * index + 2);
+					}
+
+					public static void afterOrder(int[] arr, int index) {
+						if (arr == null || arr.length == 0 || index > arr.length - 1) {
+							return;
+						}
+						afterOrder(arr, 2 * index + 1);
+						afterOrder(arr, 2 * index + 2);
+						System.out.print(arr[index]);
+					}
+				}
+		③ 顺序存储二叉树应用实例
+			A. 八大排序算法中的堆排序，就会使用到顺序存储二叉树
+	4. 线索化二叉树
+		① 先看一个问题
+			A. 将数列 {1, 3, 6, 8, 10, 14} 构建成一颗二叉树
+								+---+
+								| 1 |
+								+---+
+								  |
+						+---------+---------+
+						↓		  			↓
+					  +---+		  		  +---+
+					  | 3 |		  		  | 6 |
+					  +---+		  		  +---+
+						|		  			|
+				  +-----+----+	  	  +-----+
+				  |			 |	  	  |
+				+---+	   +---+  	+---+
+				| 8 |	   | 10|  	| 14|
+				+---+	   +---+  	+---+
+			B. 问题分析: 
+				a. 当我们对上面的二叉树进行中序遍历时，数列为 {8, 3, 10, 1, 6, 14 }
+				b. 但是 6, 8, 10, 14 这几个节点的左右指针，并没有完全的利用上
+				c. 如果我们希望充分的利用 各个节点的左右指针， 让各个节点可以指向自己的前后节点,怎么办
+				d. 解决方案 - 线索二叉树
+		② 线索二叉树基本介绍
+			A. n 个结点的二叉链表中含有 n+1（2n-(n-1)=n+1）个空指针域。利用二叉链表中的空指针域，存放指向该结点在某种遍历次序下的前驱和后继结点的指针
+				（这种附加的指针称为“线索”）
+			B. 这种加上了线索的二叉链表称为线索链表，相应的二叉树称为线索二叉树(Threaded BinaryTree)。根据线索性质的不同，线索二叉树可分为前序线索二叉树、
+				中序线索二叉树和后序线索二叉树三种
+			C. 一个结点的前一个结点，称为前驱结点
+			D. 一个结点的后一个结点，称为后继结点
+		③ 线索二叉树应用案例
+			A. 应用案例说明：将下面的二叉树，进行中序线索二叉树
+			B. 思路分析:  中序遍历的结果：{8, 3, 10, 1, 14, 6}
+			C. 说明: 当线索化二叉树后，Node节点的属性 left 和 right，有如下情况
+				a. left 指向的是左子树，也可能是指向的前驱节点. 比如 1 节点 left 指向的左子树, 而 10 节点的 left 指向的就是前驱节点
+				b. right指向的是右子树，也可能是指向后继节点，比如 1 节点 right 指向的是右子树，而 10 节点的right 指向的是后继节点
+											+-------+
+											|	1	|
+											+-------+
+											 ↑	|  ↑
+							+-------------------+-------------------+
+							|			     |	   |				|
+						+-------+		     |	   |			+-------+
+						|	3	|		     |	   |			|	6	|
+						+-------+		     |	   |			+-------+
+						  ↑	| ↑			     |	   |			  ↑	|
+					+-------+-------+	     |	   |		+-------+
+					|	  |	  |		|	     |	   |		|	  |
+				+-------+ |	  |	+-------+    |	   |	+-------+ |
+				|	8	|-+	  +-|	10	|----+	   +----|	14	|-+
+				+-------+		+-------+				+-------+
+			D. 代码实现
+				public class Node {
+					// ...
+					// 0：左子结点，1：前驱结点
+					int leftType;
+					// 0：右子结点，1：后继结点
+					int rightType;
+				}
+				
+				public class BinaryTree {
+					// ...
+					// 前驱结点
+					Node pre = null;
+					
+					/**
+					 * 中序线索化二叉树
+					 */
+					public void threadedNode(Node node) {
+						// 如果当前 node 为空，则不线索化
+						if (node == null) {
+							return;
+						}
+
+						// 线索化左子树
+						threadedNode(node.left);
+						
+						// 处理当前结点的前驱结点
+						// 线索化当前结点
+						if (node.left == null) {
+							// 让当前结点的左指针之前前驱结点
+							node.left = pre;
+							// 修改当前结点的左指针类型
+							node.leftType = 1;
+						}
+
+						// 处理当前结点的后继结点
+						if (pre != null && pre.right == null) {
+							// 让当前结点的右指针指向后继结点，逆向思维
+							// 让前驱结点的右指针指向当前结点
+							pre.right = node;
+							pre.rightType = 1;
+						}
+
+						// 每处理一个结点后，让当前结点是下一个结点的前驱结点
+						pre = node;
+						
+						// 线索化右子树
+						threadedNode(node.right);
+					}
+				}
+				
+				public class ThreadedBinaryTreeDemo {
+
+					public static void main(String[] args) {
+						Node root = new Node(1);
+						Node node1 = new Node(3);
+						Node node2 = new Node(6);
+						Node node3 = new Node(8);
+						Node node4 = new Node(10);
+						Node node5 = new Node(14);
+						root.left = node1;
+						root.right = node2;
+						node1.left = node3;
+						node1.right = node4;
+						node2.left = node5;
+
+						BinaryTree threadedBinaryTree = new BinaryTree(root);
+						threadedBinaryTree.threadedNode();
+						System.out.println(node4.left);
+						System.out.println(node4.right);
+					}
+				}
+		④ 遍历线索化二叉树
+			A. 说明：对前面的中序线索化的二叉树， 进行遍历
+			B. 分析：因为线索化后，各个结点指向有变化，因此原来的遍历方式不能使用，这时需要使用新的方式遍历线索化二叉树，各个节点可以通过线型方式遍历，
+			因此无需使用递归方式，这样也提高了遍历的效率。 遍历的次序应当和中序遍历保持一致。
+			C. 代码实现
+				public class BinaryTree {
+					// ...
+					/**
+					 * 遍历线索化二叉树
+					 */
+					public void orderThreadedBinaryTree() {
+						// 定义一个临时结点，存储当前遍历的结点，从 root 开始
+						Node node = root;
+						while (node != null) {
+							// 循环找到 leftType 为 1 的结点，随着遍历的变化，当 leftType 为 1 时
+							// 说明该结点就是按照线索化处理后的有效结点
+							while (node.leftType == 0) {
+								node = node.left;
+							}
+							// 输出该有效结点
+							System.out.println(node);
+							// 如果当前结点的右指针指向的是后继结点，则一直输出
+							while (node.rightType == 1) {
+								// 获取当前结点的后继结点
+								node = node.right;
+								System.out.println(node);
+							}
+							// 替换这个遍历的结点
+							node = node.right;
+						}
+					}
+				}
+				
+				public class ThreadedBinaryTreeDemo {
+
+					public static void main(String[] args) {
+						// ...
+						threadedBinaryTree.orderThreadedBinaryTree();
+					}
+				}
+		⑤ 前序线索化二叉树和后序线索化二叉树的分析思路类似
+	5. 树结构实际应用
+		① 堆排序
+			A. 堆排序基本介绍
+				a. 堆排序是利用堆这种数据结构而设计的一种排序算法，堆排序是一种选择排序，他的最好、最坏、平均时间复杂度均为 O(nlogn)，它也是不稳定排序
+				b. 堆是具有以下性质的完全二叉树：每个结点的值都大于或等于其左右子结点的值，称为大顶堆，注意：没有要求结点的左右子结点值的大小关系
+				c. 每个结点的值都小于或等于其左右子结点的值，称为小顶堆
+				d. 大顶堆举例说明
+										大顶堆							对堆中的结点按层进行编号，映射到数组中就是以下
+										+---+							+----+----+----+----+----+----+----+----+----+
+										| 50| 0							| 50 | 45 | 40 | 20 | 25 | 35 | 30 | 10 | 15 |
+										+---+							+----+----+----+----+----+----+----+----+----+
+										  |								   0	1	 2	  3	   4	5	 6	  7	   8
+								+---------+---------+
+								↓		  			↓					大顶堆特点：arr[i] >= arr[2*i + 1] && arr[2*i + 2] // i 对应第几个结点，i 从 0 开始编号
+							  +---+		  		  +---+
+							  | 45|	1	  		  | 40| 2
+							  +---+		  		  +---+
+								|		  			|
+						  +-----+----+	  	  +-----+-----+
+						  |			 |	  	  |			  |	
+						+---+	   +---+  	+---+		+---+
+						| 20| 3	   | 25| 4 	| 35| 5		| 30| 6
+						+---+	   +---+  	+---+		+---+
+						  |
+					+-----+----+
+					|		   |
+				  +---+	 	 +---+
+				  | 10| 7	 | 15| 8
+				  +---+	   	 +---+
+				e. 小顶堆举例说明
+										小顶堆							对堆中的结点按层进行编号，映射到数组中就是以下
+										+---+							+----+----+----+----+----+----+----+----+----+
+										| 10| 0							| 10 | 20 | 15 | 25 | 50 | 30 | 40 | 35 | 45 |
+										+---+							+----+----+----+----+----+----+----+----+----+
+										  |								   0	1	 2	  3	   4	5	 6	  7	   8
+								+---------+---------+
+								↓		  			↓					大顶堆特点：arr[i] <= arr[2*i + 1] && arr[2*i + 2] // i 对应第几个结点，i 从 0 开始编号
+							  +---+		  		  +---+
+							  | 20|	1	  		  | 15| 2
+							  +---+		  		  +---+
+								|		  			|
+						  +-----+----+	  	  +-----+-----+
+						  |			 |	  	  |			  |	
+						+---+	   +---+  	+---+		+---+
+						| 25| 3	   | 50| 4 	| 30| 5		| 40| 6
+						+---+	   +---+  	+---+		+---+
+						  |
+					+-----+----+
+					|		   |
+				  +---+	 	 +---+
+				  | 35| 7	 | 45| 8
+				  +---+	   	 +---+
+				f. 一般升序采用大顶堆，降序采用小顶堆
+			B. 堆排序的基本思想
+				a. 将待排序序列构造成一个大顶堆
+				b. 此时，整个序列的最大值就是堆顶的根节点
+				c. 将其与末尾元素进行交换，此时末尾就是最大值
+				d. 将剩余 n-1 个元素重新构造成一个堆，这样会得到 n 个元素的次小值。如此反复执行，便能得到一个有序序列了
+				e. 可以看到在构建大顶堆的过程中，元素的个数逐渐减少，最后就得到一个有序序列
+			C. 堆排序步骤图解说明
+				a. 要求：给一个数组 {4,6,8,5,9}， 要求使用堆排序法，将数组升序排序。 
+					(1) 构造初始堆，将给定无序序列构造成一个大顶堆（一般升序采用大顶堆，降序采用小顶堆），给定无序序列结构如下
+										+---+
+										| 4 | 0
+										+---+
+										  |
+								+---------+---------+
+								↓		  			↓
+							  +---+		  		  +---+
+							  | 6 | 1		   	  | 8 | 2
+							  +---+		  		  +---+
+								|
+						  +-----+----+
+						  |			 |
+						+---+	   +---+
+						| 5 | 3	   | 9 | 4
+						+---+	   +---+
+						  0	  1   2   3   4
+						+---+---+---+---+---+
+						| 4 | 6 | 8 | 5 | 9 |
+						+---+---+---+---+---+
+					(2) 此时从最后一个非叶子结点开始（叶子结点自然不用调整，第一个非叶子结点（arr.length/2-1=1），从左至右，从上至下进行调整
+										+---+										+---+
+										| 4 | 0										| 4 | 0
+										+---+										+---+
+										  |											  |
+								+---------+---------+						+---------+---------+
+								↓		  			↓						↓		  			↓
+							  +---+		  		  +---+					  +---+		  		  +---+
+							  | 6 | 1		   	  | 8 | 2				  | 9 | 1		   	  | 8 | 2
+							  +---+		  		  +---+					  +---+		  		  +---+
+								|											|
+						  +-----+----+						---->	  +-----+----+
+						  |			 |								  |			 |
+						+---+	   +---+							+---+	   +---+
+						| 5 | 3	   | 9 | 4							| 5 | 3	   | 6 | 4
+						+---+	   +---+							+---+	   +---+
+						  0	  1   2   3   4							  0	  1   2   3   4
+						+---+---+---+---+---+						+---+---+---+---+---+
+						| 4 | 6 | 8 | 5 | 9 |						| 4 | 9 | 8 | 5 | 6 |
+						+---+---+---+---+---+						+---+---+---+---+---+
+					(3) 找到第二个非叶子结点 4，由于 [4, 9, 8] 中 9 元素最大，于是 4 和 9 交换
+										+---+										+---+
+										| 4 | 0										| 9 | 0
+										+---+										+---+
+										  |											  |
+								+---------+---------+						+---------+---------+
+								↓		  			↓						↓		  			↓
+							  +---+		  		  +---+					  +---+		  		  +---+
+							  | 9 | 1		   	  | 8 | 2				  | 4 | 1		   	  | 8 | 2
+							  +---+		  		  +---+					  +---+		  		  +---+
+								|											|
+						  +-----+----+						---->	  +-----+----+
+						  |			 |								  |			 |
+						+---+	   +---+							+---+	   +---+
+						| 5 | 3	   | 6 | 4							| 5 | 3	   | 6 | 4
+						+---+	   +---+							+---+	   +---+
+						  0	  1   2   3   4							  0	  1   2   3   4
+						+---+---+---+---+---+						+---+---+---+---+---+
+						| 4 | 9 | 8 | 5 | 6 |						| 9 | 4 | 8 | 5 | 6 |
+						+---+---+---+---+---+						+---+---+---+---+---+
+					(4) 这时，交换导致了 [4, 5, 6] 结构混乱，继续调整，由于 6 最大，于是 4 和 6 交换，就将一个无序序列构造成了一个大顶堆
+										+---+										+---+
+										| 9 | 0										| 9 | 0
+										+---+										+---+
+										  |											  |
+								+---------+---------+						+---------+---------+
+								↓		  			↓						↓		  			↓
+							  +---+		  		  +---+					  +---+		  		  +---+
+							  | 4 | 1		   	  | 8 | 2				  | 6 | 1		   	  | 8 | 2
+							  +---+		  		  +---+					  +---+		  		  +---+
+								|											|
+						  +-----+----+						---->	  +-----+----+
+						  |			 |								  |			 |
+						+---+	   +---+							+---+	   +---+
+						| 5 | 3	   | 6 | 4							| 5 | 3	   | 4 | 4
+						+---+	   +---+							+---+	   +---+
+						  0	  1   2   3   4							  0	  1   2   3   4
+						+---+---+---+---+---+						+---+---+---+---+---+
+						| 9 | 4 | 8 | 5 | 6 |						| 9 | 6 | 8 | 5 | 4 |
+						+---+---+---+---+---+						+---+---+---+---+---+
+					(5) 将堆顶元素与末尾元素进行交换，使得末尾元素最大，然后继续调整堆，再将堆顶元素与末尾元素交换，得到第二大元素。如此反复进行交换、重建
+				b. 代码实现
+					public class HeapSortDemo {
+
+						public static void main(String[] args) {
+							// 将数组进行升序排序
+							// int[] arr = {4, 6, 8, 5, 9};
+
+							int max = 10000000;
+							int[] arr = new int[max];
+							for (int i = 0; i < max; i++) {
+								arr[i] = (int) (Math.random() * max);
+							}
+							// System.out.println("排序前：" + Arrays.toString(arr));
+							long start = System.currentTimeMillis();
+							heapSort(arr);
+							long end = System.currentTimeMillis();
+							System.out.println("总共花费时间：" + (end - start));
+							// System.out.println("排序后：" + Arrays.toString(arr));
+						}
+
+						/**
+						 * 堆排序
+						 */
+						public static void heapSort(int[] arr) {
+							// 将无序序列构建成大顶堆，
+							for (int i = arr.length / 2 - 1; i >= 0; i--) {
+								adjustHeap(arr, i, arr.length);
+							}
+							int temp;
+							for (int i = arr.length - 1; i > 0; i--) {
+								// 将堆顶元素与末尾元素进行交换
+								temp = arr[i];
+								arr[i] = arr[0];
+								arr[0] = temp;
+
+								// 这里只需要从堆顶进行调整，是因为堆顶元素与末尾元素进行交换，而除堆顶外，剩余结点已然构成大顶堆
+								adjustHeap(arr, 0, i);
+							}
+						}
+
+						/**
+						 * 完成以 i 对应的非叶子结点的树调整成大顶堆
+						 *
+						 * @param arr    待调整的数组
+						 * @param i      非叶子结点在数组中的索引
+						 * @param length 对多少个元素进行调整
+						 */
+						public static void adjustHeap(int[] arr, int i, int length) {
+							// 先取出当前元素的值，保存在临时变量
+							int temp = arr[i];
+							// j 是 i 的左子结点
+							for (int j = 2 * i + 1; j < length; j = 2 * j + 1) {
+								// 左子结点的值小于右子节点的值
+								if (j + 1 < length && arr[j] < arr[j + 1]) {
+									// j 指向右子节点
+									j++;
+								}
+								// 如果子结点大于父结点，则进行交换
+								if (arr[j] > temp) {
+									arr[i] = arr[j];
+									// i 指向 j，继续循环比较
+									i = j;
+								} else {
+									break;
+								}
+							}
+							// 当 for 循环结束后，已经将以 i 为父结点的树的最大值，放在了最顶
+							// 将 temp 值放到调整后的位置
+							arr[i] = temp;
+						}
+					}
+		② 赫夫曼树
+			A. 基本介绍
+				a. 给定 n 个权值作为 n 个叶子结点，构造一颗二叉树，若该树的带权路径长度（wpl）达到最小，称这样的二叉树为最优二叉树，也称为哈夫曼树（Huffman Tree），
+				霍夫曼树、赫夫曼树。
+				b. 哈夫曼树是带权路径长度最短的树，权值较大的结点离根较近
+			B. 哈夫曼树几个重要
+				a. 路径和路径长度：在一颗树中，从一个结点往下可以达到的孩子或者孙子结点之间的通路，称为路径。通路中分支的数目称为路径长度。若规定根结点的层数为1，
+				则从根结点到第 L 层结点的路径长度为 L-1
+				b. 结点的权及带权路径长度：若将树中结点赋给一个有着某种含义的数值，则这个数值称为该结点的权。结点的带权路径长度为：从根结点到该结点之间路径长度与
+				该结点的权的乘积
+				c. 树的带权路径长度：树的带权路径长度规定为所有叶子结点的带权路径长度之和，记为 WPL（Weighted path length），权值越大的结点离根结点越近的二叉树才是
+				最优二叉树
+				d. WPL 最小的就是哈夫曼树
+									+---+
+									|   |
+									+---+
+									  |
+							+---------+---------+
+							↓		  			↓
+						  +---+		  		  +---+
+						  |   |		  		  |   |
+						  +---+		  		  +---+
+							|		  			|
+					  +-----+----+	  	  +-----+-----+
+					  |			 |	  	  |			  |
+					+---+	   +---+  	+---+		+---+
+					| 13|	   | 7 |  	| 8 |		| 3 |
+					+---+	   +---+  	+---+		+---+
+					WPL = 13 * 2 + 7 * 2 + 8 * 2 + 3 * 2 = 62
+			C. 哈夫曼树创建思路
+				a. 给定一个数列 {13, 7, 8, 3, 29, 6, 1}，要求转成一颗哈夫曼树
+				b. 构成哈夫曼树的步骤
+					(1) 从小到大进行排序，将每一个数据，每个数据都是一个结点，每个结点可以看成是一颗最简单的二叉树
+					(2) 取出根节点权值最小的两颗二叉树
+					(3) 组成一颗新的二叉树，该新的二叉树的根节点的权值是前面两颗二叉树根结点权值的和
+					(4) 再将这颗二叉树，以根结点的权值大小再次排序，不断重复 1-2-3-4 的步骤，直到数列中，所有的数据都被处理，就得到一颗哈夫曼树
+				c. 代码实现
+					public class Node implements Comparable<Node> {
+						@Override
+						public int compareTo(Node o) {
+							return this.value - o.value;
+						}
+					}
+					
+					
+					public class HuffmanTreeDemo {
+
+						public static void main(String[] args) {
+							int[] arr = {13, 7, 8, 3, 29, 6, 1};
+							Node root = createHuffmanTree(arr);
+							root.prevOrder();
+						}
+
+						/**
+						 * 创建哈夫曼树
+						 */
+						public static Node createHuffmanTree(int[] arr) {
+							List<Node> nodes = Arrays.stream(arr).mapToObj(Node::new).collect(Collectors.toList());
+							while (nodes.size() > 1) {
+								Collections.sort(nodes);
+								Node left = nodes.get(0);
+								Node right = nodes.get(1);
+								Node parent = new Node(left.getValue() + right.getValue());
+								parent.setLeft(left);
+								parent.setRight(right);
+								nodes.remove(left);
+								nodes.remove(right);
+								nodes.add(parent);
+							}
+							return nodes.get(0);
+						}
+					}
+		③ 赫夫曼编码
+			A. 基本介绍
+				a. 哈夫曼编码（赫夫曼编码、霍夫曼编码，Huffman Coding），是一种编码方式，属于一种程序算法
+				b. 哈夫曼编码是哈夫曼树在电讯通信中的经典的应用之一
+				c. 哈夫曼编码广泛地应用于数据文件压缩。其压缩率通常在 20%-90% 之间
+				d. 哈夫曼编码是可变字长编码（VLC的一种）。Huffman 于 1952 年提出的一种编码方法，称之为最佳编码
+			B. 原理剖析，通信领域中信息的处理方式
+				a. 定长编码
+					(1) i like like like java do you like a java（共40个字符，包括空格）
+					(2) 105 32 108 105 107 101 32 108 105 107 101 32 108 105 107 101 32 106 97 118 97 32 100 111 32 121 111 117 32 108 105 107 101 32 97 32 106 97 118 
+					97（对应Ascii码）
+					(3) 01101001 00100000 01101100 01101001 01101011 01100101 00100000 01101100 01101001 01101011 01100101 00100000 01101100 01101001 01101011 01100101 
+					00100000 01101010 01100001 01110110 01100001 00100000 01100100 01101111 00100000 01111001 01101111 01110101 00100000 01101100 01101001 01101011 
+					01100101 00100000 01100001 00100000 01101010 01100001 01110110 01100001（对应的二进制）
+					(4) 按照二进制来传递信息，总的长度是 359（包括空格）
+					(5) 在线转码工具 ：https://www.mokuge.com/tool/asciito16/ 
+				b. 变长编码
+					(1) i like like like java do you like a java（共40个字符，包括空格）
+					(2) d:1 y:1 u:1 j:2  v:2  o:2  l:4  k:4  e:4 i:5  a:5 空格:9（各个字符对应的个数）
+					(3) 0=空格,  1=a, 10=i, 11=e, 100=k, 101=l, 110=o, 111=v, 1000=j, 1001=u, 1010=y, 1011=d，说明：按照各个字符出现的次数进行编码，原则是出现次数越多的，
+					则编码越小，比如空格出现了 9 次，编码为0，其它依次类推
+					(4) 按照上面给各个字符规定的编码，则我们在传输  "i like like like java do you like a java" 数据时，编码就是 10 0 101 10 100...  
+					(5) 字符的编码都不能是其他字符编码的前缀，符合此要求的编码叫做前缀编码， 即不能匹配到重复的编码
+				c. 赫夫曼编码
+					(1) i like like like java do you like a java（共40个字符，包括空格）
+					(2) d:1 y:1 u:1 j:2  v:2  o:2  l:4  k:4  e:4 i:5  a:5 空格:9（各个字符对应的个数）
+					(3) 按照上面字符出现的次数构建一颗赫夫曼树，次数作为权值，如图所示
+														  +---+
+														  | 40|
+														  +---+
+													0		|		1
+											  +-------------+--------------+
+											  |							   |
+											+---+						 +---+
+											| 17|						 | 23|
+											+---+						 +---+
+											0 |	1					0	   |		1
+										+-----+-----+		  +------------+-------------+
+										|			|		  |							 |
+									  +---+	 	+------+	+---+					   +---+
+									  | 8 | 	|  : 9 |	| 10|					   | 13|
+									  +---+		+------+	+---+					   +---+
+									0  |  1					0 |	 1					  0	 |  1
+								  +----+----+			 +----+-----+				+----+---+
+								  |			|			 |			|				|		 |
+								+---+	+------+	   +---+	+------+		+------+   +---+
+								| 4 |	| l: 4 |	   | 5 |	| i: 5 |		| a: 5 |   | 8 |
+								+---+	+------+	   +---+	+------+		+------+   +---+
+								0 |	1				   0 |	1							  0	 |  1
+							+-----+-----+			+----+----+						   +-----+------+
+							|		    |			|		  |						   |		    |
+						+------+	+------+	+------+	+---+				    +------+	+------+
+						| j: 2 |	| v: 2 |	| o: 2 |	| 3 |					| k: 4 |	| e: 4 |
+						+------+	+------+	+------+	+---+					+------+	+------+
+														   0  |  1
+														+-----+---+
+														|		  |
+													+------+	+---+
+													| u: 1 |	| 2 |
+													+------+	+---+
+															   0  |  1
+															+-----+-----+
+															|		    |
+														+------+	+------+
+														| d: 1 |	| y: 1 |
+														+------+	+------+
+					(4) 根据赫夫曼树，给各个字符，规定编码，向左的路径为0，向右的路径为1，编码如下:
+					(5) o: 1000，u: 10010，d: 100110，y: 100111，i: 101，a: 110，k: 1110，e: 1111，j: 0000，v: 0001，l: 001，空格: 01
+					(6) 按照上面的赫夫曼编码，i like like like java do you like a java 字符串对应的编码为（注意这里我们使用的无损压缩）
+					1010100110111101111010011011110111101001101111011110100001100001110011001111000011001111000100100100110111101111011100100001100001110
+					长度为 ： 133 
+					(7) 原来长度是 359，压缩了 (359-133) / 359 = 62.9%
+					(8) 此编码满足前缀编码，即字符的编码都不能是其他字符编码的前缀。不会造成匹配的多义性
+					(9) 注意，这个赫夫曼树根据排序方法不同，也可能不太一样，这样对应的赫夫曼编码也不完全一样，但是 wpl 是一样的，都是最小的
+				d. 最佳实践-数据压缩
+					(1) 将给出的一段文本，比如 i like like like java do you like a java，根据前面的讲的赫夫曼编码原理，对其进行数据压缩处理，形式如
+					1010100110111101111010011011110111101001101111011110100001100001110011001111000011001111000100100100110111101111011100100001100001110
+					(2)	根据赫夫曼编码压缩数据的原理，需要创建 i like like like java do you like a java 对应的赫夫曼树
+					(3) 生成赫夫曼树对应的赫夫曼编码，如下表：空格=01 a=100 d=11000 u=11001 e=1110 v=11011 i=101 y=11010 j=0010 k=1111 l=000 o=0011
+					(4) 使用赫夫曼编码来生成赫夫曼编码数据，即按照上面的赫夫曼编码，将 i like like like java do you like a java 字符串生成对应的编码数据, 形式如下
+					1010100010111111110010001011111111001000101111111100100101001101110001110000011011101000111100101000101111111100110001001010011011100
+					(5) 将赫夫曼编码每八位比特位转换为字节，得到如下
+					[-88, -65, -56, -65, -56, -65, -55, 77, -57, 6, -24, -14, -117, -4, -60, -90, 28]
+				e. 最佳实践-数据解压（使用赫夫曼编码解码）	
+					(1) 前面得到了赫夫曼编码和对应的编码 byte[]，即：[-88, -65, -56, -65, -56, -65, -55, 77, -57, 6, -24, -14, -117, -4, -60, -90, 28]
+					(2) 现在要求使用赫夫曼编码，进行解码，又重新得到原来的字符串 i like like like java do you like a java
+				f. 代码实现
+					public class Node implements Comparable<Node> {
+
+						Byte data;
+
+						int weight;
+
+						Node left;
+
+						Node right;
+
+						public Node(Byte data, int weight) {
+							this.weight = weight;
+							this.data = data;
+						}
+
+						public void preOder() {
+							System.out.println(this);
+							if (left != null) {
+								left.preOder();
+							}
+							if (right != null) {
+								right.preOder();
+							}
+						}
+
+						@Override
+						public int compareTo(Node o) {
+							return this.weight - o.weight;
+						}
+
+						@Override
+						public String toString() {
+							return "Node{" +
+									"data=" + data +
+									", weight=" + weight +
+									'}';
+						}
+					}
+					
+					public class HuffmanCodingDemo {
+
+						public static void main(String[] args) {
+							String text = "i like like like java do you like a java";
+							byte[] encode = encode(text.getBytes());
+							System.out.println(Arrays.toString(encode));
+							byte[] decode = decode(encode);
+							System.out.println(new String(decode));
+						}
+
+						/**
+						 * 解码
+						 */
+						private static byte[] decode(byte[] bytes) {
+							StringBuilder sb = new StringBuilder();
+							for (int i = 0; i < bytes.length; i++) {
+								boolean flag = i == bytes.length - 1;
+								sb.append(byteToBit(!flag, bytes[i]));
+							}
+
+							Map<String, Byte> map = new HashMap<>();
+							huffmanCodingTable.forEach((k, v) -> map.put(v, k));
+							List<Byte> list = new ArrayList<>();
+							for (int i = 0; i < sb.length();) {
+								int count = 1;
+								while (true) {
+									String substring = sb.substring(i, i + count);
+									Byte aByte = map.get(substring);
+									if (aByte != null) {
+										list.add(aByte);
+										break;
+									} else {
+										count++;
+									}
+								}
+								i += count;
+							}
+
+							byte[] decode = new byte[list.size()];
+							for (int i = 0; i < list.size(); i++) {
+								decode[i] = list.get(i);
+							}
+							return decode;
+						}
+
+						/**
+						 * 将字节转换为二进制
+						 */
+						private static String byteToBit(boolean flag, byte b) {
+							int temp = b;
+							if (flag) {
+								temp |= 256;
+							}
+							String binary = Integer.toBinaryString(temp);
+							if (flag) {
+								return binary.substring(binary.length() - 8);
+							}
+							return binary;
+						}
+
+						private static byte[] encode(byte[] bytes) {
+							List<Node> nodes = getNodes(bytes);
+							Node huffmanCodingTree = createHuffmanCodingTree(nodes);
+							Map<Byte, String> huffmanCodingTable = createHuffmanCodingTable(huffmanCodingTree);
+							return encode(bytes, huffmanCodingTable);
+						}
+
+						/**'
+						 * 编码
+						 */
+						private static byte[] encode(byte[] bytes, Map<Byte, String> huffmanCodingTable) {
+							StringBuilder sb = new StringBuilder();
+							for (byte aByte : bytes) {
+								sb.append(huffmanCodingTable.get(aByte));
+							}
+
+							int len = (sb.length() + 7) / 8;
+							int index = 0;
+							byte[] encode = new byte[len];
+							for (int i = 0; i < sb.length(); i += 8) {
+								String substring;
+								if (i + 8 > sb.length()) {
+									substring = sb.substring(i);
+								} else {
+									substring = sb.substring(i, i + 8);
+								}
+								encode[index++] = (byte) Integer.parseInt(substring, 2);
+							}
+
+							return encode;
+						}
+
+						private static final Map<Byte, String> huffmanCodingTable = new HashMap<>();
+
+						private static final StringBuilder stringBuilder = new StringBuilder();
+
+						public static Map<Byte, String> createHuffmanCodingTable(Node node) {
+							if (node == null) {
+								return null;
+							} else {
+								createHuffmanCodingTable(node.left, "0", stringBuilder);
+								createHuffmanCodingTable(node.right, "1", stringBuilder);
+							}
+
+							return huffmanCodingTable;
+						}
+
+						/**
+						 * 创建哈夫曼编码表
+						 */
+						public static void createHuffmanCodingTable(Node node, String code, StringBuilder stringBuilder) {
+							StringBuilder sb = new StringBuilder(stringBuilder);
+							sb.append(code);
+							if (node != null) {
+								if (node.data == null) {
+									// 如果是非叶子结点
+									createHuffmanCodingTable(node.left, "0", sb);
+									createHuffmanCodingTable(node.right, "1", sb);
+								} else {
+									// 如果是叶子结点
+									huffmanCodingTable.put(node.data, sb.toString());
+								}
+							}
+						}
+
+						/**
+						 * 生成哈夫曼树
+						 */
+						private static Node createHuffmanCodingTree(List<Node> nodes) {
+							while (nodes.size() > 1) {
+								Collections.sort(nodes);
+								Node left = nodes.get(0);
+								Node right = nodes.get(1);
+								Node parent = new Node(null, left.weight + right.weight);
+								parent.left = left;
+								parent.right = right;
+								nodes.remove(left);
+								nodes.remove(right);
+								nodes.add(parent);
+							}
+							return nodes.get(0);
+						}
+
+						/**
+						 * 获取叶子结点
+						 */
+						private static List<Node> getNodes(byte[] bytes) {
+							Map<Byte, Integer> countMap = new HashMap<>();
+							for (byte aByte : bytes) {
+								Integer count = countMap.getOrDefault(aByte, 0);
+								countMap.put(aByte, count + 1);
+							}
+
+							return countMap.entrySet().stream().map(entry -> new Node(entry.getKey(), entry.getValue())).collect(Collectors.toList());
+						}
+					}
+		④ 二叉排序树
+			A. 需求：给一个数列 {7, 3, 10, 12, 5, 1, 9}，要求能够高效的完成对数据的查询和添加
+			B. 解决方案分析
+				a. 使用数组
+					(1) 数组未排序， 优点：直接在数组尾添加，速度快。 缺点：查找速度慢
+					(2) 数组排序，优点：可以使用二分查找，查找速度快，缺点：为了保证数组有序，在添加新数据时，找到插入位置后，后面的数据需整体移动，速度慢
+				b. 使用链式存储-链表：不管链表是否有序，查找速度都慢，添加数据速度比数组快，不需要数据整体移动
+				c. 使用二叉排序树
+			C. 二叉排序树介绍
+				a. 二叉排序树（BST）：Binary Sort(Search) Tree，对于二叉排序树的任何一个非叶子节点，要求左子节点的值比当前节点的值小，右子节点的值比当前节点的值大。
+				b. 特别说明：如果有相同的值，可以将该节点放在左子节点或右子节点
+				c. 比如针对前面的数据 {7, 3, 10, 12, 5, 1, 9}，对应的二叉排序树为
+									+---+														+---+
+									| 7 |														| 7 |
+									+---+														+---+
+									  |															  |
+							+---------+---------+										+---------+---------+
+							↓		  			↓										↓		  			↓
+						  +---+		  		  +---+									  +---+		  		  +---+
+						  | 3 |		  		  | 10|					插入2			  | 3 |		  		  | 10|
+						  +---+		  		  +---+				------------>		  +---+		  		  +---+
+							|		  			|										|		  			|
+					  +-----+----+	  	  +-----+-----+							  +-----+----+	  	  +-----+-----+
+					  |			 |	  	  |			  |							  |			 |	  	  |			  |
+					+---+	   +---+  	+---+		+---+						+---+	   +---+  	+---+		+---+
+					| 1 |	   | 5 |  	| 9 |		| 12|						| 1 |	   | 5 |  	| 9 |		| 12|
+					+---+	   +---+  	+---+		+---+						+---+	   +---+  	+---+		+---+
+																				  |
+																				  +----+
+																					   |
+																					 +---+
+																					 | 2 |
+																					 +---+
+			D. 二叉排序树创建和遍历
+				a. 一个数组创建成对应的二叉排序树，并使用中序遍历二叉排序树，比如: 数组为 Array(7, 3, 10, 12, 5, 1, 9)，创建成对应的二叉排序树为：
+				b. 代码实现
+					public class Node {
+						// ...	
+						
+						public void add(Node node) {
+							if (node == null) {
+								return;
+							}
+
+							if (node.value < this.value) {
+								if (this.left == null) {
+									this.left = node;
+								} else {
+									this.left.add(node);
+								}
+							} else {
+								if (this.right == null) {
+									this.right = node;
+								} else {
+									this.right.add(node);
+								}
+							}
+						}
+					}
+					
+					public class BinaryTree {
+						// ...
+						
+						public void add(Node node) {
+							if (root == null) {
+								root = node;
+							} else {
+								root.add(node);
+							}
+						}
+					}
+					
+					public class BinarySortTreeDemo {
+					
+						public static void main(String[] args) {
+							int[] arr = {7, 3, 10, 12, 5, 1, 9, 2};
+							BinaryTree binaryTree = new BinaryTree();
+							for (int num : arr) {
+								binaryTree.add(new Node(num));
+							}
+
+							binaryTree.infixOrder();
+						}
+					}
+			E. 二叉排序树的删除
+				a. 二叉排序树的删除情况比较复杂，有下面三种情况需要考虑
+					(1) 删除叶子结点，思路：
+						找到要删除的结点 targetNode
+						找到 targetNode 的父结点 parentNode
+						确定targetNode 是 parentNode的左子结点，还是右子结点
+						根据前面的情况来对应删除，左子结点：parentNode.left = null，右子结点：parentNode.right = null
+					(2) 删除只有一颗子树的结点，思路：
+						找到要删除的结点 targetNode
+						找到 targetNode 的父结点 parentNode
+						确定 targetNode 的子结点是左子结点还是右子结点
+						确定 targetNode 是 parentNode 的左子结点，还是右子结点
+						如果 targetNode 的子结点是左子结点
+							如果 targetNode 是 parentNode 的左子结点，parentNode.left = targetNode.left
+							如果 targetNode 是 parentNode 的右子结点，parentNode.right = targetNode.left
+						如果 targetNode 的子结点是右子结点
+							如果 targetNode 是 parentNode 的左子结点，parentNode.left = targetNode.right
+							如果 targetNode 是 parentNode 的右子结点，parentNode.right = targetNode.right
+					(3) 删除有两颗子树的结点，思路：
+						找到要删除的结点 targetNode
+						找到 targetNode 的父结点 parentNode
+						从 targetNode 的右子树找到最小的结点
+						用一个临时变量，保存最小值，删除最小值
+						将目标值替换为最小值
+				b. 代码实现
+					public class Node {
+						// ...
+						
+						public Node searchTarget(int value) {
+							if (this.value == value) {
+								return this;
+							} else {
+								if (this.left != null && this.value > value) {
+									return this.left.searchTarget(value);
+								} else if (this.right != null && this.value <= value) {
+									return this.right.searchTarget(value);
+								} else {
+									return null;
+								}
+							}
+						}
+
+						public Node searchParent(int value) {
+							if ((this.left != null && this.left.value == value)
+									|| (this.right != null && this.right.value == value)) {
+								return this;
+							} else {
+								if (this.left != null && this.value > value) {
+									return this.left.searchParent(value);
+								} else if (this.right != null && this.value <= value) {
+									return this.right.searchParent(value);
+								} else {
+									return null;
+								}
+							}
+						}
+					}
+					
+					public class BinaryTree {
+						// ...
+						
+						public void del(int value) {
+							if (root == null) {
+								return;
+							}
+
+							Node targetNode = searchTarget(value);
+							if (targetNode == null) {
+								return;
+							}
+							// 如果该二叉树只有一个结点
+							if (root.left == null && root.right == null) {
+								root = null;
+								return;
+							}
+							Node parentNode = searchParent(value);
+							if (targetNode.left == null && targetNode.right == null) {
+								// 情况一：删除叶子结点
+								if (parentNode.left != null && parentNode.left.value == value) {
+									parentNode.left = null;
+								} else if (parentNode.right != null && parentNode.right.value == value) {
+									parentNode.right = null;
+								}
+							} else if (targetNode.left != null && targetNode.right != null) {
+								// 情况三：删除有两颗子树的结点
+								int min = searchRightTreeMin(targetNode.right);
+								del(min);
+								targetNode.value = min;
+							} else {
+								// 情况二：删除只有一颗子树的结点
+								if (targetNode.left != null) {
+									if (parentNode != null) {
+										if (parentNode.left != null && parentNode.left.value == value) {
+											parentNode.left = targetNode.left;
+										} else if (parentNode.right != null && parentNode.right.value == value) {
+											parentNode.right = targetNode.left;
+										}
+									} else {
+										// 当删除只有一颗子树时，需要考虑父结点为空的情况
+										root = targetNode.left;
+									}
+
+								} else {
+									if (parentNode != null) {
+										if (parentNode.left != null && parentNode.left.value == value) {
+											parentNode.left = targetNode.right;
+										} else if (parentNode.right != null && parentNode.right.value == value) {
+											parentNode.right = targetNode.right;
+										}
+									} else {
+										root = targetNode.right;
+									}
+								}
+							}
+						}
+
+						/**
+						 * 查找待删除结点右子树的最小结点
+						 */
+						public int searchRightTreeMin(Node node) {
+							Node target = node;
+							while (target.left != null) {
+								target = target.left;
+							}
+							return target.value;
+						}
+
+						/**
+						 * 查找待删除的结点
+						 */
+						public Node searchTarget(int value) {
+							if (root == null) {
+								return null;
+							}
+							return root.searchTarget(value);
+						}
+
+						/**
+						 * 查找当前结点的父结点
+						 */
+						public Node searchParent(int value) {
+							if (root == null) {
+								return null;
+							}
+							return root.searchParent(value);
+						}
+					}
+					
+					public class BinarySortTreeDemo {
+
+						public static void main(String[] args) {
+							int[] arr = {7, 3, 10, 12, 5, 1, 9, 2};
+							BinaryTree binaryTree = new BinaryTree();
+							for (int num : arr) {
+								binaryTree.add(new Node(num));
+							}
+
+							binaryTree.infixOrder();
+							System.out.println();
+
+							binaryTree.del(2);
+							binaryTree.del(5);
+							binaryTree.del(9);
+							binaryTree.del(12);
+							binaryTree.del(7);
+							binaryTree.del(3);
+							binaryTree.del(10);
+					//        binaryTree.del(1);
+							binaryTree.infixOrder();
+						}
+					}
+		⑤ 平衡二叉树（AVL树）
+			A. 看一个案例（说明二叉排序树可能的问题）
+				a. 给一个数列 {1,2,3,4,5,6}，要求创建一颗二叉排序树（BST）
+									+---+
+									| 1  |
+									+---+
+									  |
+									  +-----+
+											↓
+										  +---+
+										  | 2 |
+										  +---+
+											|
+											+-----+
+												  |
+												+---+
+												| 3 |
+												+---+
+												  |
+												  +-----+
+														|
+													  +---+
+													  | 4 |
+													  +---+
+				b. 上边 BST 存在的问题分析
+					(1) 左子树全部为空，从形式上看，更像一个单链表
+					(2) 插入速度没有影响
+					(3) 查询速度明显降低（因为需要依次比较） 不能发挥 BST 的优势，因为每次还需要比较左子树，其查询速度比单链表还慢
+					(4) 解决方案-平衡二叉树（AVL）
+			B. 基本介绍
+				a. 平衡二叉树也叫平衡二叉搜索树（Self-balancing binary search tree）又被称为 AVL 树，可以保证查询效率较高。
+				b. 具有以下特点：它是一棵空树或它的左右两个子树的高度差的绝对值不超过1，并且左右两个子树都是一棵平衡二叉树。平衡二叉树的常用实现方法有红黑树、
+				AVL、替罪羊树、Treap、伸展树等
+			C. 应用案例-单旋转（左旋转）
+				a. 要求: 给一个数列，创建出对应的平衡二叉树，数列 {4,3,6,5,7,8}
+				b. 思路分析
+					(1) 创建一个新的节点 newNode，值等于当前根节点的值
+					(2) 把新节点的左子树设置为当前节点的左子树
+					(3) 把新节点的右子树设置为当前节点的右子树的左子树
+					(4) 把当前节点的值换为右子结点的值
+					(5) 把当前节点的右子树设置成右子树的右子树
+					(6) 把当前节点的左子树设置成新节点
+																						  +---+
+																						  | 6 |
+																						  +---+
+																							|
+																				  +---------+---------+
+																				  ↓					  |
+									+---+										+---+				  |
+									| 4 |										| 4 |				  |
+									+---+										+---+				  |
+									  |											  |					  |
+							+---------+---------+						+---------+					  |
+							↓		  			↓						↓		  |					  |
+						  +---+		  		  +---+					  +---+		  |		  +---+		  |
+						  | 3 |		  		  | 6 |					  | 3 |		  |		  | 6 |		  |
+						  +---+		  		  +---+					  +---+		  |		  +---+		  |
+												|								  |			|		  |
+										  +-----+-----+							  |	  +-----+-----+	  |
+										  |			  |							  |	  |			  |	  |
+										+---+		+---+						  |	+---+		+---+ |
+										| 5 |		| 7 |						  +-| 5 |		| 7 |-+
+										+---+		+---+							+---+		+---+
+													  |											  |
+													  +-----+									  +-----+
+															|											|
+														  +---+										  +---+
+														  | 8 |										  | 8 |
+														  +---+										  +---+
+			D. 应用案例-单旋转（右旋转）
+				a. 要求: 给一个数列，创建出对应的平衡二叉树，数列 {10,12, 8, 9, 7, 6}
+				b. 思路分析
+					(1) 创建一个新的节点 newNode，值等于当前根节点的值
+					(2) 把新节点的右子树设置为当前节点的右子树
+					(3) 把新节点的左子树设置为当前节点的左子树的右子树
+					(4) 把当前值设置成左子节点的值
+					(5) 把当前节点的左子树设置成左子树的左子树
+					(6) 把当前节点的右子树设置成新节点
+																				  +---+
+																				  | 8 |
+																				  +---+
+																					|
+																		  +---------+---------+
+																		  |					  ↓
+										+---+							  |					+---+
+										| 10|							  |					| 10|
+										+---+							  |					+---+
+										  |								  |					  |
+								+---------+---------+					  |					  +---------+
+								↓		  			↓					  |					  |			↓
+							  +---+		  		  +---+					  |		  +---+		  |		  +---+
+							  | 8 |		  		  | 12|					  |		  | 8 |		  |		  | 12|
+							  +---+		  		  +---+					  |		  +---+		  |		  +---+
+								|										  |			|		  |
+						  +-----+----+									  |	  +-----+----+	  |
+						  |			 |									  |	  |			 |	  |
+						+---+	   +---+								  |	+---+	   +---+  |
+						| 7 |	   | 9 |								  +-| 7 |	   | 9 |--+
+						+---+	   +---+									+---+	   +---+
+						  |													  |
+					+-----+												+-----+
+					|													|
+				  +---+												+---+
+				  | 6 |												| 6 |
+				  +---+												+---+
+			E. 应用案例-双旋转
+				a. 前面的两个数列，进行单旋转（即一次旋转）就可以将非平衡二叉树转成平衡二叉树，但是在某些情况下，单旋转不能完成平衡二叉树的转换。比如数列
+				int[] arr = {10, 11, 7, 6, 8, 9}，运行原来的代码可以看到，并没有转成 AVL树。int[] arr = {2,1,6,5,7,3}，运行原来的代码可以看到，并没有转成 AVL 树
+				b. 解决思路分析
+					(1) 当符合右旋转条件时，如果左子树的右子树高度大于左子树的左子树高度，先对当前节点的左子树进行左旋转，再对当前节点进行右旋转
+					(2) 当符合左旋转条件时，如果右子树的左子树高度大于右子树的右子树高度，先对当前节点的右子树进行右旋转，再对当前节点进行左旋转
+			F. 代码实现
+				public class Node {
+					// ...
+					
+					public void leftRotate() {
+						Node newNode = new Node(value);
+						newNode.left = left;
+						newNode.right = right.left;
+						value = right.value;
+						right = right.right;
+						left = newNode;
+					}
+
+					public void rightRotate() {
+						Node newNode = new Node(value);
+						newNode.right = right;
+						newNode.left = left.right;
+						value = left.value;
+						left = left.left;
+						right = newNode;
+					}
+
+					public int height() {
+						return Math.max(left == null ? 0 : left.height(), right == null ? 0 : right.height()) + 1;
+					}
+
+					public int leftHeight() {
+						if (left == null) {
+							return 0;
+						}
+						return left.height();
+					}
+
+					public int rightHeight() {
+						if (right == null) {
+							return 0;
+						}
+						return right.height();
+					}
+					
+					public void add(Node node) {
+						if (node == null) {
+							return;
+						}
+
+						if (node.value < this.value) {
+							if (this.left == null) {
+								this.left = node;
+							} else {
+								this.left.add(node);
+							}
+						} else {
+							if (this.right == null) {
+								this.right = node;
+							} else {
+								this.right.add(node);
+							}
+						}
+
+						// 如果右子树高度-左子树高度大于1，进行左旋转
+						if (rightHeight() - leftHeight() > 1) {
+							if (right != null && right.leftHeight() > right.rightHeight()) {
+								// 如果右子树的左子树大于右子树，先对右子树进行右旋转
+								right.rightRotate();
+							}
+							leftRotate();
+							return;
+						}
+						// 如果左子树高度-右子树高度大于1，进行右旋转
+						if (leftHeight() - rightHeight() > 1) {
+							if (left != null && left.rightHeight() > left.leftHeight()) {
+								// 如果左子树的右子树大于左子树，先进行左旋转
+								left.rightRotate();
+							}
+							rightRotate();
+						}
+					}
+				}
+				
+				public class AVLTreeDemo {
+
+					public static void main(String[] args) {
+						BinaryTree binaryTree = new BinaryTree();
+						// int[] arr = {4, 3, 6, 5, 7, 8};
+						// int[] arr = {10, 12, 8, 9, 7, 6};
+						int[] arr = {2, 1, 6, 5, 7, 3};
+						for (int i : arr) {
+							binaryTree.add(new Node(i));
+						}
+						binaryTree.infixOrder();
+
+						System.out.println(binaryTree.root.height());
+						System.out.println(binaryTree.root.left.height());
+						System.out.println(binaryTree.root.right.height());
+					}
+				}
+九、图
+	1. 图基本介绍
+		① 为什么要有图
+			A. 前面学了线性表和树
+			B. 线性表局限于一个直接前驱和一个直接后继的关系
+			C. 树也只能有一个直接前驱也就是父节点
+			D. 当需要表示多对多的关系时，就用到了图
+		② 图的举例说明
+			A. 图是一种数据结构，其中结点可以具有零个或多个相邻元素。两个结点之间的连接称为边。 结点也可以称为顶点。如图：
+				+---+		+---+		 +---+
+				| A |-------| B |--------| C |
+				+---+		+---+		 +---+
+				  |			  |
+				  |			  |
+				  |			  |
+				  |			  |
+				  |			+---+		 +---+
+				  +---------| D |--------| E |
+							+---+		 +---+
+	2. 图的常用概念
+		① 顶点(vertex)
+		② 边(edge)
+		③ 路径：比如从 D -> C 的路径有
+			D->B->C
+			D->A->B->C
+		④ 无向图：顶点之间的连接没有方向，比如A-B，即可以是 A-> B 也可以 B->A。
+		⑤ 有向图：顶点之间的连接有方向，比如A-B，只能是 A-> B 不能是 B->A。
+		⑥ 带权图：这种边带权值的图也叫网
+	3. 图的表示方式
+		① 图的表示方式有两种：二维数组表示（邻接矩阵）；链表表示（邻接表）。
+		② 邻接矩阵
+			A. 邻接矩阵是表示图形中顶点之间相邻关系的矩阵，对于n个顶点的图而言，矩阵是的row和col表示的是1....n个点。
+				   A B C D E
+				A| 0 1 0 1 0 |
+				B| 1 0 1 1 0 |
+				C| 0 1 0 0 0 |
+				D| 1 1 0 0 1 |
+				E| 0 0 0 1 0 |
+			B. 邻接表
+				a. 邻接矩阵需要为每个顶点都分配n个边的空间，其实有很多边都是不存在,会造成空间的一定损失。
+				b. 邻接表的实现只关心存在的边，不关心不存在的边。因此没有空间浪费，邻接表由数组+链表组成
+					  +---+	   +---+
+					0 | 1 | -> | 3 | ->
+					  +---+	   +---+	+---+
+					1 | 0 | -> | 2 | -> | 3 | ->
+					  +---+	   +---+	+---+
+					2 | 1 | ->
+					  +---+	   +---+	+---+
+					3 | 0 | -> | 1 | -> | 4 | ->
+					  +---+	   +---+	+---+
+					4 | 3 | ->
+					  +---+
+	4. 图的快速入门案例
+		① 要求: 代码实现如下图结构
+							+---+
+							| E |
+							+---+
+							  |
+							  |
+							  |
+							  |
+				+---+		+---+		 +---+
+				| C |-------| B |--------| D |
+				+---+		+---+		 +---+
+				  |			  |
+				  |			  |
+				  |			  |
+				  |			  |
+				  |			+---+		 
+				  +---------| A |
+							+---+		 
+		② 思路分析
+			A. 存储顶点String 使用 ArrayList
+			B. 保存矩阵 int[][] edges
+			C. 代码实现
+				public class Graph {
+
+					private final List<String> vertexList;
+
+					private final int[][] edges;
+
+					private int numOfEdges;
+
+					public static void main(String[] args) {
+						String[] vertexes = {"A", "B", "C", "D", "E"};
+						Graph graph = new Graph(vertexes.length);
+
+						// 循环添加顶点
+						for (String vertex : vertexes) {
+							graph.insertVertex(vertex);
+						}
+
+						// 添加边
+						// A-B A-C B-C B-D B-E
+						graph.insertEdge(0, 1, 1);
+						graph.insertEdge(0, 2, 1);
+						graph.insertEdge(1, 2, 1);
+						graph.insertEdge(1, 3, 1);
+						graph.insertEdge(1, 4, 1);
+
+						graph.showGraph();
+					}
+
+					public Graph(int n) {
+						this.vertexList = new ArrayList<>(n);
+						this.edges = new int[n][n];
+						this.numOfEdges = 0;
+					}
+
+					/**
+					 * 插入顶点
+					 */
+					public void insertVertex(String vertex) {
+						this.vertexList.add(vertex);
+					}
+
+					/**
+					 * ‘添加边
+					 */
+					public void insertEdge(int v1, int v2, int weight) {
+						this.edges[v1][v2] = weight;
+						this.edges[v2][v1] = weight;
+						this.numOfEdges++;
+					}
+
+					/**
+					 * 获取顶点个数
+					 */
+					public int getNumOfVertex() {
+						return this.vertexList.size();
+					}
+
+					/**
+					 * 获取边的个数
+					 */
+					public int getNumOfEdges() {
+						return this.numOfEdges;
+					}
+
+					/**
+					 * 根据索引获取顶点
+					 */
+					public String getVertexByIndex(int index) {
+						return this.vertexList.get(index);
+					}
+
+					/**
+					 * 获取顶点间的权值
+					 */
+					public int getWeight(int v1, int v2) {
+						return this.edges[v1][v2];
+					}
+
+					/**
+					 * 打印图
+					 */
+					public void showGraph() {
+						for (int[] edge : this.edges) {
+							System.out.println(Arrays.toString(edge));
+						}
+					}
+				}
+	5. 图的深度优先遍历
+		① 图遍历介绍：所谓图的遍历，即是对结点的访问。一个图有那么多个结点，如何遍历这些结点，需要特定策略，一般有两种访问策略
+			A. 深度优先遍历
+			B. 广度优先遍历
+		② 深度优先遍历基本思想
+			A. 深度优先遍历，从初始访问结点出发，初始访问结点可能有多个邻接结点，深度优先遍历的策略就是首先访问第一个邻接结点，然后再以这个被访问的邻接结点作为初始结点，
+			访问它的第一个邻接结点， 可以这样理解：每次都在访问完当前结点后首先访问当前结点的第一个邻接结点。
+			B. 可以看到，这样的访问策略是优先往纵向挖掘深入，而不是对一个结点的所有邻接结点进行横向访问。
+			C. 显然，深度优先搜索是一个递归的过程
+		③ 深度优先遍历算法步骤
+			A. 访问初始结点 v，并标记结点 v 为已访问
+			B. 查找结点 v 的第一个邻接结点 w。
+			C. 若 w 存在，则继续执行 4，如果 w 不存在，则回到第 1 步，将从 v 的下一个结点继续。
+			D. 若 w 未被访问，对 w 进行深度优先遍历递归（即把 w 当做另一个 v，然后进行步骤 123）。
+			E. 查找结点 v 的 w 邻接结点的下一个邻接结点，转到步骤 3。
+		④ 案例
+			A. 要求：对下图进行深度优先搜索, 从 A 开始遍历
+							+---+
+							| E |
+							+---+
+							  |
+							  |
+							  |
+							  |
+				+---+		+---+		 +---+
+				| C |-------| B |--------| D |
+				+---+		+---+		 +---+
+				  |			  |
+				  |			  |
+				  |			  |
+				  |			  |
+				  |			+---+		 
+				  +---------| A |
+							+---+
+			B. 代码实现
+				public class Graph {
+					// ...
+					private boolean[] isVisited;
+					
+					/**
+					 * 对所有顶点进行深度优先遍历
+					 */
+					public void dfs() {
+						this.isVisited = new boolean[getNumOfVertex()];
+						for (int i = 0; i < getNumOfVertex(); i++) {
+							if (!isVisited[i]) {
+								dfs(isVisited, i);
+							}
+						}
+					}
+
+					private void dfs(boolean[] isVisited, int i) {
+						// 1.访问初始顶点v
+						System.out.print(getVertexByIndex(i) + "->");
+						// 将顶点v标记为已访问
+						isVisited[i] = true;
+						// 2.查找顶点v的第一个邻接顶点 w
+						int w = getFirstNeighbor(i);
+						// 3.若w存在，则继续执行4，如果w不存在，则回到第1步，将从v的下一个结点继续
+						while (w != -1) {
+							if (!isVisited[w]) {
+								// 4.若w未被访问，对w进行深度优先遍历递归
+								dfs(isVisited, w);
+							}
+							// 5.查找顶点v的邻接顶点w的下一个邻接顶点，转到步骤3
+							w = getNextNeighbor(i, w);
+						}
+					}
+
+					/**
+					 * 获取第一个邻接顶点
+					 */
+					public int getFirstNeighbor(int index) {
+						for (int j = 0; j < getNumOfVertex(); j++) {
+							if (edges[index][j] > 0) {
+								return j;
+							}
+						}
+						return -1;
+					}
+
+					/**
+					 * 根据第一个邻接顶点获取下一个邻接顶点
+					 */
+					public int getNextNeighbor(int v1, int v2) {
+						for (int j = v2 + 1; j < getNumOfVertex(); j++) {
+							if (edges[v1][j] > 0) {
+								return j;
+							}
+						}
+						return -1;
+					}
+				}
+	6. 图的广度优先遍历
+		① 广度优先遍历基本思想
+			A. 图的广度优先搜索(Broad First Search) 
+			B. 类似于一个分层搜索的过程，广度优先遍历需要使用一个队列以保持访问过的结点的顺序，以便按这个顺序来访问这些结点的邻接结点
+		② 广度优先遍历算法步骤
+			A. 访问初始结点 v 并标记结点 v 为已访问
+			B. 结点 v 入队列
+			C. 当队列非空时，继续执行，否则算法结束
+			D. 出队列，取得队头结点 u
+			E. 查找结点u的第一个邻接结点 w
+			F. 若结点u的邻接结点 w 不存在，则转到步骤 3；否则循环执行以下三个步骤：
+				a. 若结点 w 尚未被访问，则访问结点 w 并标记为已访问
+				b. 结点 w 入队列
+				c. 查找结点 u 的继 w 邻接结点后的下一个邻接结点 w，转到步骤 6
+		③ 案例
+			A. 要求：对下图进行广度优先搜索, 从 A 开始遍历
+							+---+
+							| E |
+							+---+
+							  |
+							  |
+							  |
+							  |
+				+---+		+---+		 +---+
+				| C |-------| B |--------| D |
+				+---+		+---+		 +---+
+				  |			  |
+				  |			  |
+				  |			  |
+				  |			  |
+				  |			+---+		 
+				  +---------| A |
+							+---+
+			B. 代码实现
+				public class Graph {
+					// ...
+					
+					public static void main(String[] args) {
+						String[] vertexes = {"A", "B", "C", "D", "E"};
+						Graph graph = new Graph(vertexes.length);
+
+						// 循环添加顶点
+						for (String vertex : vertexes) {
+							graph.insertVertex(vertex);
+						}
+
+						// 添加边
+						// A-B A-C B-C B-D B-E
+						graph.insertEdge(0, 1, 1);
+						graph.insertEdge(0, 2, 1);
+						graph.insertEdge(1, 2, 1);
+						graph.insertEdge(1, 3, 1);
+						graph.insertEdge(1, 4, 1);
+
+						graph.showGraph();
+
+						System.out.println("深度优先遍历");
+						graph.dfs();
+						System.out.println();
+						System.out.println("广度优先遍历");
+						graph.bfs();
+					}
+					
+					/**
+					 * 对所有顶点进行广度优先遍历
+					 */
+					public void bfs() {
+						isVisited = new boolean[getNumOfVertex()];
+						for (int i = 0; i < getNumOfVertex(); i++) {
+							if (!isVisited[i]) {
+								bfs(isVisited, i);
+							}
+						}
+					}
+
+					/**
+					 * 广度优先遍历算法
+					 */
+					private void bfs(boolean[] isVisited, int i) {
+						int u, w;
+						LinkedList<Integer> queue = new LinkedList<>();
+						// 1.访问初始顶点v
+						System.out.print(getVertexByIndex(i) + "->");
+						// 并标记顶点v为已访问
+						isVisited[i] = true;
+						// 2.将顶点v入队列
+						queue.addLast(i);
+						// 3.当队列非空时
+						while (!queue.isEmpty()) {
+							// 4.出队列，取得队头顶点u
+							u = queue.removeFirst();
+							// 5.查找顶点u的第一个邻接结点w
+							w = getFirstNeighbor(u);
+							// 6.若结点u的邻接结点w不存在，则转到步骤3；否则循环执行以下三个步骤：
+							while (w != -1) {
+								if (!isVisited[w]) {
+									// 6.1若结点w尚未被访问，则访问结点w并标记为已访问
+									System.out.print(getVertexByIndex(w) + "->");
+									isVisited[w] = true;
+									// 6.2结点w入队列
+									queue.addLast(w);
+								}
+								// 查找顶点u的邻接顶点w的下一个邻接顶点，转到步骤6
+								w = getNextNeighbor(u, w);
+							}
+						}
+					}
+	7. 图的深度优先VS 广度优先
+		① 应用实例
+							+---+
+							| 1 |
+							+---+
+							  |
+					+---------+---------+
+					|					|
+				  +---+	 			  +---+
+				  | 2 |	 			  | 3 |
+				  +---+	 			  +---+
+					|					|
+			   +----+----+		   +----+----+
+			   |		 |		   |		 |
+			 +---+	   +---+	 +---+	   +---+
+			 | 4 |	   | 5 |	 | 6 |	   | 7 |
+			 +---+	   +---+	 +---+	   +---+
+			   |		 |
+			   +----+----+
+					|
+				  +---+
+				  | 8 |
+				  +---+
+		② 边
+			graph.insertEdge(0, 1, 1);
+			graph.insertEdge(0, 2, 1);
+			graph.insertEdge(1, 3, 1);
+			graph.insertEdge(1, 4, 1);
+			graph.insertEdge(3, 7, 1);
+			graph.insertEdge(4, 7, 1);
+			graph.insertEdge(2, 5, 1);
+			graph.insertEdge(2, 6, 1);
+			graph.insertEdge(5, 6, 1);
+		③ 深度优先遍历顺序为 1->2->4->8->5->3->6->7
+		④ 广度优先算法的遍历顺序为：1->2->3->4->5->6->7->8 

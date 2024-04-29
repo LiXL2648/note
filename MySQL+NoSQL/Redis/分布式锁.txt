@@ -1,0 +1,1049 @@
+一、减库存
+	1. 案例
+		① 库存在并发量较大情况下很容易发生超卖现象，一旦发生超卖现象，就会出现多成交了订单而发不了货的情况。
+		② 商品S库存余量为5时，用户A和B同时来购买一个商品S，此时查询库存数都为5，库存充足则开始减库存：
+			用户A：update db_stock set stock = stock - 1 where id = 1
+			用户B：update db_stock set stock = stock - 1 where id = 1
+		③ 并发情况下，更新后的结果可能是4，而实际的最终库存量应该是3才对
+	2. 环境准备
+		① 建表语句：
+			CREATE TABLE `db_stock` (
+				`id` bigint(20) NOT NULL AUTO_INCREMENT,
+				`product_code` varchar(255) DEFAULT NULL COMMENT '商品编号',
+				`stock_code` varchar(255) DEFAULT NULL COMMENT '仓库编号',
+				`count` int(11) DEFAULT NULL COMMENT '库存量',
+				PRIMARY KEY (`id`)
+			) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8;
+		② 创建工程
+			A. pom.xml
+				<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+				  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+				  <modelVersion>4.0.0</modelVersion>
+				  <parent>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-starter-parent</artifactId>
+					<version>2.7.18</version>
+					<relativePath/> <!-- lookup parent from repository -->
+				  </parent>
+				  <groupId>com.li</groupId>
+				  <artifactId>distributed-lock</artifactId>
+				  <version>1.0-SNAPSHOT</version>
+				  <name>distributed-lock</name>
+				  <description>分布式锁</description>
+
+				  <properties>
+					<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+				  </properties>
+
+				  <dependencies>
+					<dependency>
+					  <groupId>org.springframework.boot</groupId>
+					  <artifactId>spring-boot-starter-web</artifactId>
+					</dependency>
+
+					<dependency>
+					  <groupId>org.springframework.boot</groupId>
+					  <artifactId>spring-boot-starter-test</artifactId>
+					</dependency>
+
+					<dependency>
+					  <groupId>com.baomidou</groupId>
+					  <artifactId>mybatis-plus-boot-starter</artifactId>
+					  <version>3.5.5</version>
+					</dependency>
+
+					<dependency>
+					  <groupId>org.projectlombok</groupId>
+					  <artifactId>lombok</artifactId>
+					  <version>1.18.30</version>
+					  <scope>provided</scope>
+					</dependency>
+
+					<dependency>
+					  <groupId>mysql</groupId>
+					  <artifactId>mysql-connector-java</artifactId>
+					  <version>8.0.32</version>
+					</dependency>
+
+				  </dependencies>
+
+				  <build>
+					<plugins>
+					  <plugin>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-maven-plugin</artifactId>
+					  </plugin>
+					</plugins>
+				  </build>
+				</project>
+			B. 配置文件
+				server:
+				  port: 8080
+				  servlet:
+					context-path: /lock
+
+
+				spring:
+				  datasource:
+					driver-class-name: com.mysql.cj.jdbc.Driver
+					url: jdbc:mysql://localhost:3306/mall
+					username: root
+					password: 2648
+
+				mybatis-plus:
+				  type-aliases-package: com.li
+				  mapper-locations: classpath:mapper/*.xml
+			C. 启动类
+				@SpringBootApplication
+				public class DistributedLockApplication {
+
+					public static void main(String[] args) {
+						SpringApplication.run(DistributedLockApplication.class, args);
+					}
+				}
+			D. 业务代码
+				a. controller 
+					@RestController
+					public class StockController {
+
+						@Resource
+						private StockService stockService;
+
+						@GetMapping("check/lock")
+						public String checkAndLock() {
+							stockService.checkAndLock();
+							return "success";
+						}
+					}
+				b. service
+					public interface StockService {
+						void checkAndLock();
+					}
+				c. service.impl
+					@Service
+					public class StockServiceImpl implements StockService {
+
+						@Resource
+						private StockMapper stockMapper;
+
+						@Override
+						public void checkAndLock() {
+							Stock stock = stockMapper.selectOne(new LambdaQueryWrapper<Stock>().eq(Stock::getProductCode, "1001"));
+							// Stock stock = stockMapper.selectForUpdate("1001");
+							if (stock != null && stock.getCount() > 0) {
+								stock.setCount(stock.getCount() - 1);
+								stockMapper.updateById(stock);
+							}
+						}
+					}
+				d. entity
+					@TableName("db_stock")
+					@Data
+					public class Stock {
+
+						@TableId
+						private Long id;
+
+						private String productCode;
+
+						private String stockCode;
+
+						private Integer count;
+					}
+			E. 启动服务
+			F. 使用浏览器访问：http://localhost/lock/check/lock
+	3. 演示超卖现象
+		① 使用jmeter压力测试工具，高并发下压测一下，添加线程组：并发100循环50次，即5000次请求
+		② 启动测试，数据库库存没减少为0
+		② 出行超卖现象
+二、JVM 本地锁
+	1. JVM本地锁
+		① 使用synchronized关键字或者ReentrantLock，再次执行，并没有发生超卖现象
+		② 代码
+			ReentrantLock lock = new ReentrantLock();
+
+			@Override
+			public void checkAndLock() {
+				lock.lock();
+				try {
+					Stock stock = stockMapper.selectOne(new LambdaQueryWrapper<Stock>().eq(Stock::getProductCode, "1001"));
+					// Stock stock = stockMapper.selectForUpdate("1001");
+					if (stock != null && stock.getCount() > 0) {
+						stock.setCount(stock.getCount() - 1);
+						stockMapper.updateById(stock);
+					}
+				} finally {
+					lock.unlock();
+				}
+			}
+	2. 三种情况导致JVM本地锁失效
+		① 多例模式
+			A. spring 创建的bean默认是单例模式，在 service 上加 @Scope 注解，指定bean的类型为原型模式
+			B. 但是使用@Scope注解，指定bean创建模式是原型模式，仍是单例模式，原因是其默认不使用代理模式，因此需要指定代理模式为
+			ScopedProxyMode.INTERFACES，因为在工程中已为改实现类定义了接口
+				a. ScopedProxyMode.DEFAULT：默认，不使用代理模式
+				a. ScopedProxyMode.NO：不使用代理模式
+				a. ScopedProxyMode.INTERFACES：使用JDK代理，需要定义接口
+				a. ScopedProxyMode.TARGET_CLASS：使用CGLIB代理，不需要定义接口
+			 C. 此时启动jmeter模拟高并发，出行超卖现象
+			 D. 原因：单例模式下，JVM本地锁的对象是同一个，而在多例模式下，锁的对象是多个，因此导致锁失效
+			 E. 代码实例：
+				@Service
+				@Scope(value = "prototype", proxyMode = ScopedProxyMode.INTERFACES)
+				public class StockServiceImpl implements StockService {
+
+					@Resource
+					private StockMapper stockMapper;
+
+					ReentrantLock lock = new ReentrantLock();
+
+					@Override
+					public void checkAndLock() {
+						lock.lock();
+						try {
+							Stock stock = stockMapper.selectOne(new LambdaQueryWrapper<Stock>().eq(Stock::getProductCode, "1001"));
+							// Stock stock = stockMapper.selectForUpdate("1001");
+							if (stock != null && stock.getCount() > 0) {
+								stock.setCount(stock.getCount() - 1);
+								stockMapper.updateById(stock);
+							}
+						} finally {
+							lock.unlock();
+						}
+					}
+				}
+		② 事务
+			A. 使用@Transactional注解定义为该方法开启事务，spring使用aop为方法开启事务
+			B. 具体流程如下
+				+-------+---------------+------------+------------+------------+--------+------------+------------+----------+-----------+--------+----------+
+				| a用户 | begin开启事务 | 获取锁成功 | 查询库存20 | 扣减库存19 | 释放锁 |			 |			  |	提交事务 |  		 |		  |			 |
+				+-------+---------------+------------+------------+------------+--------+------------+------------+----------+-----------+--------+----------+
+				| b用户 | begin开启事务 | 			 |			  |			   |		| 获取锁成功 | 查询库存20 | 		 |扣减库存19 | 释放锁 | 提交事务 |
+				+-------+---------------+------------+------------+------------+--------+------------+------------+----------+-----------+--------+----------+
+			C. MySQL事务的默认隔离级别是可重复度，因此库存即使被扣减，在未提交前，其他事务仍能读取未扣减前的数据
+			D. 将事务的隔离级别修改未读未提交，可解决超卖现象，但是该隔离级别在秒杀场景下存在风险，当库存刚好为1时，事务a扣减库存，未提交时，事务b此时
+			获取库存的数量已为0，当事务a回滚后，事务B扣减失败。具体流程如下
+				SET GLOBAL transaction_isolation = 'READ-UNCOMMITTED';
+				SELECT @@global.tx_isolation;
+				事务a：
+				begin;
+				SELECT * FROM db_stock WHERE id = 1; # 1
+				update db_stock set count = count - 1 where id = 1; # 0
+				事务b:
+				begin;
+				SELECT * FROM db_stock WHERE id = 1; #0
+				事务a：
+				rollback;
+				
+				SET GLOBAL transaction_isolation = 'REPEATABLE-READ';
+			E. 代码实例：
+				@Override
+				@Transactional
+				// @Transactional(isolation = Isolation.READ_UNCOMMITTED)
+				public void checkAndLock() {
+					lock.lock();
+					try {
+						Stock stock = stockMapper.selectOne(new LambdaQueryWrapper<Stock>().eq(Stock::getProductCode, "1001"));
+						// Stock stock = stockMapper.selectForUpdate("1001");
+						if (stock != null && stock.getCount() > 0) {
+							stock.setCount(stock.getCount() - 1);
+							stockMapper.updateById(stock);
+						}
+					} finally {
+						lock.unlock();
+					}
+				}
+		③ 分部署集群
+			A. 启动另外一个服务，并设置端口号8081
+			B. 配置nginx，并启动
+				http {
+					# ...
+					upstream myserver {
+						server localhost:8080;
+						server localhost:8081;
+					}
+					
+					# ...
+					server {
+						# ...
+						location /lock {
+							proxy_pass http://myserver;
+						}
+						
+						# ...
+					}
+					# ...
+				}
+			C. 修改jmeter，并启动压力测试
+			D. 发生超卖现象
+	3. 使用MySQL锁解决超卖
+		① 使用一条SQL语句解决上述三种锁失效场景
+			A. 代码示例
+				@Override
+					public void checkAndLock() {
+						stockMapper.updateStock("1001", 1);
+					}
+				int updateStock(@Param("productCode") String productCode, @Param("count") int count);
+				<update id="updateStock">
+					update db_stock set count = count - #{count} where product_code = #{productCode} and count >= #{count}
+				</update>
+			B. 该SQL在更新时判断库存
+			C. 优点：吞吐量提高
+			D. 缺点
+				a. 锁范围（表级锁），会导致整张表被锁住，如何使用行级锁
+					(1) 锁的查询或者更新条件必须是索引字段
+					(2) 锁的查询或者更新条件必须是具体值
+				b. 同一个商品存在多条库存记录
+				c. 无法记录库存变化前后的状态
+		② 悲观锁
+			A. select ... for update
+			B. 代码示例
+				@Transactional
+				public void checkAndLock() {
+					Stock stock = stockMapper.selectForUpdate("1001");
+					if (stock != null && stock.getCount() > 0) {
+						stock.setCount(stock.getCount() - 1);
+						stockMapper.updateById(stock);
+					}
+				}
+				
+				<select id="selectForUpdate" resultType="com.li.empty.Stock">
+					select * from db_stock where product_code = #{productCode} for update
+				</select>
+			C. 优点
+				a. 解决同一个商品存在多条库存记录的问题
+				b. 可以记录库存变化前后的状态
+			D. 缺点：
+				a. 锁范围（表级锁）
+				b. 性能问题
+				c. 死锁问题：事务a、b，首先事务a对id为1的商品加锁，事务b对id为2的商品加锁，然后事务a对id为2的商品加锁，紧接着事务b对id为1的商品
+				加锁，此时会造成死锁。因此对多条数据加锁时，加锁的顺序要一致
+				d. 库存操作要统一，比如某个事务使用select ... for update，另外的事务使用select，则会导致锁库存失败
+			E. 注意：悲观锁必须在事务下才能生效
+		③ 乐观锁：时间戳和版本号
+			A. CAS机制：compare and swap，比较并交换变量
+			B. 代码示例
+				@Override
+				public void checkAndLock() {
+					Stock stock = stockMapper.selectOne(new LambdaQueryWrapper<Stock>().eq(Stock::getProductCode, "1001"));
+					if (stock != null && stock.getCount() > 0) {
+						Integer version = stock.getVersion();
+						stock.setCount(stock.getCount() - 1);
+						stock.setVersion(version + 1);
+						int update = stockMapper.update(stock, new LambdaQueryWrapper<Stock>().eq(Stock::getProductCode, "1001").eq(Stock::getVersion, version));
+						if (update == 0) {
+							checkAndLock();
+						}
+					}
+				}
+			C. 问题
+				a. 高并发情况下，性能降低
+				b. ABA问题
+				c. 读写分离情况下导致乐观锁不可靠，这是由于读写分离时，MySQL会将写操作记录到binlog日志，从库会监听binlog日志，并将写操作记录到中继日志中，
+				再将写操作在从库中执行，由于进行网络IO，会出现延迟，在高并发下，可能会造成，读取到的版本是旧值，从而引起更新失败重试。
+	4. MySQL锁总结
+		① 性能：一个SQL>悲观锁>JVM锁>乐观锁
+		② 如果追求极致性能、业务场景简单并且不需要记录数据前后变化的情况下，优先选择乐观锁
+		③ 如果写并发较低（多读），争抢不是很激烈的情况下优先选择：乐观锁
+		④ 如果写并发较高，一般会经常冲突，此时选择乐观锁的话，会导致业务代码不断重试，优先选择悲观锁
+		⑤ 不推荐使用 JVM 本地锁
+三、redis分布式锁
+	1. redis超卖
+		① 代码示例
+			<dependency>
+			  <groupId>org.springframework.boot</groupId>
+			  <artifactId>spring-boot-starter-data-redis</artifactId>
+			</dependency>
+			
+			spring:
+			  redis:
+				host: 192.168.26.48
+			
+			@Resource
+			private StringRedisTemplate stringRedisTemplate;
+			@Override
+			public void checkAndLock() {
+				String stock = stringRedisTemplate.opsForValue().get("stock");
+				if (StringUtils.isNotBlank(stock)) {
+					int count = Integer.parseInt(stock);
+					if (count > 0) {
+						stringRedisTemplate.opsForValue().set("stock", String.valueOf(--count));
+					}
+				}
+			}
+	2. redis乐观锁
+		① 指令：watch mutil exec
+			A. watch：可以监听一个或者多个key的值，如果在事务（exec）执行之前，key的值发生变化则取消事务执行
+			B. mutil：开启事务
+			C. exec：执行事务
+		② 使用乐观锁解决超卖
+			A. 代码示例
+				@Override
+				public void checkAndLock() {
+					stringRedisTemplate.execute(new SessionCallback<Object>() {
+						@Override
+						public String execute(RedisOperations operations) throws DataAccessException {
+							// watch
+							operations.watch("stock");
+							String stock = (String) operations.opsForValue().get("stock");
+							if (StringUtils.isNotBlank(stock)) {
+								int count = Integer.parseInt(stock);
+								if (count > 0) {
+									// multi
+									operations.multi();
+									operations.opsForValue().set("stock", String.valueOf(--count));
+									// exec
+									List exec = operations.exec();
+									// 失败重试
+									if (CollectionUtils.isEmpty(exec)) {
+										try {
+											Thread.sleep(50);
+										} catch (InterruptedException e) {
+											e.printStackTrace();
+										}
+										checkAndLock();
+									}
+								}
+							}
+							return null;
+						}
+					});
+				}
+	3. 分布式锁
+		① 场景
+			A. 超卖
+			B. 缓存击穿
+		② 特征
+			A. 独占排他，使用 setnx
+			B. 防止死锁：如果 redis 客户端程序从redis服务中获取锁之后立马宕机，解决：给锁设置过期时间 expire
+			C. 原子性：
+				a. 获取锁和设置过期时间：set key value ex time nx
+				b. 判断和释放锁：lua脚本
+					if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end
+				c. 代码实例：
+					@Override
+					public void checkAndLock() {
+						// 加锁
+						String uuid = UUID.randomUUID().toString();
+						while (Boolean.FALSE.equals(stringRedisTemplate.opsForValue().setIfAbsent("lock", uuid, 30, TimeUnit.SECONDS))) {
+							try {
+								Thread.sleep(20);
+							} catch (InterruptedException e) {
+								throw new RuntimeException(e);
+							}
+						}
+						try {
+							String stock = stringRedisTemplate.opsForValue().get("stock");
+							if (StringUtils.isNotBlank(stock)) {
+								int count = Integer.parseInt(stock);
+								if (count > 0) {
+									stringRedisTemplate.opsForValue().set("stock", String.valueOf(--count));
+								}
+							}
+						} finally {
+							// 解锁
+							String script = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
+							stringRedisTemplate.execute(new DefaultRedisScript<>(script, Boolean.class), Collections.singletonList("lock"), uuid);
+							/*if (uuid.equals(stringRedisTemplate.opsForValue().get("lock"))) {
+								stringRedisTemplate.delete("lock");
+							}*/
+						}
+
+					}
+			D. 防误删：先判断再删除，Lua脚本
+			E. 可重入：hash+Lua脚本
+			F. 自动续期：定时任务（时间驱动Timer定时器）+Lua脚本
+		③ 操作
+			A. 加锁：setnx
+			B. 解锁：del
+			C. 重试：递归、循环
+		④ ReentrantLock（非公平锁）可重入锁原理
+			A. 加锁流程
+				a. CAS 获取锁，如果没有线程占用锁（state==0），加锁成功并记录当前线程是有锁线程
+				b. 如果state不为0，说明锁已经被占用，则判断当前线程是否是有锁线程，如果是则重入（state+1）
+				c. 否则加锁失败，入队等待
+			B. 解锁流程
+				a. 判断当前线程是否是有锁线程，不是则抛出异常
+				b. 对state的值减一后，判断state是否等于0，是则解锁成功，返回true
+				c. 如果减一后的值不为0，则返回false
+		⑤ 参照ReentrantLock非公平可重入锁实现分布式可重入锁：hash+Lua脚本
+			A. 加锁流程
+				a. 判断锁是否存在（exists），如果不存在则直接获取锁 hset key field value
+				b. 如果锁存在则判断是否是自己的锁（hexists），如果是则重入 hincrby key field increment
+				c. 否则重试：递归或循环
+				d. Lua脚本
+					if redis.call('exists', KEYS[1]) == 0 or redis.call('hexists', KEYS[1], ARGV[1]) == 1
+					then
+						redis.call('hincrby', KEYS[1], ARGV[1], 1)
+						redis.call('expire', KEYS[1], ARGV[2])
+						return 1
+					else
+						return 0
+					end
+					
+					if redis.call('exists', KEYS[1]) == 0 or redis.call('hexists', KEYS[1], ARGV[1]) == 1 then redis.call('hincrby', KEYS[1], ARGV[1], 1) redis.call('expire', KEYS[1], ARGV[2]) return 1 else return 0 end
+			B. 解锁流程
+				a. 判断自己的锁是否存在（hexists），不存在则返回0
+				b. 如果自己的锁存在，则减1（hincrby -1），判断减1后是否为0，为0则释放锁（del）并返回1
+				c. 不为0，则返回0
+				d. Lua脚本
+					if redis.call('hexists', KEYS[1], ARGV[1]) == 0
+					then
+						return nil
+					elseif redis.call('hincrby', KEYS[1], ARGV[1], -1) == 0
+					then
+						return redis.call('del', KEYS[1])
+					else return 0
+					end
+					
+					if redis.call('hexists', KEYS[1], ARGV[1]) == 0 then return nil elseif redis.call('hincrby', KEYS[1], ARGV[1], -1) == 0 then return redis.call('del', KEYS[1]) else return 0 end
+		⑥ 自动续期
+			A. 判断自己的锁是否存在（hexists），如果存在则重置过期时间
+			B. Lua脚本
+				if redis.call('hexists', KEYS[1], ARGV[1]) == 1
+				then
+					return redis.call('expire', KEYS[1], ARGV[2])
+				else
+					return 0
+				end
+				
+				if redis.call('hexists', KEYS[1], ARGV[1]) == 1 then return redis.call('expire', KEYS[1], ARGV[2]) else return 0 end
+		⑦ 分布式锁代码实现
+			@Resource
+			private DistributedLock distributedLock;
+
+			@Override
+			public void checkAndLock() {
+				DistributedRedisLock redisLock = distributedLock.getDistributedRedis("lock");
+				redisLock.lock();
+				try {
+					// 查询库存
+					String stock = stringRedisTemplate.opsForValue().get("stock");
+					// 判断库存
+					if (StringUtils.isNotBlank(stock)) {
+						int count = Integer.parseInt(stock);
+						if (count > 0) {
+							// 扣减库存
+							stringRedisTemplate.opsForValue().set("stock", String.valueOf(--count));
+							// testLock();
+							/*try {
+								Thread.sleep(30000);
+							} catch (InterruptedException e) {
+								throw new RuntimeException(e);
+							}*/
+						}
+					}
+				} finally {
+					redisLock.unlock();
+				}
+			}
+			
+			public void testRedisLock() {
+				DistributedRedisLock redisLock = distributedLock.getDistributedRedis("lock");
+				redisLock.lock();
+				System.out.println("testLock");
+				redisLock.unlock();
+			}
+			
+			
+			@Component
+			public class DistributedLock {
+
+				private String uuid;
+
+				public DistributedLock() {
+					this.uuid = UUID.randomUUID().toString();
+				}
+
+				@Resource
+				private StringRedisTemplate stringRedisTemplate;
+
+				public DistributedRedisLock getDistributedRedis(String lockName) {
+					return new DistributedRedisLock(stringRedisTemplate, lockName, uuid);
+				}
+			}
+			
+			public class DistributedRedisLock implements Lock {
+
+				private StringRedisTemplate stringRedisTemplate;
+
+				private String lockName;
+
+				private String uuid;
+
+				private long expire = 30l;
+
+				public DistributedRedisLock(StringRedisTemplate stringRedisTemplate, String lockName, String uuid) {
+					this.stringRedisTemplate = stringRedisTemplate;
+					this.lockName = lockName;
+					this.uuid = uuid + "-" + Thread.currentThread().getId();;
+				}
+
+				public void setStringRedisTemplate(StringRedisTemplate stringRedisTemplate) {
+					this.stringRedisTemplate = stringRedisTemplate;
+				}
+
+				@Override
+				public void lock() {
+					tryLock();
+				}
+
+				@Override
+				public void lockInterruptibly() throws InterruptedException {
+
+				}
+
+				@Override
+				public boolean tryLock() {
+					try {
+						return tryLock(-1L, TimeUnit.SECONDS);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+					return false;
+				}
+
+				/**
+				 * 加锁
+				 */
+				@Override
+				public boolean tryLock(long time, TimeUnit unit) throws InterruptedException {
+					this.expire = time == -1L ? this.expire : unit.toSeconds(time);
+					String script = "if redis.call('exists', KEYS[1]) == 0 or redis.call('hexists', KEYS[1], ARGV[1]) == 1 " +
+									"then " +
+									"   redis.call('hincrby', KEYS[1], ARGV[1], 1) " +
+									"   redis.call('expire', KEYS[1], ARGV[2]) " +
+									"   return 1 " +
+									"else " +
+									"   return 0 " +
+									"end";
+					// 获取锁失败，尝试继续获取锁
+					while (!Boolean.TRUE.equals(stringRedisTemplate.execute(new DefaultRedisScript<>(script, Boolean.class), Collections.singletonList(lockName), this.uuid, String.valueOf(this.expire)))) {
+						Thread.sleep(50);
+					}
+					renewExpire();
+					return true;
+				}
+
+				/**
+				 * 解锁
+				 */
+				@Override
+				public void unlock() {
+					String script = "if redis.call('hexists', KEYS[1], ARGV[1]) == 0 " +
+									"then " +
+									"   return nil " +
+									"elseif redis.call('hincrby', KEYS[1], ARGV[1], -1) == 0 " +
+									"then " +
+									"   return redis.call('del', KEYS[1]) " +
+									"else " +
+									"   return 0 " +
+									"end";
+					if (stringRedisTemplate.execute(new DefaultRedisScript<>(script, Long.class), Collections.singletonList(lockName), uuid) == null) {
+						throw new IllegalMonitorStateException("this lock doesn't belong to you");
+					}
+				}
+
+				@Override
+				public Condition newCondition() {
+					return null;
+				}
+
+				/**
+				 * 自动续期
+				 */
+				private void renewExpire() {
+					String script = "if redis.call('hexists', KEYS[1], ARGV[1]) == 1 " +
+							"then " +
+							"   return redis.call('expire', KEYS[1], ARGV[2]) " +
+							"else " +
+							"   return 0 end";
+					// 开启定时器
+					new Timer().schedule(new TimerTask() {
+						@Override
+						public void run() {
+							Boolean execute = stringRedisTemplate.execute(new DefaultRedisScript<>(script, Boolean.class), Collections.singletonList(lockName), uuid, String.valueOf(expire));
+							if (Boolean.TRUE.equals(execute)) {
+								// 更新成功，则继续开启定时器
+								renewExpire();
+							}
+						}
+					}, this.expire * 1000 / 3);
+				}
+			}
+	4. redisson
+四、zookeeper 实现分布式锁
+	1. 基本指令
+		① 启动zookeeper
+			A. 启动服务：./zkServer.sh
+			B. 启动客户端：./zkCLient.sh
+		② 操作指令
+			A. 查看节点：ls /
+			B. 查看节点内容：get /lixl/hello
+			C. 创建节点：create /lixl
+			D. 新增节点内容：create /lixl/hello world
+			E. 删除节点：delete  /lixl/hello
+			F. 修改节点内容：set /lixl/hello "Hello World"
+		③ 节点类型
+			A. 永久节点（persistent）：客户端与zookeeper断开连接后，该节点依旧存在
+				create /lixl
+			B. 临时节点（ephemeral）：客户端与zookeeper断开连接后，该节点被删除
+				create -e /lixl/yucx ycx
+			C. 永久序列化节点（persistent sequential）：客户端与zookeeper断开连接后，该节点依旧存在，Zookeeper给该节点名称进行顺序编号
+				create -s /lixl/yucx- ycx
+				结果：Created /lixl/yucx-0000000008
+			D. 临时序列化节点（ephemeral sequential）：客户端与zookeeper断开连接后，该节点被删除，Zookeeper给该节点名称进行顺序编号
+				create -s -e /lixl/yucx- ycx
+		③ 节点的事件监听
+			① 节点创建：NodeCreated
+				A. 在A客户端中监听节点创建
+					stat -w /lixl/yucx
+				B. 在B客户端中创建节点
+					create /lixl/yucx ycx
+				C. A客户端中打印
+					WATCHER::
+
+					WatchedEvent state:SyncConnected type:NodeCreated path:/lixl/yucx
+				D. 一次性监听（节约资源）
+			② 节点删除：NodeDeleted
+				A. 在A客户端中监听节点删除
+					stat -w /lixl/yucx
+				B. 在B客户端中删除节点
+					delete /lixl/yucx
+				C. A客户端中打印
+					WATCHER::
+
+					WatchedEvent state:SyncConnected type:NodeDeleted path:/lixl/yucx
+			③ 节点数据变化：NodeDataChanged
+				A. 在A客户端中监听节点数据变化
+					get -w /lixl/yucx
+				B. 在B客户端中修改节点数据
+					set /lixl/yucx "ycx 0829"	
+				C. A客户端中打印
+					WATCHER::
+
+					WatchedEvent state:SyncConnected type:NodeDataChanged path:/lixl/yucx
+			④ 子节点变化
+				A. 在A客户端中监听子节点变化
+					ls -w /lixl
+				B. 在B客户端中删除节点
+					delete /lixl/yucx  
+				C. A客户端中打印
+					WATCHER::
+
+					WatchedEvent state:SyncConnected type:NodeChildrenChanged path:/lixl
+	2. java 客户端
+		① 代码示例：
+			<dependency>
+			  <groupId>org.apache.zookeeper</groupId>
+			  <artifactId>zookeeper</artifactId>
+			  <version>3.9.1</version>
+			</dependency>
+			
+			public void testZookeeper() {
+				ZooKeeper zooKeeper = null;
+				try {
+					// 由于该获取连接是异步执行，防止在外部使用zooKeeper对象空指针
+					// 因此需要使用闭锁进行阻塞
+					// 获取zookeeper连接
+					CountDownLatch countDownLatch = new CountDownLatch(1);
+					zooKeeper = new ZooKeeper("192.168.26.48:2181", 30000, watchedEvent -> {
+
+						Watcher.Event.KeeperState state = watchedEvent.getState();
+						if (Watcher.Event.KeeperState.SyncConnected.equals(state) && Watcher.Event.EventType.None.equals(watchedEvent.getType())) {
+							System.out.println("获取连接");
+							countDownLatch.countDown();
+						} else if (Watcher.Event.KeeperState.Closed.equals(state)) {
+							System.out.println("获取关闭");
+						}
+						// 可在此监听节点事件
+						else {
+							System.out.println("节点事件：" + watchedEvent.getType().toString());
+						}
+					});
+					countDownLatch.await();
+					// 新增节点
+					// 永久
+					zooKeeper.create("/lixl/yucx", "ycx".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+					/*// 临时
+					zooKeeper.create("/lixl/test1", "test1".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+					// 永久序列化
+					zooKeeper.create("/lixl/test2-", "test2".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
+					zooKeeper.create("/lixl/test2-", "test2".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
+					zooKeeper.create("/lixl/test2-", "test2".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
+					// 临时序列化
+					zooKeeper.create("/lixl/test3-", "test3".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+					zooKeeper.create("/lixl/test3-", "test3".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+					zooKeeper.create("/lixl/test3-", "test3".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+					*/
+
+					// 查询节点
+					// 查询判断节点是否存在，绑定事件类似于 stat -w
+					Stat stat = zooKeeper.exists("/lixl/yucx", watchedEvent -> {
+						Watcher.Event.EventType type = watchedEvent.getType();
+						if (Watcher.Event.EventType.NodeCreated.equals(type)) {
+							System.out.println("节点创建");
+						} else if (Watcher.Event.EventType.NodeDeleted.equals(type)) {
+							System.out.println("节点删除");
+						} else if (Watcher.Event.EventType.NodeDataChanged.equals(type)) {
+							System.out.println("节点数据修改");
+						}
+					});
+					if (stat != null) {
+						System.out.println("节点/lixl/yucx存在");
+					} else {
+						System.out.println("节点/lixl/yucx不存在");
+					}
+					// 获取当前节点中的数据，绑定事件类似于 get -w
+					byte[] data = zooKeeper.getData("/lixl/yucx", true, stat);
+					System.out.println("节点/lixl/yucx内容为：" + new String(data));
+					// 获取当前节点的子节点，绑定事件类似于 ls -w
+					List<String> children = zooKeeper.getChildren("/lixl", watchedEvent -> {
+						System.out.println("子结点发生变化");
+					});
+					System.out.println("节点/lixl/yucx的子结点为：" + children);
+
+					// 更新节点：版本号必须和当前节点版本号一致，否则更新失败，也可以指定为-1，代表不关心版本号
+					stat = zooKeeper.setData("/lixl/yucx", "ycx 0829".getBytes(), stat.getVersion());
+
+					// 删除
+					zooKeeper.delete("/lixl/yucx", stat.getVersion());
+					System.in.read();
+				} catch (Exception e) {
+					e.printStackTrace();
+				} finally {
+					if (zooKeeper != null) {
+						try {
+							zooKeeper.close();
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						}
+					}
+				}
+			}
+	3. zooKeeper分布式锁
+		① 实现思路
+			A. 独占排它：利用znode节点不可重复
+			B. 阻塞锁：临时序列化实现公平锁，步骤如下
+				a. 所有请求要求获取锁时，给每一个请求创建临时序列化节点
+				b. 获取当前节点的前置节点，如果前置节点为空，则获取锁成功，否则监听前置节点
+				c. 获取锁成功后，执行业务操作，然后释放当前请求的锁（删除当前节点）
+			C. 可重入：同一线程已经获取该锁的情况下，可重入
+				a. 在节点的内容中记录服务器、线程以及重入信息
+				b. ThreadLocal：线程局部变量，线程私有
+			D. 公平锁：有序性
+		② 与 redis 对比
+			A. 独占排它锁：节点不重复
+			B. 防死锁：
+				a. 客户端程序获取锁之后服务器立马宕机：临时节点，一旦服务端宕机，连接就会关闭，此时ZK心跳检测不到客户端程序，删除客户端程序对应的临时节点
+				b. 不可重入：使用ThreadLocal实现可重入
+			C. 防误删：给每一个请求线程创建一个唯一的序列化节点。
+			D. 原子性：创建节点、删除节点、查询及监听都具备原子性
+			E. 可重复：使用ThreadLocal实现可重入
+			F. 自动续期：ZK中的锁是临时节点没有过期时间
+			G. 单点故障：ZK一般都是集群部署
+			H. ZK集群：偏向一致性原则
+		③ 代码实现
+			@Resource
+			private ZKClient zkClient;
+
+			@Override
+			public void checkAndLock() {
+				DistributedZKLock lock = zkClient.getLock("lock");
+				lock.lock();
+				try {
+					// 查询库存
+					String stock = stringRedisTemplate.opsForValue().get("stock");
+					// 判断库存
+					if (StringUtils.isNotBlank(stock)) {
+						int count = Integer.parseInt(stock);
+						if (count > 0) {
+							// 扣减库存
+							stringRedisTemplate.opsForValue().set("stock", String.valueOf(--count));
+							testZKLock();
+						}
+					}
+				} finally {
+					lock.unlock();
+				}
+			}
+
+			public void testZKLock() {
+				DistributedZKLock lock = zkClient.getLock("lock");
+				lock.lock();
+				System.out.println("测试可重入");
+				lock.unlock();
+			}
+			
+			@Component
+			public class ZKClient {
+
+				private ZooKeeper zooKeeper;
+
+				@PostConstruct
+				public void init() {
+					// 容器启动时，创建连接
+					CountDownLatch countDownLatch = new CountDownLatch(1);
+					try {
+						zooKeeper = new ZooKeeper("192.168.26.48:2181", 30000, watchedEvent -> {
+							Watcher.Event.KeeperState state = watchedEvent.getState();
+							if (Watcher.Event.KeeperState.SyncConnected.equals(state) && Watcher.Event.EventType.None.equals(watchedEvent.getType())) {
+								System.out.println("获取连接");
+								countDownLatch.countDown();
+							} else if (Watcher.Event.KeeperState.Closed.equals(state)) {
+								System.out.println("关闭连接");
+							}
+						});
+						countDownLatch.await();
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+				}
+
+				@PreDestroy
+				public void destroy() {
+					// 释放 zk 连接
+					try {
+						if (zooKeeper != null) {
+							zooKeeper.close();
+						}
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+				}
+
+				public DistributedZKLock getLock(String lockName) {
+					return new DistributedZKLock(zooKeeper, lockName);
+				}
+			}
+			
+			public class DistributedZKLock implements Lock {
+
+				private ZooKeeper zooKeeper;
+
+				private String lockName;
+
+				private String currentNodePath;
+
+				// 存放分布式锁的根路径
+				private static final String ROOT_PATH = "/locks";
+
+				private static final ThreadLocal<Integer> THREAD_LOCAL = new ThreadLocal<>();
+
+				public DistributedZKLock(ZooKeeper zooKeeper, String lockName) {
+					this.zooKeeper = zooKeeper;
+					this.lockName = lockName;
+					// 根节点初始化
+					try {
+						if (zooKeeper.exists(ROOT_PATH, false) == null) {
+							zooKeeper.create(ROOT_PATH, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+						}
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+				}
+
+				@Override
+				public void lock() {
+					tryLock();
+				}
+
+				@Override
+				public void lockInterruptibly() throws InterruptedException {
+
+				}
+
+				@Override
+				public boolean tryLock() {
+					// 创建znode节点的操作
+					// 判断 threaLocal中是否已经有锁，有锁直接重入
+					Integer count = THREAD_LOCAL.get();
+					if (count!= null && count > 0) {
+						THREAD_LOCAL.set(count + 1);
+						return true;
+					}
+					try {
+						// 防止死锁问题，因此创建临时节点
+						// 实现阻塞锁，利用临时序列化
+						currentNodePath = zooKeeper.create(ROOT_PATH + "/" + lockName + "-", null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+						// 获取前置节点，如果前置节点为空，则获取锁成功，否则监听前置节点
+						String preNode = getPreNode();
+						if (preNode != null) {
+							// 使用闭锁实现阻塞
+							CountDownLatch countDownLatch = new CountDownLatch(1);
+							// 再次判断前置节点是否存在，因为获取前置节点操作不具备原子性
+							if (zooKeeper.exists(ROOT_PATH + "/" + preNode, watchedEvent -> {
+								countDownLatch.countDown();
+							}) == null) {
+								THREAD_LOCAL.set(1);
+								return true;
+							}
+							countDownLatch.await();
+						}
+						THREAD_LOCAL.set(1);
+					} catch (Exception e) {
+						e.printStackTrace();
+						/*try {
+							Thread.sleep(50);
+						} catch (InterruptedException ex) {
+							ex.printStackTrace();
+						}
+						// 自选，重新获取连接
+						tryLock();*/
+					}
+					return true;
+				}
+
+				private String getPreNode() throws Exception {
+					// 获取根节点下的所有节点
+					List<String> children = zooKeeper.getChildren(ROOT_PATH, false);
+					if (CollectionUtils.isEmpty(children)) {
+						throw new IllegalMonitorStateException("非法操作");
+					}
+
+					// 获取和当前节点同一资源的锁
+					children = children.stream().filter(node -> StringUtils.startsWith(node, lockName + "-")).collect(Collectors.toList());
+					if (CollectionUtils.isEmpty(children)) {
+						throw new IllegalMonitorStateException("非法操作");
+					}
+
+					// 对锁进行排序
+					Collections.sort(children);
+
+					// 获取当前节点的下标
+					String currentNode = StringUtils.substringAfterLast(currentNodePath, "/");
+					int index = Collections.binarySearch(children, currentNode);
+					if (index < 0) {
+						throw new IllegalMonitorStateException("非法操作");
+					} else if (index > 0) {
+						// 返回前置节点
+						return children.get(index - 1);
+					}
+					//如果当前节点就是第一个节点，则返回 null
+					return null;
+				}
+
+				@Override
+				public boolean tryLock(long time, TimeUnit unit) throws InterruptedException {
+					return false;
+				}
+
+				@Override
+				public void unlock() {
+					// 删除znode节点的操作
+					try {
+						THREAD_LOCAL.set(THREAD_LOCAL.get() - 1);
+						if (THREAD_LOCAL.get() == 0) {
+							zooKeeper.delete(currentNodePath, -1);
+						}
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+				}
+
+				@Override
+				public Condition newCondition() {
+					return null;
+				}
+			}
+	4. Curator
