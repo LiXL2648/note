@@ -1047,3 +1047,200 @@
 				}
 			}
 	4. Curator
+		① 介绍：Netflix贡献给Apache
+		② 两部分组成
+			A. Curator-framework：对 zookeeper的底层做了一些封装
+			B. Curator-recipes：典型应用场景做了一些封装，比如：分布式锁
+		③ 整合Curator
+			A. 依赖
+				<dependency>
+				  <groupId>org.apache.curator</groupId>
+				  <artifactId>curator-framework</artifactId>
+				  <version>5.6.0</version>
+				  <exclusions>
+					<exclusion>
+					  <groupId>org.apache.zookeeper</groupId>
+					  <artifactId>zookeeper</artifactId>
+					</exclusion>
+				  </exclusions>
+				</dependency>
+
+				<dependency>
+				  <groupId>org.apache.curator</groupId>
+				  <artifactId>curator-recipes</artifactId>
+				  <version>5.6.0</version>
+				  <exclusions>
+					<exclusion>
+					  <groupId>org.apache.zookeeper</groupId>
+					  <artifactId>zookeeper</artifactId>
+					</exclusion>
+				  </exclusions>
+				</dependency>
+			B. 配置类
+				@Configuration
+				public class CuratorConfig {
+
+					@Bean
+					public CuratorFramework curatorFramework() {
+						// 初始化重试策略，这里使用的是指数补偿策略，初始间隔时间，重试次数
+						RetryPolicy retryPolicy = new ExponentialBackoffRetry(10000, 3);
+						// 初始化Curator客户端
+						CuratorFramework client = CuratorFrameworkFactory.newClient("192.168.26.48:2181", retryPolicy);
+						// 手动启动，否则很多功能都无法正常使用
+						client.start();
+						return client;
+					}
+				}
+		③ InterProcessMutex：类似于 ReentrantLock可重入锁
+			A. 核心方法
+				public InterProcessMutex(CuratorFramework client, String path)
+				public void acquire()
+				public void release()
+			B. 代码示例
+				@Resource
+				private CuratorFramework curatorFramework;
+
+				@Override
+				public void checkAndLock() {
+					InterProcessMutex mutex = new InterProcessMutex(curatorFramework, "/curator/locks");
+					try {
+						mutex.acquire();
+						// 查询库存
+						String stock = stringRedisTemplate.opsForValue().get("stock");
+						// 判断库存
+						if (StringUtils.isNotBlank(stock)) {
+							int count = Integer.parseInt(stock);
+							if (count > 0) {
+								// 扣减库存
+								stringRedisTemplate.opsForValue().set("stock", String.valueOf(--count));
+								testReentrant(mutex);
+							}
+						}
+					} catch (Exception e) {
+						e.printStackTrace();
+					} finally {
+						try {
+							mutex.release();
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+					}
+				}
+				
+				public void testReentrant(InterProcessMutex mutex) throws Exception {
+					mutex.acquire();
+					System.out.println("测试可重入");
+					mutex.release();
+				}
+			C. InterProcessMutex 底层原理
+				a. InterProcessMutex
+					InterProcessMutex
+						LockInternals internals：LockInternals对象，加锁/解锁
+						String basePath：初始化锁时指定的节点路径
+						ConcurrentMap<Thread, LockData> threadData：记录重入信息
+						
+						class LockData
+							Thread owningThread;
+							String lockPath;
+							AtomicInteger lockCount;
+				b. LockInternals
+					LockInternals
+						int maxLeases：租约，值为1
+						String path：basePath + "lock-"
+						String basePath：初始化锁时指定的节点路径
+		④ InterProcessSemaphoreMutex：不可重入锁
+		⑤ InterProcessReadWriteLock：可重入读写锁
+			A. 读跟读可以并发
+			B. 读跟写不可以并发
+			C. 写跟写不可以并发
+		⑥ InterProcessMultiLock：联锁
+		⑦ InterProcessSemaphoreV2：信号量
+		⑧ 共享计数器
+			SharedCount
+			DistributedAtomicNumber
+				DistributedAtomicInteger
+				DistributedAtomicLong
+五、基于MySQl关系型数据库实现分布式锁
+	1. 原理
+		① redis：基于 key 唯一性
+		② zookeeper：基于 znode节点唯一性
+		③ MySQL：唯一键索引
+	2. 思路
+		① 加锁：INSERT INTO db_lock(lock_name) VALUES('lock');执行成功表示加锁成功
+		② 获取锁成功的请求执行业务操作，执行完成之后通过delete删除对应的记录
+		③ 获取锁失败进行重试：递归
+	3. 代码示例
+		① 建表
+			CREATE TABLE `db_lock` (
+			  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '主键',
+			  `lock_name` varchar(50) NOT NULL COMMENT '锁名称',
+			  PRIMARY KEY (`id`),
+			  UNIQUE KEY `idx_unique` (`lock_name`)
+			) ENGINE=InnoDB AUTO_INCREMENT=34916 DEFAULT CHARSET=utf8mb4;
+		② 实体类
+			@Data
+			@Accessors(chain = true)
+			@TableName("db_lock")
+			public class Lock {
+
+				@TableId(value = "id", type = IdType.AUTO)
+				private Long id;
+
+				private String lockName;
+			}
+		③ Mapper接口
+			@Mapper
+			public interface LockMapper extends BaseMapper<Lock> {
+				
+			}
+		④ 实现类
+			@Resource
+			private LockMapper lockMapper;
+
+			@Override
+			public void checkAndLock() {
+				Lock lock = new Lock().setLockName("lock");
+				try {
+					lockMapper.insert(lock);
+					// 查询库存
+					String stock = stringRedisTemplate.opsForValue().get("stock");
+					// 判断库存
+					if (StringUtils.isNotBlank(stock)) {
+						int count = Integer.parseInt(stock);
+						if (count > 0) {
+							// 扣减库存
+							stringRedisTemplate.opsForValue().set("stock", String.valueOf(--count));
+						}
+					}
+				} catch (Exception e) {
+					e.printStackTrace();
+					// 重试
+					try {
+						Thread.sleep(50);
+					} catch (InterruptedException ex) {
+						throw new RuntimeException(ex);
+					}
+					checkAndLock();
+				} finally {
+					lockMapper.deleteById(lock.getId());
+				}
+			}
+	4. MySQL分布式锁存在问题及解决方案
+		① 独占排它互斥使用：唯一键索引
+		② 防死锁：
+			A. 客户端程序获取到锁之后，客户端程序的服务宕机，给锁记录添加一个获取锁的时间列（lock_time），使用服务器外的定时器判断该锁是否超时，超时则删除该锁
+			B. 不可重入：实现MySQL分布式锁可重入，记录服务器信息（server_info）及线程信息（thread_info），和重入次数（count）
+		③ 防误删：借助于自增主键id的唯一性防误删
+		④ 原子性：一个写操作是一个事务，具有原子性，若多个写操作，可借助MySQL的悲观锁
+		⑤ 可重入
+		⑥ 自动续期：服务器内的定时器重置获取锁的时间
+		⑦ 单机故障问题：搭建MySQL的主从
+		⑧ 集群情况下锁机制失效问题
+	5. 总结
+		① 建议程度：MySQL>Redis>ZooKeeper
+		② 性能：Redis>ZooKeeper>MySQL
+		③ 可靠性：ZooKeeper>Redis=MySQL
+		④ 如何选择
+			A. 追求性能：Redis
+			B. 追求可靠性：ZooKeeper
+			C. 对性能和可靠性要求不高，则使用MySQL

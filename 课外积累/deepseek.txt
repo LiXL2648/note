@@ -1,0 +1,18 @@
+一、DeepSeek 的几种使用方式
+	1. 网页版：https://chat.deepseek.com/
+	2. 下载 DeepSeek App
+	3. 高阶使用
+		① 调用API+DeepSeek服务器
+			A. 特点：灵活
+			B. 网址：https://platform.deepseek.com/usage
+			C. 接口文档地址：https://api-docs.deepseek.com/
+		② 第三方平台
+			A. 特点：不卡顿
+				a. 硅基流动：
+				b. 秘搭搜索：
+				c. 百度千帆：
+			B. 举例
+		③ GitHub 直接拉模式，本地算力部署
+			A. 特点：模型的蒸馏，离线使用，数据安全，完全免费
+			B. 工具：Ollama + ChatBox/Anything LLM
+			C. 模型下载地址：https://github.com/deeps-ai
